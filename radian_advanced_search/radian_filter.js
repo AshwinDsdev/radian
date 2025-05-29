@@ -248,6 +248,29 @@
    */
 
 
+  async function checkNumbersBatch(numbers) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        EXTENSION_ID,
+        {
+          type: "queryLoans",
+          loanIds: numbers,
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            return reject(chrome.runtime.lastError.message);
+          } else if (response.error) {
+            return reject(response.error);
+          }
+
+          const available = Object.keys(response.result).filter(
+            (key) => response.result[key]
+          );
+          resolve(available);
+        }
+      );
+    });
+  }
 
 
   /**
