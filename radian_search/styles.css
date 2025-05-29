@@ -1,200 +1,487 @@
-/* Main Styles for Radian Search */
-body {
-    font-family: Arial, Helvetica, sans-serif;
+/* Basic Reset and Body Styles */
+body, html {
     margin: 0;
     padding: 0;
-    background-color: #f5f5f5;
-    color: #333;
-}
-
-.container-sc {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* Header Styles */
-.sc-fjWFkj {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.sc-bLjspH {
-    display: flex;
-    align-items: center;
-}
-
-.sc-dsbZNW {
-    display: flex;
-    align-items: center;
-}
-
-/* Search Box Styles */
-.sc-cAvGjs {
-    position: relative;
-    margin-right: 20px;
-}
-
-.sc-suerX {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    width: 250px;
-}
-
-/* Form Styles */
-form {
-    margin-top: 20px;
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.sc-etHFsQ, .sc-bzyfJx, .sc-jjbsrS {
-    margin-bottom: 15px;
-}
-
-.sc-kwYMOK {
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-/* Button Styles */
-.sc-fvNoK {
-    margin-top: 20px;
-    text-align: center;
-}
-
-button.sc-eOrxMY {
-    background-color: #00807A;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 16px;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f4f4f4;
 }
 
-button.sc-eOrxMY:hover {
-    background-color: #006c66;
-}
-
-/* Table Styles */
-.sc-drIVue {
-    margin-top: 30px;
-}
-
-table.sc-jBIHhB {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th.sc-dkBYrC, td.sc-kXOizl {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-th.sc-dkBYrC {
-    background-color: #f8f8f8;
-    font-weight: bold;
-}
-
-tr:hover {
-    background-color: #f5f5f5;
-}
-
-/* Footer Styles */
-.sc-khmTKb {
-    margin-top: 40px;
-    padding: 20px 0;
-    background-color: #f8f8f8;
-    border-top: 1px solid #e0e0e0;
-}
-
-footer.sc-jxwAOl {
-    display: flex;
-    justify-content: space-between;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-}
-
-/* Links */
 a {
-    color: #00807A;
     text-decoration: none;
+    color: #007bff;
 }
 
 a:hover {
     text-decoration: underline;
 }
 
-/* Modal Styles */
-.sc-jlvdqA {
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Container for the whole app */
+#mionline-container-sc {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header Styles */
+.sc-fjWFkj { /* Original: gUCoPx - Main header bar */
+    background-color: #ffffff;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.sc-bLjspH { /* Original: ehLEEb - Logo container */
+    display: flex;
+    align-items: center;
+}
+
+.sc-bLjspH img { /* Logos */
+    margin-right: 15px;
+}
+
+.sc-gQPmIy { /* Original: dOECFp - MI Online Logo */
+    height: 40px;
+    width: auto;
+}
+.sc-faqbys { /* Original: fhjAJg - Separator image? */
+    /* Assuming this is a visual separator, might need specific styling or replacement */
+    height: 30px;
+    opacity: 0.5;
+}
+.sc-dtxua-d { /* Original: bQZMUS - Radian Logo */
+    height: 35px;
+    width: auto;
+}
+
+
+/* Header Right Section (Search, Contact, Profile) */
+.sc-dsbZNW { /* Original: iArNxs - Container for search, contact, profile */
+    display: flex;
+    align-items: center;
+}
+
+/* Search Bar in Header */
+.sc-cAvGjs { /* Original: hOnLDi - Search input container */
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 8px;
+}
+
+.sc-suerX { /* Original: kzCUeD - Search input */
+    border: none;
+    outline: none;
+    padding: 5px;
+    font-size: 14px;
+}
+
+.sc-cAvGjs svg { /* Search icon */
+    fill: #002b49;
+    cursor: pointer;
+}
+
+/* Contact Info in Header */
+.sc-bpHLwy { /* Original: gMeVH - Phone number container */
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+    font-size: 14px;
+    color: #002b49;
+}
+.sc-bpHLwy svg {
+    margin-right: 8px;
+}
+.sc-fLzJWX { /* Original: cBQHhY - Phone number text */
+    font-weight: bold;
+}
+
+.sc-ZXAPV { /* Original: cagSrw - Email and Chat icons */
+    display: flex;
+    align-items: center;
+}
+.sc-ZXAPV a, .sc-ZXAPV svg {
+    margin-left: 10px;
+    color: #002b49;
+    cursor: pointer;
+}
+.sc-ZXAPV svg:hover path{
+    fill: #0056b3;
+}
+
+
+/* Profile Dropdown */
+.sc-gVALFP { /* Original: kAYHMn - Profile section container */
+    position: relative;
+    margin-left: 20px;
+}
+
+.sc-jgqiaS { /* Original: gxMGeg - Profile button/link */
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+.sc-jgqiaS:hover {
+    background-color: #e9ecef;
+}
+
+.sc-cmMxcv { /* Original: emBQzb - Profile icon container */
+    margin-right: 8px;
+}
+.sc-cmMxcv svg {
+    width: 22px;
+    height: 22px;
+    stroke: #002b49; /* Assuming default stroke color */
+    fill: none; /* Assuming icon is outline */
+}
+.sc-cmMxcv svg path[fill=""] { /* Target paths that should be filled by parent or CSS */
+   fill: #002b49;
+}
+
+
+.sc-bXSgPt { /* Original: faLlFi - Profile text */
+    font-size: 14px;
+    color: #002b49;
+}
+
+.sc-dRWtrI { /* Original: eyTfHN - Profile dropdown menu */
+    display: none; /* Hidden by default, shown by JS */
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    min-width: 200px;
+    padding: 10px 0;
+}
+.sc-gVALFP:hover .sc-dRWtrI, /* Show on hover for now, JS will handle click */
+.sc-gVALFP.active .sc-dRWtrI { /* Class added by JS */
+    display: block;
+}
+
+
+.sc-iPEYie { /* Original: cTmOFa - Dropdown list item */
+    /* list-style-type: none; is already in ul reset */
+}
+
+.sc-hqXMut { /* Original: hKSFjB - Dropdown link */
+    display: block;
+    padding: 8px 15px;
+    color: #333;
+    font-size: 14px;
+    white-space: nowrap;
+}
+.sc-hqXMut:hover {
+    background-color: #f0f0f0;
+    text-decoration: none;
+}
+.sc-jlbYWI { /* Original: biqJox - Change password container */
+    /* Styles for the two-line text if needed */
+}
+.sc-jlbYWI .msg { /* Expires in X days message */
+    font-size: 0.8em;
+    color: #777;
+}
+
+/* Main Content Area */
+.main {
+    display: flex;
+    flex-grow: 1; /* Takes remaining height */
+    background-color: #e9ecef; /* Light background for content area */
+}
+
+/* Sidenav */
+.sidenav {
+    width: 250px; /* Default width */
+    background-color: #002b49; /* Dark blue */
+    color: white;
+    padding: 20px 0;
+    transition: width 0.3s ease;
+}
+.sidenav.collapsed {
+    width: 60px; /* Width when collapsed */
+}
+.sidenav.collapsed .sc-kIsWfj div,
+.sidenav.collapsed .sc-kIsWfj span, /* if text is in span */
+.sidenav.collapsed .sc-eEPoex li > a:not(.sc-kBWpzf img) { /* Target text part of link */
+    display: none;
+}
+.sidenav.collapsed .sc-kBWpzf { /* Toggle button container */
+    justify-content: center;
+}
+.sidenav.collapsed .sc-hyYNNQ { /* Chevron icon */
+    transform: rotate(180deg);
+}
+
+
+.sc-cgKfJC { /* Original: kjxZdk - Nav element */
+    /* No specific style needed here, ul will handle items */
+}
+
+.sc-eEPoex { /* Original: bAEyFO - Main nav UL */
+    /* ul reset handles base */
+}
+
+.sc-kBWpzf { /* Original: jfFUJD - Sidenav toggle container */
+    padding: 0 15px 15px 15px;
+    text-align: right;
+    cursor: pointer;
+    display: flex;
+    justify-content: flex-end;
+}
+.sc-hyYNNQ { /* Original: KjCsb - Chevron icon for sidenav toggle */
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+}
+
+
+.sc-eEPoex li {
+    /* General list item styling if needed */
+}
+
+.sc-kIsWfj { /* Original: djsgz - Nav link / button */
+    display: flex; /* Use flex for icon and text alignment */
+    align-items: center;
+    padding: 12px 20px;
+    color: white;
+    font-size: 15px;
+    border: none; /* If it's a button */
+    background: none; /* If it's a button */
+    width: 100%; /* If it's a button */
+    text-align: left; /* If it's a button */
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.sc-kIsWfj:hover {
+    background-color: #00406b; /* Slightly lighter blue on hover */
+    text-decoration: none;
+}
+.sc-kIsWfj div { /* Text part of the link/button */
+    flex-grow: 1;
+}
+.sc-kIsWfj svg { /* Chevron for dropdowns */
+    margin-left: auto; /* Pushes icon to the right */
+    transition: transform 0.3s ease;
+}
+
+/* Sidenav Dropdown */
+.sc-iGMcjw { /* Original: dtDFZN - Dropdown LI container */
+    position: relative;
+}
+.sc-iGMcjw.open > .sc-kIsWfj svg { /* Rotate chevron when open */
+    transform: rotate(180deg);
+}
+
+.sc-cngMpG { /* Original: fBOVvP - Dropdown UL */
+    display: none; /* Hidden by default */
+    background-color: #003554; /* Slightly different background for submenu */
+    padding-left: 20px; /* Indent submenu items */
+}
+.sc-iGMcjw.open > .sc-cngMpG {
+    display: block;
+}
+
+.sc-fMCCA-d { /* Original: cVZhJY - Dropdown sub-item LI */
+    /* No specific style needed here */
+}
+.sc-fMCCA-d .sc-kIsWfj { /* Sub-item links */
+    padding: 10px 20px 10px 15px; /* Adjust padding for sub-items */
+    font-size: 14px;
+}
+
+
+/* Content Menu (iframe area) */
+.contentmenu {
+    flex-grow: 1;
+    padding: 20px;
+    background-color: #ffffff; /* White background for content */
+    overflow-y: auto; /* Scroll if content overflows */
+}
+
+.iFrameClass {
+    border: none; /* Remove iframe border */
+    width: 100%;
+    height: 100%; /* Make iframe fill container, adjust height via JS or parent */
+    min-height: 70vh; /* Ensure it has some height */
+}
+
+/* Footer Styles */
+.sc-khmTKb { /* Original: koUyOo - Footer wrapper */
+    background-color: #343a40; /* Dark footer */
+    color: #f8f9fa; /* Light text */
+    padding: 20px;
+    font-size: 14px;
+}
+
+.sc-jxwAOl { /* Original: EuSJr - Footer content */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px; /* Optional: constrain footer width */
+    margin: 0 auto; /* Center footer content */
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.sc-jgSARk { /* Original: ecmEQZ - Copyright text */
+    margin-right: 20px; /* Space between copyright and links */
+}
+.sc-jgSARk .ui-provider span {
+    background-color: transparent !important; /* Override inline styles */
+    color: #f8f9fa !important;
+}
+
+
+.sc-dIPoqc { /* Original: cSbodo - Footer links container */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.sc-dIPoqc span { /* Each link group */
+    display: flex;
+    align-items: center;
+}
+
+.sc-ieHmQB { /* Original: fkBWlM - Footer link */
+    color: #adb5bd; /* Lighter gray for links */
+    margin: 0 10px;
+}
+.sc-ieHmQB:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.sc-fLuVjC { /* Original: gVOGHl - Separator for footer links */
+    margin: 0 5px;
+    color: #00A6A0; /* Teal color from original */
+}
+.sc-fLuVjC svg path {
+    fill: #00A6A0 !important; /* Ensure fill from original */
+}
+
+
+/* Modal Styles (Basic Structure) */
+.mio-modal { /* Original: sc-jlvdqA fESObR - Modal container, might be hidden by default */
+    display: none; /* Controlled by JS */
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: none;
+    background-color: rgba(0,0,0,0.5); /* Semi-transparent overlay */
+    z-index: 2000;
     justify-content: center;
     align-items: center;
 }
+.mio-modal.active {
+    display: flex;
+}
 
-.sc-gdZYDh {
+.sc-gdZYDh { /* Original: fszqUU - Modal dialog box */
     background-color: white;
     padding: 20px;
-    border-radius: 4px;
-    max-width: 500px;
-    width: 100%;
+    border-radius: 5px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 50%; /* From original inline style */
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: #333; /* Reset text color for modal content */
 }
 
-/* SVG Icons */
-svg {
-    vertical-align: middle;
+.sc-iVWIdN { /* Original: hGcPpF - Modal header */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
 }
 
-/* Checkbox Styles */
-.sc-dOUtaJ {
-    margin-right: 8px;
+.sc-kXkCoi { /* Original: cCEPgb - Modal title */
+    font-size: 1.25rem;
+    margin: 0;
 }
 
-/* Date Input Styles */
-.sc-keRagD {
-    width: 100%;
-    padding: 8px 0;
-    border-bottom: 1px solid #ccc;
+.sc-cEjDvn { /* Original: gOcFlF - Modal close button container */
+    cursor: pointer;
+}
+.sc-cEjDvn svg {
+    width: 24px; /* Adjust size as needed */
+    height: 24px;
+}
+.sc-cEjDvn svg path {
+    fill: #555; /* Close icon color */
+}
+.sc-cEjDvn:hover svg path {
+    fill: #000;
 }
 
-.sc-gkCgsS {
+
+.sc-fHLMLc { /* Original: cscYEw - Modal content area */
+    margin-bottom: 20px;
+}
+.sc-epUwMn { /* Original: gUBbaA - Modal paragraph */
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.sc-epUwMn span {
+    background-color: transparent !important; /* Override inline styles */
+    color: inherit !important;
+}
+
+
+.sc-cmtsID { /* Original: demnhc - Modal footer/actions */
+    text-align: right;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.sc-dOUtaJ { /* Original: fyZudU - Modal close button */
+    padding: 8px 20px;
+    background-color: #6c757d;
+    color: white;
     border: none;
-    width: 100%;
-    padding: 8px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.sc-dOUtaJ:hover {
+    background-color: #5a6268;
 }
 
-/* Responsive Styles */
-@media (max-width: 768px) {
-    .sc-fjWFkj {
-        flex-direction: column;
-    }
-    
-    .sc-dsbZNW {
-        margin-top: 15px;
-    }
-    
-    .sc-suerX {
-        width: 100%;
-    }
-    
-    table.sc-jBIHhB {
-        display: block;
-        overflow-x: auto;
-    }
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+/* Remove GTM, Qualtrics feedback button for a cleaner look */
+/* If these are needed, they should be styled appropriately */
+#ZN_9SGDvpg2Y5SF8zk, .QSIFeedbackButton {
+    display: none !important;
+}
+
+/* Placeholder for favicon if original is unavailable */
+link[rel="shortcut icon"][href*="undefined"] {
+    /* Could replace with a default or remove if not fixable */
 }
