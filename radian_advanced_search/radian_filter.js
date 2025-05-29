@@ -246,8 +246,7 @@
    * @param {string[]} numbers - Array of loan numbers to check
    * @returns {Promise<string[]>} Promise that resolves to an array of allowed loan numbers
    */
-
-
+ 
   async function checkNumbersBatch(numbers) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -271,6 +270,7 @@
       );
     });
   }
+
 
 
   /**
@@ -743,6 +743,9 @@
   async function initialize() {
     try {
       console.log("[radian_filter] Initializing filter script");
+
+      const listener = await waitForListener()
+      if(!listener) return;
       
       // Wait for the table to be available before processing
       const waitForTable = async (maxAttempts = 10, delay = 300) => {
@@ -769,9 +772,6 @@
       
       // Give the table a moment to fully render with all its content
       setTimeout(async () => {
-
-        const listener = await waitForListener();
-        if(!listener) return;
         // Process page will handle showing the page after filtering
         await processPage();
         
