@@ -1,0 +1,70 @@
+/* -----------------------------------------------------------------------------
+   Utilities : Template
+   -------------------------------------------------------------------------- */
+
+/**
+ * Template utilities for adding structure to application documents.
+ */
+
+.u-container {
+  margin: 0 auto;
+  width: 960px;
+}
+
+.comment_style {
+    white-space: normal;
+}
+
+.lt-ie8 .u-container {
+    zoom: 1;
+}
+
+.u-container:after,
+.u-container:before {
+  display: table;
+
+  content: "";
+}
+
+.u-container:after {
+  clear: both;
+}
+
+/**
+ * Modifier: Add some right/left padding to 'container' element.
+ */
+
+.u-container--condensed {
+  padding-right: 10px;
+  padding-left: 10px;
+  width: 990px;
+}
+
+.u-container--spacing {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+/**
+ * Add a bit more padding to a container.
+ */
+
+.u-container--thick {
+  padding-left: 20px;
+  padding-right: 20px;
+  width: 940px;
+}
+
+/**
+ * Stretch a component out of its bounds
+ */
+
+.u-container--stretch {
+  width: 980px;
+}
+
+.u-container--small {
+  padding-right: 10px;
+  padding-left: 10px;
+  width: 740px;
+}

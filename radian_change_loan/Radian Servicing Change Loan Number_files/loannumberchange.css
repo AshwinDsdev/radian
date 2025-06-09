@@ -1,0 +1,36 @@
+﻿.sectionSeperatorHeader
+{
+    font-size: 10px;
+    font-weight: bold;
+    font-family: Arial;
+    display: block;
+    margin: 10px 0px 1px 0px; /* top right bottom left */
+    /*background-color: #CAE49C;*/
+    background-color: #f2f3f3;
+    border-right: solid #9DB1C6 1px;
+    border-bottom: solid #9DB1C6 1px;
+    clear: both;
+    width: 90%;
+}
+
+.sectionSeperatorHeader table
+{
+    padding: 0;
+    border: 0;
+}
+
+.sectionSeperatorHeader td
+{
+    padding: 4px 4px 5px 4px;
+    /*color: #666666;*/
+     color: #8c0c04;
+}
+
+.error
+{
+    color: #990000;
+    /*font-weight: bold;*/
+    font-family: 'Messina Sans';
+    font-size: 13px;
+    width: 120px;
+}

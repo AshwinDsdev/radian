@@ -1,0 +1,98 @@
+/* -----------------------------------------------------------------------------
+   Modules : Logo
+   -------------------------------------------------------------------------- */
+
+.MI-Logo {
+  display: inline-block;
+}
+
+/* Children
+   -------------------------------------------------------------------------- */
+
+.MI-Logo img {
+  vertical-align: bottom;
+}
+
+/* Modifiers
+   -------------------------------------------------------------------------- */
+
+/**
+ * Positioning
+ *
+ * Immediate ancestor html node needs to have a position context of 'relative'
+ * to position properly.
+ */
+
+.MI-Logo--right {
+  bottom: 0;
+  position: absolute;
+  right: 0;
+}
+.MI-Search-right {
+    bottom: -22px;
+    position: absolute;
+    padding-right: 159px;
+    right: -12px;
+  
+}
+
+.MI-Search-mid {
+    bottom: 0;
+    position: absolute;
+    padding-right: 135px;
+    right: 0;
+    line-height: 0;
+    bottom: -23px;
+}
+
+/**
+ * Display specific application logos.
+ */
+
+
+.MI-Logo--miOnline,
+.MI-Logo--radian,
+.MI-Logo--radianFull,
+.MI-Logo--byteSoftware {
+  background-repeat: no-repeat;
+}
+
+.MI-Logo--miOnline {
+    height: 40px;
+    width: 230px;
+    background-image: url("https://radian.secure.force.com/servlet/servlet.FileDownload?file=0153c000004RgdJ");
+    margin-bottom: -10px;
+}
+
+.MI-Logo--radian {
+    height: 37px;
+    width: 121px;
+    background-image: url("../../../images/radian-logo.png");
+    background-size: 121px 37px;
+    bottom: -15px;
+}
+
+.MI-Logo--radianFull {
+    height: 50px;
+    width: 123px;
+    background-image: url("../../../images/radian-logo-login.png");
+    background-size: 123px 50px;
+}
+
+.MI-Logo--byteSoftware {
+    height: 32px;
+    width: 208px;
+    background-image: url("../../../images/reskin/mi-online-sprite.png");
+    background-position: 0 -285px;
+}
+
+.MI-LiveHelpLogos{
+    width:25px;
+    height:23px;
+}
+
+.MI-Separator {
+    height: 20px;
+    width: 2px;
+    margin: 1px;
+}

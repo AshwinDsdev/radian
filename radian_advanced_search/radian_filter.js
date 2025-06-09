@@ -234,11 +234,10 @@
    * @description Checks if the user has access to a batch of loan numbers
    * @param {string[]} numbers - Array of loan numbers to check
    * @returns {Promise<string[]>} Promise that resolves to an array of allowed loan numbers
-   * 
-   * 
+   *
+   *
    */
 
-  
   /**
    * @async
    * @function checkNumbersBatch
@@ -246,7 +245,7 @@
    * @param {string[]} numbers - Array of loan numbers to check
    * @returns {Promise<string[]>} Promise that resolves to an array of allowed loan numbers
    */
- 
+
   async function checkNumbersBatch(numbers) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -271,8 +270,6 @@
     });
   }
 
-
-
   /**
    * @async
    * @function isLoanNumberAllowed
@@ -282,9 +279,13 @@
    */
   async function isLoanNumberAllowed(loanNumber) {
     try {
-
-      if (allowedLoansCache.isCacheValid() && allowedLoansCache.isAllowed(loanNumber)) {
-        console.log(`[radian_filter] Loan ${loanNumber} is allowed (from cache)`);
+      if (
+        allowedLoansCache.isCacheValid() &&
+        allowedLoansCache.isAllowed(loanNumber)
+      ) {
+        console.log(
+          `[radian_filter] Loan ${loanNumber} is allowed (from cache)`
+        );
         return true;
       }
 
@@ -297,13 +298,14 @@
     }
   }
 
-
   function createUnallowedElement() {
     const unallowed = document.createElement("tr");
     const td = document.createElement("td");
     td.setAttribute("colspan", "7");
     td.appendChild(
-      document.createTextNode("You are not provisioned to see the restricted loan")
+      document.createTextNode(
+        "You are not provisioned to see the restricted loan"
+      )
     );
     td.style.textAlign = "center";
     td.style.padding = "15px";
@@ -370,14 +372,14 @@
       if (!this.row.cells || this.row.cells.length === 0) {
         return null;
       }
-      
+
       // Find the loan number by checking the header row
-      const table = this.row.closest('table');
+      const table = this.row.closest("table");
       if (!table) {
         return null;
       }
-      
-      const headerRow = table.querySelector('thead tr');
+
+      const headerRow = table.querySelector("thead tr");
       if (!headerRow) {
         // Fallback to the 3rd column if header row not found
         if (this.row.cells.length >= 3) {
@@ -385,27 +387,27 @@
         }
         return null;
       }
-      
+
       // Find the index of the "Loan Number" column
       let loanNumberIndex = -1;
       const headerCells = headerRow.cells;
       for (let i = 0; i < headerCells.length; i++) {
-        if (headerCells[i].textContent.trim() === 'Loan Number') {
+        if (headerCells[i].textContent.trim() === "Loan Number") {
           loanNumberIndex = i;
           break;
         }
       }
-      
+
       // If we found the loan number column and the row has that many cells
       if (loanNumberIndex !== -1 && this.row.cells.length > loanNumberIndex) {
         return this.row.cells[loanNumberIndex].textContent.trim();
       }
-      
+
       // Fallback to the 3rd column (index 2) if we couldn't find it by header
       if (this.row.cells.length >= 3) {
         return this.row.cells[2].textContent.trim();
       }
-      
+
       return null;
     }
 
@@ -417,21 +419,27 @@
      */
     async filter() {
       if (!this.loanNumber) {
-        console.log('[radian_filter] No loan number to check');
+        console.log("[radian_filter] No loan number to check");
         return false;
       }
 
-      console.log('[radian_filter] Checking if loan number is allowed:', this.loanNumber);
+      console.log(
+        "[radian_filter] Checking if loan number is allowed:",
+        this.loanNumber
+      );
       const isAllowed = await isLoanNumberAllowed(this.loanNumber);
-      console.log('[radian_filter] Loan number check result:', { loanNumber: this.loanNumber, isAllowed });
+      console.log("[radian_filter] Loan number check result:", {
+        loanNumber: this.loanNumber,
+        isAllowed,
+      });
 
       if (!isAllowed) {
-        console.log('[radian_filter] Loan number not allowed, hiding row');
+        console.log("[radian_filter] Loan number not allowed, hiding row");
         this.hide();
         return true;
       }
 
-      console.log('[radian_filter] Loan number allowed, showing row');
+      console.log("[radian_filter] Loan number allowed, showing row");
       return false;
     }
 
@@ -443,23 +451,25 @@
       if (this.parent && this.row) {
         try {
           // Get the number of columns from the table header
-          const table = this.row.closest('table');
+          const table = this.row.closest("table");
           let columnCount = 7; // Default fallback
-          
+
           if (table) {
-            const headerRow = table.querySelector('thead tr');
+            const headerRow = table.querySelector("thead tr");
             if (headerRow && headerRow.cells) {
               columnCount = headerRow.cells.length;
             }
           }
-          
+
           // Log the removal for debugging
-          console.log(`[radian_filter] Removing row with loan number: ${this.loanNumber}, column count: ${columnCount}`);
-          
+          console.log(
+            `[radian_filter] Removing row with loan number: ${this.loanNumber}, column count: ${columnCount}`
+          );
+
           // Remove the row
           this.parent.removeChild(this.row);
         } catch (error) {
-          console.error('[radian_filter] Error removing row:', error);
+          console.error("[radian_filter] Error removing row:", error);
         }
       }
     }
@@ -495,7 +505,7 @@
       pageUtils.showPage(true);
       return;
     }
-    
+
     const columnCount = headerRow.cells.length;
     console.log(`[radian_filter] Table has ${columnCount} columns`);
 
@@ -513,26 +523,28 @@
         allowedRows.push(row); // Keep message rows
         continue;
       }
-      
+
       // Process data rows (rows with multiple cells)
       if (row.cells.length > 1) {
         dataRowsCount++;
-        
+
         // Extract loan number from the row (3rd column, index 2)
         let loanNumber = null;
         if (row.cells.length > 2) {
           loanNumber = row.cells[2].textContent.trim();
         }
-        
+
         if (!loanNumber) {
           console.log("[radian_filter] No loan number found in row");
           allowedRows.push(row); // Keep rows without loan numbers
           continue;
         }
-        
-        console.log(`[radian_filter] Processing row with loan number: ${loanNumber}`);
+
+        console.log(
+          `[radian_filter] Processing row with loan number: ${loanNumber}`
+        );
         const isAllowed = await isLoanNumberAllowed(loanNumber);
-        
+
         if (isAllowed) {
           allowedRows.push(row); // Keep allowed rows
         } else {
@@ -543,11 +555,13 @@
       }
     }
 
-    console.log(`[radian_filter] Processed ${dataRowsCount} rows, removed ${dataRowsRemoved} unauthorized rows`);
+    console.log(
+      `[radian_filter] Processed ${dataRowsCount} rows, removed ${dataRowsRemoved} unauthorized rows`
+    );
 
     // Clear the tbody and add only the allowed rows
-    tbody.innerHTML = '';
-    
+    tbody.innerHTML = "";
+
     // Add the allowed rows back to the table
     if (allowedRows.length === 0) {
       // Check if this was a case where we had exactly one row that was restricted
@@ -556,9 +570,13 @@
         // Use the existing createUnallowedElement function
         const unallowedElement = createUnallowedElement();
         // Make sure the colspan matches the current table
-        unallowedElement.querySelector('td').setAttribute("colspan", columnCount.toString());
+        unallowedElement
+          .querySelector("td")
+          .setAttribute("colspan", columnCount.toString());
         tbody.appendChild(unallowedElement);
-        console.log("[radian_filter] Showing restricted loan message for single restricted result");
+        console.log(
+          "[radian_filter] Showing restricted loan message for single restricted result"
+        );
       } else {
         // Standard "No results found" message for other cases
         const noResultsRow = document.createElement("tr");
@@ -572,14 +590,16 @@
       }
     } else {
       // Add all allowed rows back to the table
-      allowedRows.forEach(row => {
+      allowedRows.forEach((row) => {
         // Clone the row to avoid any reference issues
         const clonedRow = row.cloneNode(true);
         tbody.appendChild(clonedRow);
       });
-      console.log(`[radian_filter] Added ${allowedRows.length} allowed rows to table`);
+      console.log(
+        `[radian_filter] Added ${allowedRows.length} allowed rows to table`
+      );
     }
-    
+
     // Show the page after filtering
     pageUtils.showPage(true);
   }
@@ -646,14 +666,14 @@
   async function processPage() {
     try {
       console.log("[radian_filter] Processing page...");
-      
+
       // First process the table rows (most important)
       await processTableRows();
-      
+
       // Then process any other elements on the page that might contain loan numbers
       // Commenting this out for now as it might be causing issues with the table
       // await processGenericElements();
-      
+
       // Show the page after processing
       pageUtils.showPage(true);
       console.log("[radian_filter] Page processing complete");
@@ -744,44 +764,54 @@
     try {
       console.log("[radian_filter] Initializing filter script");
 
-      const listener = await waitForListener()
-      if(!listener) return;
-      
+      const listener = await waitForListener();
+      if (!listener) return;
+
       // Wait for the table to be available before processing
       const waitForTable = async (maxAttempts = 10, delay = 300) => {
         for (let i = 0; i < maxAttempts; i++) {
           const table = document.querySelector("table.sc-jBIHhB");
           if (table) {
-            console.log("[radian_filter] Table found, proceeding with filtering");
+            console.log(
+              "[radian_filter] Table found, proceeding with filtering"
+            );
             return true;
           }
-          console.log(`[radian_filter] Table not found, waiting (attempt ${i+1}/${maxAttempts})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          console.log(
+            `[radian_filter] Table not found, waiting (attempt ${
+              i + 1
+            }/${maxAttempts})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
         console.warn("[radian_filter] Table not found after maximum attempts");
         return false;
       };
-      
+
       // Wait for table to be available and fully rendered
       const tableReady = await waitForTable();
       if (!tableReady) {
-        console.warn("[radian_filter] Table not found, showing page without filtering");
+        console.warn(
+          "[radian_filter] Table not found, showing page without filtering"
+        );
         pageUtils.showPage(true);
         return;
       }
-      
+
       // Give the table a moment to fully render with all its content
       setTimeout(async () => {
         // Process page will handle showing the page after filtering
         await processPage();
-        
+
         // Set up event listeners for table updates
         const setupTableUpdateListeners = () => {
           // Listen for search button clicks
-          const searchButtons = document.querySelectorAll('button');
-          searchButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-              console.log("[radian_filter] Button clicked, will process table after delay");
+          const searchButtons = document.querySelectorAll("button");
+          searchButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+              console.log(
+                "[radian_filter] Button clicked, will process table after delay"
+              );
               // Hide the page while processing
               pageUtils.showPage(false);
               setTimeout(async () => {
@@ -790,13 +820,15 @@
               }, 800); // Longer delay to ensure table is fully rendered
             });
           });
-          
+
           // Listen for Enter key in search inputs
           const searchInputs = document.querySelectorAll('input[type="text"]');
-          searchInputs.forEach(input => {
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                console.log("[radian_filter] Enter pressed in search input, will process table after delay");
+          searchInputs.forEach((input) => {
+            input.addEventListener("keypress", (e) => {
+              if (e.key === "Enter") {
+                console.log(
+                  "[radian_filter] Enter pressed in search input, will process table after delay"
+                );
                 // Hide the page while processing
                 pageUtils.showPage(false);
                 setTimeout(async () => {
@@ -807,7 +839,7 @@
             });
           });
         };
-        
+
         setupTableUpdateListeners();
       }, 500); // Wait 500ms to ensure table is fully rendered
     } catch (error) {

@@ -1,0 +1,280 @@
+﻿
+.ui-dialog {
+    border-width: 2px;
+    border-color: dimgray;
+    top: -283px !important;
+    left: 243px !important;
+}
+
+.ui-widget-overlay {
+    position: inherit;
+    top: -283px !important;
+    left: 143px !important;
+    width: 100%;
+    height: 100%;
+    background: #FFFFFF /*{bgColorOverlay}*/ 50% /*{bgOverlayXPos}*/ 50% /*{bgOverlayYPos}*/ repeat-x /*{bgOverlayRepeat}*/;
+    opacity: unset;
+    filter: Alpha(Opacity=30) /*{opacityOverlay}*/;
+}
+
+
+table.instructions td {
+    padding-right: 10px;
+}
+
+table.resultsTableTblContainer td.add-more {
+    padding: 4px;
+    float: right;
+}
+
+.statutory-heading {
+    width: 240px;
+    white-space: nowrap;
+}
+
+.claim_info_lable_column {
+    float: left;
+    margin-right:5px;
+}
+
+.new_lbl {
+    font-size: 16px;
+    padding-bottom: 10px;
+    display: block;
+    padding-left: 0px;
+    color: #002b49;
+    font-weight: 600;
+    font-family: 'Messina Sans';
+    white-space:nowrap;
+}
+
+input[type=text] {
+    border: none;
+    outline: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.42);
+    font-family: 'Messina Sans';
+}
+
+    input[type=text]:hover {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.42);
+        box-shadow: 0px 6px 4px -4px rgba(0, 0, 0, 0.25);
+    }
+
+    input[type=text]:focus {
+        border: none;
+        outline: none;
+        border-bottom: 1px solid #00A6A0;
+    }
+
+select {
+    border: none;
+    outline: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.42);
+    background: transparent;
+}
+
+    select:hover {
+        border-bottom: 2px solid rgba(0, 0, 0, 0.42);
+        box-shadow: 0px 6px 4px -4px rgba(0, 0, 0, 0.25);
+    }
+
+    select:focus {
+        border: none;
+        outline: none;
+        border-bottom: 2px solid #00A6A0;
+    }
+.new-btn-cancel-style {
+    height: 55px;
+    background: #ffffff;
+    border-radius: 40px;
+    color: #002b49;
+    border-color: #002b49;
+    padding: 16px 40px;
+    font-family: 'Messina Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 10px;
+    cursor: pointer;
+    opacity: 1;
+    width: 165px;
+    border: 4px solid #002B49 !important;
+    outline: none;
+    box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+}
+
+    .new-btn-cancel-style:hover {
+        border-color: #00A6A0 !important;
+        background: #ffffff !important;
+        color: #002b49 !important;
+        border: 4px solid #00A6A0 !important;
+        transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+    }
+
+    .new-btn-cancel-style:focus {
+        border-color: #00A6A0 !important;
+        background: #ffffff !important;
+        color: #002b49 !important;
+        border: 4px solid #00A6A0 !important;
+        transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+    }
+
+.new-btn-style {
+    height: 55px;
+    background: #002b49;
+    border-radius: 40px;
+    color: #ffffff;
+    border-color: #ffffff;
+    padding: 16px 40px;
+    font-family: 'Messina Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 10px;
+    cursor: pointer;
+    opacity: 1;
+    width: 165px;
+    border: 4px solid #002B49;
+    outline: none;
+    box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+}
+
+    .new-btn-style:hover {
+        background-color: #00A6A0;
+        border-color: #00A6A0;
+        border: 4px solid #00A6A0;
+        transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+    }
+
+    .new-btn-style:focus {
+        border: 4px solid #00A6A0;
+        outline-style: inset;
+        background-color: #002B49;
+        outline: none;
+    }
+
+.resultsTableHeader {
+    background-color: #8095a4;
+    border: 1px solid #d8d7d7;
+    font-size: 16px;
+    padding: 0.5rem;
+}
+
+.resultsTable {
+    width: 100%;
+}
+
+    .resultsTable td {
+        border: 1px solid #d8d7d7;
+    }
+
+.resultsTableRow td {
+    background: #ffffff;
+    vertical-align: middle;
+    color: #000000;
+}
+
+.resultsTableRowAlternating td {
+    background-color: #f4f4f4;
+    vertical-align: middle;
+    color: #000000;
+}
+
+.resultsTableRowAlternating input[type='text'] {
+    background-color: transparent;
+    font-family:'Messina Sans';
+    
+}
+
+.resultsTableRow input[type='text'] {
+    border: 1px solid rgba(0, 0, 0, 0.42);
+}
+
+    .resultsTableRow input[type='text']:hover {
+        outline: none;
+        border: 1px solid rgba(0, 0, 0, 0.42);
+        box-shadow: 0px 6px 4px -4px rgba(0, 0, 0, 0.25);
+    }
+
+    .resultsTableRow input[type='text']:focus {
+        border: 1px solid #00A6A0;
+    }
+
+.resultsTableRowAlternating input[type='text'] {
+    border: 1px solid rgba(0, 0, 0, 0.42);
+}
+
+    .resultsTableRowAlternating input[type='text']:hover {
+        outline: none;
+        border: 1px solid rgba(0, 0, 0, 0.42);
+        box-shadow: 0px 6px 4px -4px rgba(0, 0, 0, 0.25);
+    }
+
+    .resultsTableRowAlternating input[type='text']:focus {
+        border: 1px solid #00A6A0;
+    }
+
+.hiddenColumn {
+    display: none;
+}
+
+.new-btn-style_table {
+    //height: 55px;
+    background: #002b49;
+    border-radius: 40px;
+    color: #ffffff;
+    border-color: #ffffff;
+    //padding: 16px 40px;
+    font-family: 'Messina Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 10px;
+    cursor: pointer;
+    opacity: 1;
+    width: 100px;
+    border: 4px solid #002B49;
+    outline: none;
+    box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+}
+
+    .new-btn-style_table:hover {
+        background-color: #00A6A0;
+        border-color: #00A6A0;
+        border: 4px solid #00A6A0;
+        transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+    }
+
+    .new-btn-style_table:focus {
+        border: 4px solid #00A6A0;
+        outline-style: inset;
+        background-color: #002B49;
+        outline: none;
+    }
+
+.resultsTableRow td span {
+    color: #3d3935;
+    font-size: 14px;
+    font-family: 'Messina Sans';
+}
+
+.resultsTableRowAlternating td span {
+    color: #3d3935;
+    font-size: 14px;
+    font-family: 'Messina Sans';
+}
+
+.loan_number_notice_desc{
+    font-family:'Messina Sans';
+    font-size:16px;
+    line-height:18px;
+}
+
+  .twocolumnHeaderValue{
+      display:flex;
+      justify-content: space-between;
+  }
+
+.addMoreButtonPosition{
+    float: right;
+}

@@ -1,0 +1,243 @@
+/* -----------------------------------------------------------------------------
+   Modules : Nav
+   -------------------------------------------------------------------------- */
+
+/**
+ * Core nav module.
+ *
+ * Can mark up Nav component in a number of ways:
+ *
+ * Unordered list (alternatively can be ordered list):
+ *  <ul class="MI-Nav">
+ *    <li><a class="MI-Nav-item" href="#">Link</a></li>
+ *    <li><a class="MI-Nav-item" href="#">Link</a></li>
+ *  </ul>
+ *
+ * With a <nav> element:
+ *  <nav class="MI-Nav">
+ *    <a class="MI-Nav-item">Link</a>
+ *    <a class="MI-Nav-item">Link</a>
+ *  </nav>
+ *
+ * Use the 'MI-Nav--inline' modifier to make Nav component align
+ * horizontally.
+ *
+ * Example:
+ *  <nav class="MI-Nav MI-Nav--inline">
+ *    <a class="MI-Nav-item" href="#">Link</a>
+ *    <a class="MI-Nav-item" href="#">Link</a>
+ *  </nav>
+ *
+ * or with <ul>
+ *
+ * <ul class="MI-Nav MI-Nav--inline">
+ *  <li><a class="MI-Nav-item" href="#">Linke</a>
+ *  <li><a class="MI-Nav-item" href="#">Linke</a>
+ * </ul>
+ */
+
+/* Nav container
+   -------------------------------------------------------------------------- */
+
+.MI-Nav {
+  margin-bottom: 20px;
+  font-family: "futura-pt", Helvetica, Sans-Serif;
+}
+
+/**
+ * Intentional specificity.
+ * 1. Remove default spacing in case nav selector is applied to a 'list'
+ * element (i.e. ol, ul).
+ */
+
+ul.MI-Nav,
+ol.MI-Nav { 
+  margin-left: 0;  /*1*/
+  padding: 0; /* 1 */
+  list-style: none; /* 1 */
+  margin-right:-1em; /*fix top nav bar wrap issue in IE9 compatibility view*/  
+}
+
+/* Nav children
+   -------------------------------------------------------------------------- */
+
+.MI-Nav-item,
+.MI-Nav-text,
+.MI-Nav-header {
+  display: block;
+}
+
+.MI-Nav-item {
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.MI-Nav-item.is-active.cuwLink{
+  padding-right: 0;
+  padding-left: 0;
+}
+
+/**
+ * Navigation header
+ */
+
+.MI-Nav-header {
+  margin-bottom: 10px;
+}
+
+/**
+ * Nav divider: vertical hr to add more visual separation b/w nav items.
+ *
+ * 1. Adjust display so we can add a width/height.
+ * 2. Add position context to adjust position.
+ * 3. Add default background here.  Adjusting color for nesting in
+ * specific component should be done in themes folder.
+ */
+
+.MI-Nav-item--divider:after {
+  display: inline-block; /* 1 */
+  position: relative; /* 2 */
+  right: -10px;
+  top: 2px;
+
+  height: 14px;
+  width: 2px;
+
+  background-color: #999; /* 3 */
+
+  content: "";
+}
+
+/* Nav list
+   -------------------------------------------------------------------------- */
+
+/**
+ * For navigation in a ol or ul that needs to stack.
+ *
+ * 1. Remove padding set on a Nav-item.
+ * 2. Re-declare line-height for FF.
+ */
+
+.MI-NavList .MI-Nav-item {
+  padding-right: 0; /* 1 */
+  padding-left: 0; /* 1 */
+
+  line-height: 20px; /* 2 */
+}
+
+/* Modifiers
+   -------------------------------------------------------------------------- */
+
+.MI-Nav--tabs > li,
+ul.MI-Nav--inline > li,
+ol.MI-Nav--inline > li,
+.MI-Nav--inline > .MI-Nav-item {
+  float: left;
+}
+
+.MI-Nav--tabs:before,
+.MI-Nav--tabs:after,
+.MI-Nav--inline:before,
+.MI-Nav--inline:after {
+  display: table;
+
+  content: "";
+}
+
+.MI-Nav--tabs:after,
+.MI-Nav--inline:after {
+  clear: both;
+}
+
+.lt-ie8 .MI-Nav--tabs,
+.lt-ie8 .MI-Nav--inline {
+  zoom: 1;
+}
+
+/**
+ * IE 6 fix to make Nav align horizontally.
+ */
+
+* html .MI-Nav--tabs li,
+* html ul.MI-Nav--inline li,
+* html ol.MI-Nav--inline li,
+* html .MI-Nav--inline .MI-Nav-item {
+  display: inline;
+  zoom: 1;
+}
+
+/**
+ * Nav Tabs
+ */
+
+.MI-Nav--tabs .MI-Nav-item {
+  margin-right: 2px;
+  padding: 6px 20px;
+
+  line-height: 20px;
+}
+
+/**
+ * Skin: default
+ */
+
+.MI-Nav--default,
+.MI-NavList--default .MI-Nav-header {
+  font-family: "futura-pt", sans-serif;
+}
+
+.MI-Nav--default .MI-Nav-header,
+.MI-NavList--default .MI-Nav-header {
+  color: #8c0c04;
+  text-transform: uppercase;
+}
+
+.MI-NavList--default {
+  font-family: "calluna", serif;
+}
+
+.MI-NavList--default .MI-Nav-item {
+  font-weight: 600;
+}
+
+.MI-Nav--tabs--default {
+  border-bottom: 2px solid #8c0c04;
+}
+
+.MI-Nav--tabs--default .MI-Nav-item {
+  background-color: #f2f3f3;
+
+  font-family: "calluna", serif;
+  font-weight: 700;
+
+  -webkit-transition: background-color 0.2s ease;
+  -moz-transition:    background-color 0.2s ease;
+  -ms-transition:     background-color 0.2s ease;
+  -o-transition:      background-color 0.2s ease;
+  transition:         background-color 0.2s ease;
+}
+
+/**
+ * Skin: state
+ */
+
+.MI-Nav--tabs--default .MI-Nav-item:hover {
+  background-color: #dcdddd;
+
+  text-decoration: none;
+}
+
+.MI-Nav--tabs--default .MI-Nav-item.is-active {
+  background-color: #8c0c04;
+
+  color: #fff;
+}
+
+.InlineMINav {
+    display:inline;
+}
+
+
+
+
+

@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Radian Servicing - Change Loan Number</title>
+    <meta name="description" content="Radian Servicing - Change Loan Number portal for mortgage insurance services">
+    <meta name="keywords" content="Radian, mortgage insurance, loan servicing, loan number change">
+    <meta property="og:title" content="MI Online - Radian">
+    <meta property="og:description" content="Radian Servicing - Change Loan Number">
+    <meta property="og:site_name" content="MI Online, Inc.">
+    <link rel="shortcut icon" href="./Radian Servicing Change Loan Number_files/favicon.ico">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #002b49;
+            --secondary-color: #00a6a0;
+            --accent-color: #8f97ff;
+            --light-color: #f5f9ff;
+            --dark-color: #172b4d;
+            --gray-color: #5f6062;
+            --light-gray: #ebeeff;
+            --white-color: #ffffff;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            color: var(--dark-color);
+            background-color: var(--light-color);
+            line-height: 1.6;
+        }
+
+        a {
+            text-decoration: none;
+            color: var(--primary-color);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--secondary-color);
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        .container {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        .header {
+            background-color: var(--white-color);
+            box-shadow: var(--shadow);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-divider {
+            height: 30px;
+            width: 2px;
+            background-color: var(--light-gray);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            padding: 0.5rem 2.5rem 0.5rem 1rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            width: 200px;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            width: 250px;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .contact-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .phone-number {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .contact-icons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .contact-icon {
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .contact-icon:hover {
+            background-color: var(--light-gray);
+            color: var(--secondary-color);
+        }
+
+        .profile-dropdown {
+            position: relative;
+        }
+
+        .profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .profile-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--white-color);
+            box-shadow: var(--shadow);
+            border-radius: 4px;
+            width: 200px;
+            padding: 0.5rem 0;
+            margin-top: 0.5rem;
+            display: none;
+            z-index: 10;
+        }
+
+        .profile-menu.active {
+            display: block;
+        }
+
+        .profile-menu li {
+            padding: 0.5rem 1rem;
+        }
+
+        .profile-menu li a {
+            display: block;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .profile-menu li a:hover {
+            background-color: var(--light-gray);
+        }
+
+        .password-info {
+            font-size: 0.8rem;
+            color: var(--gray-color);
+            margin-top: 0.25rem;
+        }
+
+        /* Main Content Styles */
+        .main-container {
+            display: flex;
+            flex: 1;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--white-color);
+            box-shadow: var(--shadow);
+            padding: 2rem 0;
+            height: calc(100vh - 80px);
+            position: sticky;
+            top: 80px;
+            overflow-y: auto;
+            transition: var(--transition);
+        }
+
+        .sidebar.collapsed {
+            width: 80px;
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            right: -15px;
+            top: 20px;
+            background-color: var(--white-color);
+            border: 1px solid var(--light-gray);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 5;
+            box-shadow: var(--shadow);
+        }
+
+        .nav-menu {
+            padding: 0 1rem;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            color: var(--primary-color);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .nav-link:hover {
+            background-color: var(--light-gray);
+        }
+
+        .nav-link.active {
+            background-color: var(--secondary-color);
+            color: var(--white-color);
+        }
+
+        .nav-link i {
+            margin-right: 0.75rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .dropdown-menu {
+            padding-left: 2.5rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .dropdown-menu.active {
+            max-height: 500px;
+        }
+
+        .dropdown-item {
+            margin: 0.5rem 0;
+        }
+
+        .dropdown-link {
+            display: block;
+            padding: 0.5rem;
+            border-radius: 4px;
+            color: var(--primary-color);
+            font-weight: 400;
+            transition: var(--transition);
+        }
+
+        .dropdown-link:hover {
+            background-color: var(--light-gray);
+        }
+
+        .dropdown-link.active {
+            color: var(--secondary-color);
+            font-weight: 500;
+        }
+
+        /* Content Area Styles */
+        .content {
+            flex: 1;
+            padding: 0;
+            background-color: var(--light-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .contentmenu {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .iFrameClass {
+            flex: 1;
+            border: none;
+            min-height: 923px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+
+        .card {
+            background-color: var(--white-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: var(--white-color);
+            transition: var(--transition);
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-col {
+            flex: 1;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--white-color);
+        }
+
+        .btn-primary:hover {
+            background-color: #00395f;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: var(--white-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: #008c87;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: var(--white-color);
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        /* Footer Styles */
+        .footer {
+            background-color: var(--white-color);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+            margin-top: auto;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .copyright {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .footer-link {
+            color: var(--primary-color);
+            font-size: 0.9rem;
+            position: relative;
+        }
+
+        .footer-link:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: -0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1px;
+            height: 15px;
+            background-color: var(--secondary-color);
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: var(--white-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            width: 500px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray-color);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--primary-color);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--light-gray);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 1024px) {
+            .header-content {
+                flex-wrap: wrap;
+            }
+            
+            .header-right {
+                margin-top: 1rem;
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .sidebar {
+                width: 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+            
+            .search-input {
+                width: 150px;
+            }
+            
+            .contact-info {
+                display: none;
+            }
+            
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+                padding: 1rem 0;
+            }
+            
+            .sidebar-toggle {
+                display: none;
+            }
+            
+            .content {
+                padding: 1rem;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+            
+            .footer-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="./Radian Servicing Change Loan Number_files/MI Online_Primary Icon Logo_Full Color_RGB.svg" alt="MI Online Logo" height="41" width="175">
+                    <div class="logo-divider"></div>
+                    <img src="./Radian Servicing Change Loan Number_files/radian_primary_RGB.svg" alt="Radian Logo" height="36" width="111">
+                </div>
+                
+                <div class="header-right">
+                    <div class="search-container">
+                        <input type="text" class="search-input" placeholder="Search">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    
+                    <div class="contact-info">
+                        <i class="fas fa-phone-alt"></i>
+                        <div class="phone-number">877.723.4261</div>
+                        <div class="contact-icons">
+                            <a href="mailto:customercare@radian.com" class="contact-icon" title="Email Customer Care">
+                                <i class="fas fa-envelope"></i>
+                            </a>
+                            <a href="#" class="contact-icon" title="Chat with Customer Care">
+                                <i class="fas fa-comment"></i>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-dropdown">
+                        <button class="profile-btn" id="profileBtn">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Profile</span>
+                        </button>
+                        <ul class="profile-menu" id="profileMenu">
+                            <li><a href="#">New User Request</a></li>
+                            <li><a href="#">Edit Profile</a></li>
+                            <li>
+                                <a href="#">
+                                    <div>Change Password</div>
+                                    <div class="password-info">Expires in 90 days</div>
+                                </a>
+                            </li>
+                            <li><a href="#">User Defaults</a></li>
+                            <li><a href="#">Log Off</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-chevron-left" id="toggleIcon"></i>
+                </div>
+                
+                <nav class="nav-menu">
+                    <ul>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="fas fa-home"></i>
+                                <span>Home</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="fas fa-search"></i>
+                                <span>Search</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="fas fa-percentage"></i>
+                                <span>Rate Finder</span>
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a href="#" class="nav-link dropdown-toggle" data-dropdown="orderMI">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                                <span>Order MI</span>
+                                <i class="fas fa-chevron-down ml-auto"></i>
+                            </a>
+                            <ul class="dropdown-menu" id="orderMI">
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link">New Application</a>
+                                </li>
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link">Resubmit Application</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a href="#" class="nav-link dropdown-toggle active" data-dropdown="servicing">
+                                <i class="fas fa-cogs"></i>
+                                <span>Servicing</span>
+                                <i class="fas fa-chevron-down ml-auto"></i>
+                            </a>
+                            <ul class="dropdown-menu active" id="servicing">
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link">Activate Deferred</a>
+                                </li>
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link">Transfer Servicing</a>
+                                </li>
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link active">Change Loan Number</a>
+                                </li>
+                                <li class="dropdown-item">
+                                    <a href="#" class="dropdown-link">Cancel MI</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="fas fa-folder-open"></i>
+                                <span>Document Center</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link">
+                                <i class="fas fa-book"></i>
+                                <span>Knowledge Center</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+            
+            <!-- Content Area -->
+            <main class="content">
+                <!-- Original iframe content from the Radian page -->
+                <div class="contentmenu">
+                    <iframe class="iFrameClass" title="Content Block iFrame"
+                            id="contentBlock-iframe"
+                            src="./Radian Servicing Change Loan Number_files/mionlineNavigation.html" 
+                            border="0px"
+                            height="923px" 
+                            scrolling="no" 
+                            width="100%">
+                    </iframe>
+                </div>
+            </main>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="copyright">
+                    © 2000 - 2025 Radian Group Inc. All Rights Reserved
+                </div>
+                
+                <div class="footer-links">
+                    <a href="#" class="footer-link" id="securityBtn">Security Statement</a>
+                    <a href="#" class="footer-link" id="legalBtn">Legal Agreement</a>
+                    <a href="#" class="footer-link" id="contactBtn">Contact Us</a>
+                </div>
+            </div>
+        </footer>
+        
+        <!-- Security Statement Modal -->
+        <div class="modal" id="securityModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Security Statement</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>When MI Online is accessed, it invokes SSL (Secure Socket Layers) encryption. SSL uses public-key encryption to exchange a session key between the client (your PC) and Radian's server. The session key encrypts the data submitted to and requested from MI Online. Each transaction uses a different session key so that even if a session key were decrypted, it would not provide access to the server, but only to a small piece of the transmitted information.</p>
+                    <br>
+                    <p>MI Online session keys use 128-bit key encryption, meaning there are 2<sup>128</sup> possible combinations. Using today's best technology, the odds of decrypting a session key are near impossible.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary modal-close-btn">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Legal Agreement Modal -->
+        <div class="modal" id="legalModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Legal Agreement</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>By using this website, you agree to comply with all terms and conditions set forth by Radian Group Inc. This includes respecting all intellectual property rights, using the service for lawful purposes only, and acknowledging that all information provided is accurate to the best of your knowledge.</p>
+                    <br>
+                    <p>Radian reserves the right to modify these terms at any time. Continued use of the service after such modifications constitutes your acceptance of the revised terms.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary modal-close-btn">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contact Us Modal -->
+        <div class="modal" id="contactModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Contact Us</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Customer Care:</strong> 877.723.4261</p>
+                    <p><strong>Email:</strong> <a href="mailto:customercare@radian.com">customercare@radian.com</a></p>
+                    <p><strong>Hours of Operation:</strong> Monday - Friday, 8:00 AM - 8:00 PM ET</p>
+                    <br>
+                    <p><strong>Mailing Address:</strong><br>
+                    Radian Group Inc.<br>
+                    1500 Market Street<br>
+                    Philadelphia, PA 19102</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary modal-close-btn">Close</button>
+                </div>
+            </div>
+        </div>
+        
+
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Profile Dropdown
+            const profileBtn = document.getElementById('profileBtn');
+            const profileMenu = document.getElementById('profileMenu');
+            
+            profileBtn.addEventListener('click', function() {
+                profileMenu.classList.toggle('active');
+            });
+            
+            // Close profile menu when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!profileBtn.contains(event.target) && !profileMenu.contains(event.target)) {
+                    profileMenu.classList.remove('active');
+                }
+            });
+            
+            // Sidebar Toggle
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                if (sidebar.classList.contains('collapsed')) {
+                    toggleIcon.classList.remove('fa-chevron-left');
+                    toggleIcon.classList.add('fa-chevron-right');
+                } else {
+                    toggleIcon.classList.remove('fa-chevron-right');
+                    toggleIcon.classList.add('fa-chevron-left');
+                }
+            });
+            
+            // Dropdown Menus
+            const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+            
+            dropdownToggles.forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const dropdownId = this.getAttribute('data-dropdown');
+                    const dropdownMenu = document.getElementById(dropdownId);
+                    
+                    // Close other dropdowns
+                    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                        if (menu.id !== dropdownId) {
+                            menu.classList.remove('active');
+                        }
+                    });
+                    
+                    dropdownMenu.classList.toggle('active');
+                });
+            });
+            
+            // Modal Functionality
+            const modals = {
+                security: document.getElementById('securityModal'),
+                legal: document.getElementById('legalModal'),
+                contact: document.getElementById('contactModal')
+            };
+            
+            const modalTriggers = {
+                security: document.getElementById('securityBtn'),
+                legal: document.getElementById('legalBtn'),
+                contact: document.getElementById('contactBtn')
+            };
+            
+            // Open modals
+            for (const key in modalTriggers) {
+                modalTriggers[key].addEventListener('click', function(e) {
+                    e.preventDefault();
+                    modals[key].classList.add('active');
+                });
+            }
+            
+            // Close modals
+            document.querySelectorAll('.modal-close, .modal-close-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.modal').forEach(modal => {
+                        modal.classList.remove('active');
+                    });
+                });
+            });
+            
+            // Close modal when clicking outside
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.classList.remove('active');
+                    }
+                });
+            });
+            
+            // Handle iframe loading
+            const iframe = document.getElementById('contentBlock-iframe');
+            
+            iframe.onload = function() {
+                console.log('iframe content loaded successfully');
+                // You can add additional iframe handling code here if needed
+            };
+            
+            // Add a fallback in case the iframe fails to load
+            iframe.onerror = function() {
+                console.error('Failed to load iframe content');
+                iframe.style.display = 'none';
+                
+                // Show a fallback message
+                const contentMenu = document.querySelector('.contentmenu');
+                const fallbackMsg = document.createElement('div');
+                fallbackMsg.innerHTML = `
+                    <div style="padding: 2rem; text-align: center;">
+                        <h2 style="color: var(--primary-color); margin-bottom: 1rem;">Content Unavailable</h2>
+                        <p>The loan change form content could not be loaded. Please try refreshing the page or contact support.</p>
+                        <button class="btn btn-primary" style="margin-top: 1rem;" onclick="location.reload()">Refresh Page</button>
+                    </div>
+                `;
+                contentMenu.appendChild(fallbackMsg);
+            };
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,245 @@
+//////////////////////////////////////////////////////////////// 
+// A common Pop-Up Window generator for the LivePerson HREF's.
+//////////////////////////////////////////////////////////////// 
+function OpenCommonPopUp(sPop, userID)
+{
+    var sURL;
+    //Email a Request - Main Logon Screen
+	if (sPop == 1)
+	{
+		sURL = "https://exchange.liveperson.net/LP/Int3Ask1.cfm?C=%24%29%285%2CR0%20%20%0A&Popup=Yes";
+	}
+
+	//Request a User ID	- Main Logon Screen
+	if (sPop == 2)
+	{
+		sURL = "http://exchange.liveperson.net/LP/Int3Home.cfm?C=%24%29%285%2CR0%27%5E%0A&Popup=Yes";
+	}
+
+	if (sPop == 5)
+	{
+		sURL = "member/admin/content/helpContentPreviewExt.aspx";
+	}
+	
+	if (sPop == 6)
+	{
+		sURL = "../radianapplications/resetPassword/resetPassword.aspx";
+	}
+	
+	if (sPop == 7)
+	{
+	    sURL = "../../member/admin/content/helpContentPreview.aspx?HelpContentTitleRequested=CP";
+	}
+	
+	if (sPop == 8)
+	{
+	    sURL = "../../member/admin/content/helpContentPreview.aspx?HelpContentTitleRequested=CP";
+	}
+	
+	if (sPop == 9)
+	{
+	    sURL = "../member/admin/content/helpContentPreviewExt.aspx";
+	}
+
+	if (sPop == 10)
+	{
+		sURL = "../user/challenge_question_review.aspx";
+	}
+		
+	var wi = screen.availWidth - (screen.availWidth * .1);    // Set window width
+	var hi = screen.availHeight - (screen.availHeight * .1);  // Set window height
+	var lft = screen.availWidth/2 - wi/2 - 15;  // center pop-up
+    var tp = screen.availHeight/2 - hi/2;
+    var windowprops = "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=yes" +   ",left=" + lft + ",top=" + tp + ",width=" + wi + ",height=" + hi; 
+	
+	/* For Help popup, use a reduced popup size so both the main window and help could be 
+	   displayed side-by-size in resolutions 1024+
+	*/
+	if (sPop == 5 || sPop == 7 || sPop == 8 || sPop == 9)
+	{
+		wi = 460;    // Set window width
+		hi = screen.availHeight - (screen.availHeight * .1);  // Set window height
+		windowprops = "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=yes" + ",left=" + lft + ",top=" + tp + ",width=" + wi + ",height=" + hi; 
+	}
+
+    // Request New Password - Challenge Questions	
+	if (sPop == 6)
+	{
+	    hi = 550;
+	    wi = 850;
+		lft = screen.availWidth/2 - wi/2 - 15;  // center pop-up
+		tp = screen.availHeight/2 - hi/2;
+
+	    windowprops = "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=yes" +   ",left=" + lft + ",top=" + tp + ",width=" + wi + ",height=" + hi;
+	}
+
+    //Admin - Challenge Question / Response Review
+	if (sPop == 10)
+	{
+	    hi = 300;
+	    wi = 600;
+			lft = screen.availWidth/2 - wi/2 - 15;  // center pop-up
+			tp = screen.availHeight/2 - hi/2;
+
+	    windowprops = "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,resizable=yes,copyhistory=yes" +   ",left=" + lft + ",top=" + tp + ",width=" + wi + ",height=" + hi;
+	}
+		
+	window.open(sURL,"Help",windowprops);		
+}
+
+function OpenHelpArticle(url) 
+{
+   var wi = 460;    // Set window width
+   //	hi = screen.availHeight - (screen.availHeight * .1);  // Set window height // Commented as total height was showing
+   var hi = 550
+	var windowprops = "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=yes" + ",width=" + wi + ",height=" + hi;
+	var CommonPopUpWin = window.open(url, "Help", windowprops);
+	CommonPopUpWin.focus();
+}
+
+function openChild(width,height,url) {
+
+	window.open(url, "_blank", "width=" + width + ",height=" + height +",location=no,menubar=yes,scrollbars=yes");
+}
+
+function openChildNoScroll(width, height, url) {
+
+    window.open(url, "_blank", "width=" + width + ",height=" + height + ",location=no,menubar=no,scrollbars=no");
+}
+
+
+function openChildResizable(width, height, url) {
+
+    window.open(url, "_blank", "width=" + width + ",height=" + height + ",location=no,menubar=yes,scrollbars=yes,resizable=yes");
+}
+
+function openChildResizableNoMenu(width, height, url) {
+
+    window.open(url, "_blank", "width=" + width + ",height=" + height + ",location=no,menubar=no,scrollbars=yes,resizable=yes");
+}
+
+function openChildNoMenuNotResizable(width, height, url) {
+
+    window.open(url, "_blank", "width=" + width + ",height=" + height + ",location=no,menubar=no,scrollbars=yes,resizable=no");
+}
+function openChildNoMenuNotResizableSecurity(w, h, url) {    
+    var left = (screen.width / 2) - (w / 2);
+    var top = (screen.height / 2) - (h / 2);
+    window.open(url, "_blank", "width=" + w + ",height=" + h + ',left=' + left + ',top=' + top + ",location=no,menubar=no,scrollbars=yes,resizable=yes");    
+}
+
+function openTrainingVideo(width, height, url, resizable) {
+
+    window.open(url, "_blank", "width=" + width + ",height=" + height + ",location=no,menubar=yes,scrollbars=yes,resizable=" + resizable);
+}
+
+
+function PopupLookup(targetURL) {
+    window.open(targetURL,
+    '_blank', 'height=460,width=800,top=150,left=150,status=yes,toolbar=no,menubar=no,location=no,scrollbars=yes,resizable=yes,copyhistory=false');
+}
+
+function openEmail(emailTo) {
+    var mailto_link = 'mailto:' + emailTo;
+    window.open(mailto_link);
+}
+
+////////////////////////////////
+// Function: MM_openBrWindow
+// Purpose: 
+////////////////////////////////
+function MM_openBrWindow(theURL, winName, features) {
+    //v2.0
+    window.open(theURL, winName, features);
+}
+
+function MM_openBrWindowInCenter(theURL, winName, features,w,h) {
+    //v2.0
+    var left = (screen.width / 2) - (w / 2);
+    var top = (screen.height / 2) - (h / 2);
+    window.open(theURL, winName, features+',width='+w+',height='+h+',left='+left+',top='+top);
+}
+
+/////////////////////////////////////
+// Function: openFICOHelp
+//
+////////////////////////////////////	
+function openFICOHelp() {
+    MM_openBrWindow('../ratequote/ficoScoreHelp.aspx', 'help', 'scrollbars=yes,resizable=yes,width=400,height=320');
+}
+
+////////////////////////////////
+// Function: closeWindow
+// Purpose: 
+////////////////////////////////
+function closeWindow() {
+    window.close();
+}
+
+////////////////////////////////
+// Function: closeWindowBAUFlow
+// Purpose: 
+////////////////////////////////
+function closeWindowBAUFlow() {
+    window.close();
+}
+
+/*To customize the Email contents
+Function: Email Doc
+*/
+function OpenEmailPopup(url) {
+    // Below logic to show the popup in the middle of the page 
+    var left = (screen.width / 2) - (300);
+    var top = (screen.height / 2) - (215);
+    var newwindow = window.open(url, 'MIOnline', 'width=600, height=430,menubar=no,resizable=no,scrollbars=yes,status=yes,titlebar=0,toolbar=no,location=center,top=' + top + ',left=' + left, false);
+    newwindow.focus();
+    return false;
+}
+
+//////////////////////////////////////////
+// Function: open the fax popup window
+////////////////////////////////////////
+function OpenFaxNumberPopup(url) {
+    var left = (screen.width / 2) - (300);
+    var top = (screen.height / 2) - (100);
+    window.open(url, 'FaxNumber', 'width=385,height=265,menubar=no,resizable=no,scrollbars=no,status=yes,titlebar=0,toolbar=no,location=center,top=' + top + ',left=' + left, false);
+    return false;
+}
+
+////////////////////////////////////////////////////////////
+//Function: open the Delete Confirmation Popup window
+///////////////////////////////////////////////////////////
+
+function OpenDeleteConfirmPopup(url) {
+    var left = (screen.width / 2) - (300);
+    var top = (screen.height / 2) - (100);
+    window.open(url, 'DeleteConfirmation', 'width=850,height=280,menubar=no,resizable=no,scrollbars=no,status=yes,titlebar=0,toolbar=no,location=center,top=' + top + ',left=' + left, false);
+    return false;
+}
+
+//////////////////////////////////////////
+// Function: open the View Bill PDF
+////////////////////////////////////////
+function OpenViewEBillPDF(url) {
+    window.open(url, 'EBillPDF', '', false);
+    return false;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Function:  RedirectViaTopNav()
+// Purpose:   RedirectViaTopNav.
+/////////////////////////////////////////////////////////////////////////////
+function RedirectViaTopNav(URL) {
+    top.location = URL;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Function:  SetFocusById()
+// Purpose:   Focus to specific id.
+/////////////////////////////////////////////////////////////////////////////
+function SetFocusById(id) {
+    setTimeout(function () {
+        $("#" + id).focus();
+    }, 100);
+}

@@ -1,0 +1,137 @@
+/* -----------------------------------------------------------------------------
+   Base : Scaffolding
+   -------------------------------------------------------------------------- */
+
+
+/**
+ * 1. Prevent iOS text size adjust after orientation change, without disabling
+ *    user zoom.
+ */
+
+html {
+    -ms-text-size-adjust: 100%; /* 1 */
+    -webkit-text-size-adjust: 100%; /* 1 */
+}
+
+/**
+ *  Body set up.
+ *
+ *  1. Remove default margin.
+ *  2. Set default font-family.
+ */
+
+body {
+  margin: 0; /* 1 */
+
+  background-color: #fff;
+
+  color: #5f6062;
+  font-family: Arial,serif;
+  font-size: 13px !important;
+  line-height: 20px;
+}
+
+.lt-ie9 body
+{
+    font-family: Palatino, serif;
+}
+
+/* Links
+   -------------------------------------------------------------------------- */
+
+/**
+ * 1. Remove the gray background color from active links in IE 10.
+ */
+
+a {
+  background: transparent;
+
+  color: #002B49;
+  text-decoration: none; /* 1 */
+}
+
+/**
+ * 1. Address `outline` inconsistency between Chrome and other browsers.
+ */
+
+a:focus {
+  outline: thin dotted; /* 1 */
+}
+
+.lt-ie9 .MI-Nav-item a:focus
+{
+    text-decoration: none;
+}
+
+/**
+ * 1. Improve readability when focused and also mouse hovered in all browsers.
+ */
+
+a:active,
+a:hover {
+  color: #002B49;
+  outline: 0; /* 1 */  
+  text-decoration: underline;
+}
+
+a:active
+{
+    text-decoration: none;
+}
+
+ul.MI-Dropdown-menu li a:hover
+{
+    text-decoration: underline !important;
+}
+
+a.disabled
+{
+    text-decoration: none;
+}
+
+.error-link
+{
+    text-decoration: underline !important;
+}
+
+/**
+ * Kill the focus outline for links that cannot be accessed via keyboard.
+ */
+
+[tabindex="-1"]:focus {
+  outline: none !important;
+}
+
+address {
+  font-family: "futura-pt", sans-serif;
+  font-style: normal;
+}
+
+/* Customer Care Email Address link*/
+.customercare-link {
+    color: #00BAB3;
+}
+
+.customercare-link:hover {
+    color: #00BAB3;
+}
+
+/* Disclaimer */
+#LblDisclaimer,
+#lblMIDisclaimer,
+#lblCUWDisclaimer,
+#LblDisclaimer,
+#LblDisclaimerBody {
+    color: #002B49;
+}
+
+.legal-notification {
+    font-size: 9pt;
+    color: #002B49;
+}
+.validationSummary a[href='mailto:customercare@radian.com'] {
+    color: #00BAB3;
+}
+.summaryCustomerCare a[href='mailto:customercare@radian.com'] {
+    color: #00BAB3;
+}

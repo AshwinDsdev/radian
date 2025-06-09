@@ -1,0 +1,314 @@
+﻿//Include this file to fix IFrame issues
+
+//Scrolling to top if there are any validation errors
+$(document).ready(function () {
+
+    //catching the exception and suppressing it to make sure that below script doesn't disturb existing functionality
+    try {
+        //below check is to avoid scroll to top if the focus is set to a different control intentionally in codebehind
+        var $focused = $(':focus');
+        if ($focused != null && $focused != undefined) {
+            //Below condition scrolls the page to top for all browsers if focus is not set to input field at server side
+            if ($focused.length > 0 && $focused[0].tagName != 'INPUT') {
+                scrollToTopOnError();
+            }
+            //If browser is not IE, scroll page to top.
+            else if (!$.browser.msie) {
+                //scrollToTopOnError();
+            }
+        }
+    }
+    catch (err) { }
+});
+
+//Added to allow window to full load
+$(window).on('load', function () {
+    reSizeForAllBrowsers();
+});
+
+//Call/add window resize event handler for all browser
+function reSizeForAllBrowsers() {
+
+    reSizeFrame();
+    $(window).on('resize', reSizeFrame);
+}
+
+//To be called on synchronous or asynchronous submission of form to resize the iframe to fix scrolling issues.
+function reSizeFrameAfterClientValidation(skipValidation, focusId, validationGroup) {
+    //Triggered on postback which has client side validations
+    if (skipValidation == 'false') {
+        if (typeof (Page_ClientValidate) != 'undefined') {
+            if (validationGroup != '') {
+                Page_ClientValidate(validationGroup);
+            }
+            else {
+                Page_ClientValidate();
+            }
+
+            if (!Page_IsValid) {
+                reSizeForAllBrowsers();
+                //$("#" + focusId).focus();
+                scrollToTopOnError();
+            }
+        }
+    }
+    //Triggered on asynchronous postback which doesn't have client side validations.
+    else if(skipValidation == 'true'){
+        reSizeForAllBrowsers();
+    }
+}
+
+function reSizeFrame(event) {
+
+    //alert("Entered reSizeFrame");
+
+    if (typeof (jsIsCanvasFlow) != 'undefined' && jsIsCanvasFlow == "Y") {
+        var strHeight = getDocHeightNoJQ();
+
+        if (strHeight == "0") {
+
+            try {
+                if (document.getElementById("hdnScreenSizeSFIE8") != 'undefined' && document.getElementById("hdnScreenSizeSFIE8") != null) {
+                    strHeight = document.getElementById("hdnScreenSizeSFIE8").value;
+                    //alert("Sfdc.canvas.client.resize hc(" + strHeight + ")");
+                }
+            }
+            catch (e) {
+                alert("Error during hdnScreenSizeSFIE8 determination:" + e);
+            }
+        }
+
+        var sr;
+        try {
+            sr = JSON.parse(jsSignedRequestJSON);
+        }
+        catch (e) {
+            alert("Error parsing signed request:" + e);
+        }
+
+        if (typeof (Sfdc) != 'undefined') {
+            try {
+                strHeight = setDocHeightToMinimum(strHeight);
+
+                strHeight = strHeight + "px";
+                Sfdc.canvas.client.resize(sr.client, { height: strHeight });
+            }
+            catch (SFe) {
+                alert("Error during sfdc resize:" + SFe);
+            }
+        }
+    }
+    else {
+        var strIsPopup = "N"
+        if (document.getElementById("isPopUp") != 'undefined' && document.getElementById("isPopUp") != null) {
+            strIsPopup = document.getElementById("isPopUp").value;
+        }
+
+        if (window.parent.resizeiFrameHeight != undefined && strIsPopup == "N") {
+
+            if (document.getElementById("hdnScreenReSize") != 'undefined' && document.getElementById("hdnScreenReSize") != null && document.getElementById("hdnScreenReSize").value > 0) {
+                var height = document.getElementById("hdnScreenReSize").value;
+            }
+            else {
+                height = getDocHeightNoJQ();
+                if (document.getElementById("hdnAdditionalScreenSize") != 'undefined' && document.getElementById("hdnAdditionalScreenSize") != null && document.getElementById("hdnAdditionalScreenSize").value > 0) {
+                    height = +height + +document.getElementById("hdnAdditionalScreenSize").value;
+                }
+            }
+            //alert("resize to(" + height + ")");
+
+            window.parent.resizeiFrameHeight(height);
+            window.parent.parent.postMessage(
+                {
+                    type: 'message',
+                    height: typeof height == 'string' ? parseInt(height) : height,
+                },
+                '*'
+            )
+        }
+        else {
+            //alert("Not Salesforce and is a popup")
+        }
+    }
+
+    //Stopped event propagation to avoid duplicate iFrame resize function calls.
+    if (event != null && event != undefined) {
+        try {
+            event.stopImmediatePropagation();
+        }
+        //suppressing exception if stopImmediatePropagation is not valid for any event
+        catch (err) { }
+    }
+
+    return true;
+}
+
+//Checks if calculated document height is lesser than 530, then returns as 530.
+function setDocHeightToMinimum(calculatedHeight) {
+
+    var finalHeight = 530;
+    if (calculatedHeight < finalHeight) {
+
+        if (document.getElementById("hdnIsPartialPage") != 'undefined' && document.getElementById("hdnIsPartialPage") != null
+                    && document.getElementById("hdnIsPartialPage").value == 'true') {
+            finalHeight = calculatedHeight;
+        }
+    }
+    else {
+        finalHeight = calculatedHeight;
+    }
+
+    return finalHeight;
+}
+
+function getDocHeight() {
+    var D = document;
+    return Math.max(
+        D.body.scrollHeight, D.documentElement.scrollHeight,
+        D.body.offsetHeight, D.documentElement.offsetHeight,
+        D.body.clientHeight, D.documentElement.clientHeight
+    );
+}
+
+function getDocHeightNoJQ() {
+
+    var doc_height = 0;
+    var scroll_height = 0;
+    var jq_height = 0;
+    var outer_height = 0;
+    var height_diff = 0;
+    try {
+        jQuery.browser = {};
+        var nAgnt = navigator.userAgent;
+
+        if (nAgnt.indexOf("MSIE") != -1) {
+            jQuery.browser.msie = true;
+            jQuery.browser.version = nAgnt.substring(nAgnt.indexOf("MSIE") + 5);
+        }
+
+        // In TRIDENT (IE11) => 11, the true version is after "rv:" in userAgent
+        else if (nAgnt.indexOf("Trident") != -1) {
+            jQuery.browser.msie = true;
+            var start = nAgnt.indexOf("rv:") + 3;
+            var end = start + 4;
+            jQuery.browser.version = nAgnt.substring(start, end);
+        }
+
+        // In Chrome, the true version is after "Chrome"
+        else if (nAgnt.indexOf("Chrome") != -1) {
+            jQuery.browser.chrome = true;
+            jQuery.browser.version = nAgnt.substring(nAgnt.indexOf("Chrome") + 7);
+        }
+        else if (nAgnt.indexOf("Firefox") != -1) {
+            jQuery.browser.mozilla = true;
+            jQuery.browser.version = nAgnt.substring(nAgnt.indexOf("Firefox") + 8);
+        }
+        var tradientVersion = getTridentVersion();
+
+        if (jQuery.browser.msie && jQuery.browser.version == "7.0") {
+            //IE browser version greater than 8.0 and in compatibility mode.
+            if (tradientVersion > 4) {
+                scroll_height = document.body.scrollHeight;
+            }
+            //IE browser version 7.0
+            else {
+                scroll_height = Math.max(
+                    document.body.scrollHeight, document.documentElement.scrollHeight,
+                    document.body.offsetHeight, document.body.clientHeight
+                );
+            }
+        }
+        else {
+            scroll_height = document.body.scrollHeight;
+        }
+        
+        jq_height = getDocHeight();
+        outer_height = $(this).outerHeight();
+    }
+    catch (e) {
+        doc_height = $(document).height();
+    }
+
+    if (jq_height > scroll_height) {
+        height_diff = jq_height - scroll_height;
+
+        if (height_diff > 100) {
+            doc_height = scroll_height + 10;
+        }
+        else {
+            doc_height = jq_height;
+        }
+    }
+    else {
+        doc_height = scroll_height;
+    }
+
+    //Added for IE9 and different screen resolutions
+    //outerheight should include margin and padding
+    if (typeof (jQuery.browser) != 'undefined' &&
+        typeof (jQuery.browser.msie) != 'undefined' &&
+        jQuery.browser.msie && jQuery.browser.version != "7.0" && outer_height > doc_height) {
+
+        height_diff = outer_height - doc_height;
+
+        if (height_diff < 100) {
+            doc_height = outer_height;
+        }
+    }
+
+    //alert("jq_height:" + jq_height);
+    //alert("scroll_height:" + scroll_height);
+    //alert("outer_height:" + $(this).outerHeight(true));
+    //alert("doc_height:" + doc_height);
+    //alert("div client height:" + document.getElementById('_PnlSteps').clientHeight);
+    //alert("div offsetHeight height:" + document.getElementById('_PnlSteps').offsetHeight);
+    
+    if (doc_height == 0) {
+        return jq_height;
+    }
+
+    return doc_height
+}
+
+
+//Scroll page to top, this can be called on client side or codebehind.
+function scrollToTopOnError() {
+
+    if (typeof(jsIsCanvasFlow) != 'undefined' && 
+        jsIsCanvasFlow == "Y") {
+        setFocusToTop();
+    }
+    else {
+        try {
+            //window.parent.scrollTo(0, 0);
+            setTimeout(function () {
+                window.parent.document.getElementById("mainContainer").scrollIntoView(true);
+            }, 100);
+        }
+        catch (ex) { //Suppressing error for SF flow
+        }
+    }
+}
+
+//Returns browser Trident version from which we can track the compatibility mode of the IE browser
+function getTridentVersion() {
+    var tridStr = "Trident/";
+    var index = navigator.userAgent.indexOf(tridStr);
+
+    if (index > -1) {
+        return navigator.userAgent.substr(index + tridStr.length, 3);
+    }
+    else {
+        return 0;
+    }
+}
+
+jQuery.browser = {};
+(function () {
+    jQuery.browser.msie = false;
+    jQuery.browser.version = 0;
+    if (navigator.userAgent.match(/MSIE ([0-9]+)\./)) {
+        jQuery.browser.msie = true;
+        jQuery.browser.version = RegExp.$1;
+    }
+})();

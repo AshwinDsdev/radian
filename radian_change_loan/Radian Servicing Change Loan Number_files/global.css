@@ -1,0 +1,1274 @@
+﻿/********  START - Standard HTML Styles ***********/
+
+input
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: Black;
+    margin-left: 0px;
+}
+
+td
+{
+    vertical-align: top;
+    padding: 0;
+    margin: 0;
+}
+
+table
+{
+    padding: 0;
+    margin: 0;
+}
+
+div.clearBoth
+{
+    clear: both;
+    display: block;
+}
+
+/********  END - Standard HTML Styles ***********/
+
+/********  START - Section Seperator / Header for Non_popups ***********/
+
+.sectionSeperator
+{
+    font-size: 10px;
+    font-weight: bold;
+    font-family: Arial;
+    display: block;
+    margin: 10px 0px 1px 0px; /* top right bottom left */
+    
+    /*background-color: #CAE49C;*/
+    background-color: #f2f3f3;
+    
+    border-right: solid #9DB1C6 1px;
+    border-bottom: solid #9DB1C6 1px;
+    clear: both;
+    width: 100%;
+}
+
+.sectionSeperator table
+{
+    padding: 0;
+    border: 0;
+}
+
+.sectionSeperator td
+{
+    padding: 4px 4px 5px 4px;
+    /*color: #666666;*/
+    color: #002B49; 
+}
+
+.separatetabs
+{
+    padding: 8px 5px 2px 5px;
+}
+
+/********  END - Section Seperator / Header for Non_popups ***********/
+
+/********  START - Section Seperator / Header for Popups ***********/
+
+.sectionSeperatorPopup
+{
+    font-size: 10px;
+    font-weight: bold;
+    font-family: Arial;
+    display: block;
+    margin: 0px 0px 1px 0px; /* top right bottom left */
+    /*background-color: #CAE49C;*/
+    background-color: #f2f3f3;
+    
+    border-right: solid #9DB1C6 1px;
+    border-bottom: solid #9DB1C6 1px;
+    clear: both;
+    width: 100%;
+}
+
+.sectionSeperatorPopup table
+{
+    padding: 0;
+    border: 0;
+}
+
+.sectionSeperatorPopup td
+{
+    padding: 4px 4px 5px 4px;
+    /*color: #666666;*/
+     color: #002B49;
+}
+
+/********  END - Section Seperator / Header for Popups ***********/
+
+/********  START - Non-standard Hyperlinks ***********/
+
+.hyperLink span
+{
+    font-size: 13px;
+    font-weight: normal;
+    font-family: Arial;
+    color: #003399;
+}
+
+/********  END - Non-standard Hyperlinks ***********/
+
+
+/******** START - Styles for Web Application/Not Printer Friendly Grid View ***********/
+
+.resultsTableTblContainer
+{
+    /*background-color: #f5f7fc;*/
+    background-color: #fff;
+    width: 100%;
+}
+
+.resultsTableTDContainer
+{
+    /*background-color: #f5f7fc;*/
+    background-color:  #fff;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.resultsTable
+{
+	border: none;
+}
+
+.resultsTable td
+{
+    /*color: Black;*/
+    color: #565759;
+    font-size: 11px;
+    padding-bottom: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+    padding-top: 4px; /*display: block;*/
+    border: 1px solid #fff;
+}
+
+.resultsTableRow td span
+{
+    color: #565759;
+    font-size: 11px;
+}
+
+.resultsTableRow
+{
+    /*background-color: #DBE4EE;*/
+    background-color: #e3e4e4 !important;
+}
+
+.resultsTableRowAlternating
+{
+    /*background-color: #ebeff5;*/
+    background-color: #f4f4f4;
+}
+
+.resultsTableRowAlternating td span
+{
+    color: #565759;
+    font-size: 11px;
+}
+
+.resultsTableRowAlternatingBold
+{
+    background-color: #ebeff5;
+    font-weight: bold;
+}
+
+.resultsTableHeader
+{
+    /*font-weight: normal;*/
+    font-weight: bold;
+    font-family: Arial, Serif;
+    /*color: #666666;*/
+    color:#000000;
+    /*background-color: #F2F2F2;*/
+    background-color: #fff;
+    font-size: 12px;
+    padding: 4px 4px 4px 9px;
+    text-align: left;
+    border: 1px solid #fff;
+}
+
+.resultsTableHeader th
+{
+	font-weight: bold;
+	border: 1px solid #fff;
+	text-align: left;
+    padding: 4px 4px 4px 9px;
+}
+
+.resultsTableHeader a
+{
+     /*color: #666666;*/
+    color:#000000;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.resultsTableHeader a:hover
+{
+     /*color: #666666;*/
+    color:#000000;
+    text-decoration: underline;
+    font-size: 12px;
+}
+
+.resultsTableHeader a:link, .resultsTableHeader a:visited, .resultsTableHeader a:active
+{
+     font-size: 12px;
+     font-weight: bold;
+}
+.pagerTableTblContainer
+{
+    float: right;
+    color: Black;
+    font-size: 11px;
+    font-family: Arial, Serif;
+    display: block;
+}
+
+.resultsTableFooter
+{
+    background-color: #F2F2F2;
+}
+
+/******** END - Styles for Web Application/Not Printer Friendly Grid View ***********/
+
+/******** START - Styles for Web Application/Printer Friendly Grid View ***********/
+
+.resultsTableTblContainerBW
+{
+    background-color: White;
+    width: 100%;
+}
+
+.resultsTableTDContainerBW
+{
+    background-color: White;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.resultsTableBW
+{
+    border-width: 1px;
+    border-color: Black;
+}
+
+.resultsTableBW td
+{
+    color: Black;
+    font-size: 11px;
+    font-family: Arial;
+    padding-bottom: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+    padding-top: 4px;
+    display: block;
+    border-width: 1px;
+    border-color: Black;
+}
+
+.resultsTableRowBW
+{
+    background-color: White;
+}
+
+.resultsTableRowAlternatingBW
+{
+    background-color: White;
+}
+
+.resultsTableHeaderBW
+{
+    font-weight: normal;
+    font-family: Arial;
+    color: Black;
+    background-color: White;
+    font-size: 10px;
+    padding-bottom: 4px;
+    padding-left: 9px;
+    padding-right: 4px;
+    padding-top: 4px;
+    border-width: 1px;
+    border-color: Black;
+}
+
+.resultsTablePF
+{
+    color: #000000;
+    border: #CCCCCC solid 1px;
+    padding: 4px 4px 4px 4px;
+    font-weight: normal;
+}
+
+.resultsTablewraptextPF
+{
+    color: #666666;
+    border: #CCCCCC solid 1px;
+    padding: 4px 4px 4px 4px;
+    font-weight: normal;
+    white-space: normal;
+}
+
+.valuefield
+{
+    vertical-align: bottom;
+}
+
+/******** END - Styles for Web Application/Printer Friendly Grid View ***********/
+
+/********  START - Style used for error message ***********/
+.hideElement {
+    display: none;
+}
+
+.validationSummary
+{
+    color: #990000;
+    background: url(../images/alertBox/validationSummary.GIF);
+    background-repeat: no-repeat;
+    font-weight: bold;
+    font-family: Arial;
+    border: solid 1px #ccc;
+    width: auto;
+    height: auto;
+    text-align: left;
+    font-size: 12px;
+    padding-top: 35px;
+    padding-right: 20px;
+    padding-bottom: 40px;
+    padding-left: 40px;
+    word-wrap:break-word;
+}
+
+/********  END - Style used for error message ***********/
+
+/********  START - Field Labels and Labels that contain values ***********/
+
+.lable_column
+{
+    font-size: 13px;
+    font-family: Arial, Serif;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    white-space: nowrap;
+}
+
+.lable_column_SF
+{
+    font-size: 13px;
+    font-family: Arial, Serif;
+    color:  #5f6062;
+    white-space: nowrap;
+    font-weight:bold; 
+}
+
+.lable_columnBold
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    white-space: nowrap;
+    font-weight: bold;
+}
+.lable_columnBoldupd
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    font-weight: bold;
+}
+
+.lableValue_column
+{
+    font-size: 13px;
+    font-family: Arial, Serif;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    white-space: nowrap;
+}
+
+.lableValuecolumnwrap
+{
+    font-size: 13px;
+    font-family: Arial, Serif;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    word-break: break-all;
+    word-wrap: break-word;
+}
+.lableValuetextarea
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;     
+}
+.wordwrap
+{
+    word-break: break-all;
+    word-wrap: break-word;
+    white-space: normal;
+}
+.wrapcompleteword
+{
+    word-break: normal;
+    word-wrap: break-word;
+    white-space: normal;
+}
+.lableValue_column_wrap
+{
+    font-size: 13px;
+    font-family: Arial, Serif;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    white-space: normal;  
+}
+
+.lableValue_column_wrap_breakall
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    white-space: normal;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+
+.lableValue_columnBoldupd_wrap
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    font-weight: bold;
+    white-space: normal;
+}
+
+.lableValue_Header
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    font-weight: bold;
+    text-decoration: underline;
+    text-align: center;
+}
+
+.lable_column_withBGColor
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    white-space: nowrap;
+    background-color: #DBE4EE;
+}
+.lable_column_withBGColorAlternate
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    white-space: nowrap;
+    background-color: #ebeff5;
+}
+.lableValue_column_withBGColor
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    white-space: nowrap;
+    background-color: #DBE4EE;
+}
+.lableValue_column_withBGColorAlternate
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 4px;
+    color: #000000;
+    white-space: nowrap;
+    background-color: #ebeff5;
+}
+.entry_column
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #000000;
+}
+.entryValue_column
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 3px 0px;
+    color: #000000;
+    white-space: nowrap;
+}
+
+/********  END - Field Labels and Labels that contain values ***********/
+
+/********  START - Visible and Non Visible Styles ***********/
+
+.invisible
+{
+    display: none;
+    visibility: collapse;
+    height: 0px;
+}
+
+.visible
+{
+    visibility: visible;
+}
+
+/********  END - Visible and Non Visible Styles ***********/
+
+/********  START - Instructions and/or message at top of screen ***********/
+
+.instructions
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.instructions .MI-Nav-item
+{
+    font-size: 13px;
+    font-family: Arial;
+}
+
+.instructionsHeader
+{
+    font-size: 13px;
+    font-family: Arial;
+    font-weight: bold;
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.instructionsSuray
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 0px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.instructionsSurveyHeader
+{
+    font-size: 13px;
+    font-family: Arial;
+    font-weight: bold;
+    padding: 4px 4px 0px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+
+.instructions span
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #868686;
+    white-space: nowrap;
+}
+
+.instructionsRed
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #002B49;
+    vertical-align: top;
+}
+
+.instructionsRedBold
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #002B49;
+    vertical-align: top;
+    font-weight: bold;
+}
+.dataDisplayRed
+{
+    color: #cc0000;
+    font-size: 13px;
+    font-family: Arial;
+}
+.dataDisplaybold
+{
+    color: #868686;
+    font-size: 13px;
+    font-family: Arial;
+    font-weight: bold;
+}
+.instructionssmall
+{
+    font-size: 11px;
+    font-family: Arial;
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    white-space: nowrap;
+}
+.dataDisplayredsmall
+{
+    color: #cc0000;
+    font-size: 11px;
+    font-family: Arial;
+}
+
+/* Change Request - Aug-08-2012 In the doc uploaded popup message, bold the file name (similar to the first sentence) */
+.instructionsWrap
+{
+    font-size: 13px;
+    font-family: Arial;
+    font-weight: bold;
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    word-break: break-all;
+    word-wrap: break-word;
+    white-space: normal;
+}
+
+.instructionsNormalWrap
+{
+    font-size: 13px;
+    font-family: Arial;
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #868686;
+    vertical-align: top;
+    word-break: break-all;
+    word-wrap: break-word;
+    white-space: normal;
+}
+
+/********  END - Instructions and/or message at top of screen ***********/
+
+/********  START - Steps at top of screen ***********/
+
+.stepActive
+{
+    font-size: 14px;
+    font-family: Arial;
+    color: #868686;
+    font-weight: bold;
+    padding-right: 25px;
+}
+
+.stepInactive
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #c2c2c2;
+    padding-right: 25px;
+}
+
+/********  END - Steps at top of screen ***********/
+
+/********  START - Standard Links at the top of pages ***********/
+
+.VideoDemo
+{
+    font-size: 14px;
+    font-family: Arial;
+    color: #003399;
+}
+
+
+.topLinks
+{
+    font-size: 13px;
+    height: 20px;
+    vertical-align: bottom;
+    padding-top: 15px;
+    padding-right: 10px;
+}
+
+/*.returnLink
+{
+    background-image: url(../../images/cs_icon_2.gif);
+    background-repeat: no-repeat;
+    background-position: left 3px;
+    font-weight: normal;
+    display: block;
+    padding-bottom: 4px;
+    padding-left: 13px;
+}*/
+
+.returnLink_non_block
+{
+    background-image: url(../../images/cs_icon_2.gif);
+    background-repeat: no-repeat;
+    background-position: left 3px;
+    font-weight: normal;
+    padding-bottom: 4px;
+    padding-left: 13px;
+}
+
+/*.printLink
+{
+    background-image: url(../../images/icon_printer.gif);
+    background-repeat: no-repeat;
+    background-position: left -1px;
+    font-weight: normal;
+    display: block;
+    padding-left: 20px;
+    padding-right: 5px;
+    padding-bottom: 3px;
+}
+
+.pdf
+{
+    background-image: url(../../images/icon_acrobat.gif);
+    background-repeat: no-repeat;
+    background-position: left 2px;
+    font-weight: normal;
+    display: block;
+    padding-left: 20px;
+    padding-top: 5px;
+    padding-bottom: 3px;
+    text-decoration: underline;
+}
+
+.uploadDocuments
+{
+    background-image: url(../../images/uploadIcon.gif);
+    background-repeat: no-repeat;
+    background-position: left 5px;
+    font-weight: normal;
+    display: block;
+    padding-left: 23px;
+    padding-bottom: 3px;
+    vertical-align: bottom;
+    padding-top: 10px;
+}*/
+
+.email
+{
+    background-image: url(../../images/email.jpg);
+    background-repeat: no-repeat;
+    font-weight: normal;
+    display: block;
+    padding-left: 33px;
+    padding-bottom: 3px;
+    vertical-align: bottom;
+    padding-top: 10px;
+}
+
+.cancellation
+{
+    background-image: url(../../images/icon_delete.gif);
+    background-repeat: no-repeat;
+    background-position: left 12px;
+    font-weight: normal;
+    display: block;
+    padding-left: 17px;
+    padding-bottom: 3px;
+    vertical-align: bottom;
+    padding-top: 12px;
+}
+
+/*.comments
+{
+    background-image: url(../../images/icoNotes.gif);
+    background-repeat: no-repeat;
+    background-position: left 12px;
+    font-weight: normal;
+    display: block;
+    padding-left: 17px;
+    padding-bottom: 3px;
+    vertical-align: bottom;
+    padding-top: 12px;
+}*/
+
+
+/********  END - Standard Links at the top of pages ***********/
+
+/********  START - Standard Buttons at the top of pages ***********/
+
+div#actions
+{
+    padding-top: 12px;
+    border-top: 1px solid #003399;
+    margin-top: 5px;
+    margin-bottom: 7px;
+    width: 865px;
+}
+
+div#actions ul
+{
+    float: left;
+    clear: both;
+}
+
+div#actions ul li
+{
+    float: left;
+    list-style: none;
+    margin: 0 5px 3px 0;
+    border: 1px solid #003399;
+}
+
+div#actions ul a
+{
+    display: block;
+    padding: 2px 5px 2px 16px;
+    text-decoration: none;
+    font-size: 11px;
+    color: #003399;
+    background: #fff7d9 url(../images/small_arrow.gif) 3px 3px no-repeat;
+}
+
+div#actions ul a:link, div#actions ul a:visited
+{
+}
+
+div#actions ul a:hover, div#actions ul a:active
+{
+    background-color: #fff2bf;
+}
+
+div#actions ul li.iconButton
+{
+    border: none;
+    margin: 0 5px 5px 0;
+}
+
+div#actions ul li.iconButton a
+{
+    padding: 2px;
+    background: none;
+}
+
+
+/********  END - Standard Buttons at the top of pages ***********/
+
+/********  START - Standard Buttons at the top of pages ***********/
+
+.defaultedField
+{
+    background-color: #ebeff5;
+}
+
+/********  END - Standard Buttons at the top of pages ***********/
+
+/********  START - Standard Service Unavailable ***********/
+.defaultServiceUnavailable
+{
+    background-color: #DBE4EE;
+    color: #cc0000;
+    font-size: 11px;
+    font-family: Verdana;
+    display: block;
+    padding: 4px 4px 4px;
+    margin: 4px 4px 4px;
+    vertical-align: middle;
+}
+
+.defaultServiceUnavailable td
+{
+    vertical-align: middle;
+}
+/********  END - Standard Service Unavailable ***********/
+
+/********  START - Standard Watermark ***********/
+.dropdownWatermark
+{
+    color: #999 !important;
+}
+.watermark
+{
+    color: #999 !important;
+}
+.TxtOptionalWatermark:-moz-placeholder
+{
+    color: #999 !important;
+}
+
+.TxtOptionalWatermark::-webkit-input-placeholder
+{
+    color: #999 !important;
+}
+
+.DDLOptionalWatermark
+{
+    font-size: 13px;
+    font-family: Arial;
+    color: #999;
+}
+
+/********  END - Standard Watermark ***********/
+
+/********  START - Standard warning message ***********/
+.lable_column_warning
+{
+    font-size: 14px !important;
+    padding: 4px 4px 3px 4px;
+    color: #990000;
+    vertical-align: top;
+}
+
+.lable_column_no_sz
+{
+    font-size: 13px;
+    padding: 4px 4px 3px 4px;
+    color: #868686;
+    vertical-align: top;
+}
+/********  END - Standard warning message ***********/
+
+/********  START - App entry conditions grid ***********/
+/* Ticket # 357469 (MI Conditions) : Added below css from orderMICUW to this file.*/
+.conditionTextBox
+{
+    width: 470px;
+    border: 0;
+    border-bottom-color: White;
+    border-bottom-style: none;
+    white-space: normal;
+}
+
+.tdDelete
+{
+    vertical-align: middle;
+    text-align: center;
+}
+
+.columnsspace
+{
+    margin :10px;
+}
+
+.successmessage
+{
+    font-size: 13px;
+    font-family: Arial;
+    font-weight:bold ;  
+    padding: 4px 4px 20px 4px; /*top right bottom left*/
+    color: #990000;
+    vertical-align: top;
+    white-space: nowrap;
+    display:inline-block;
+}
+/********  End - App entry conditions grid ***********/
+
+
+/************ Start - For CUW .net Page ****************/
+
+.resultsTableHeaderBold
+{
+    font-weight:bold !important;
+    font-family: Arial;
+    color: #666666;
+    background-color: #F2F2F2;
+    font-size: 10px;
+    padding-bottom: 4px;
+    padding-left: 9px;
+    padding-right: 4px;
+    padding-top: 4px;
+    text-align: left;
+}
+
+.tabMoney
+{
+    width:80px;
+	text-align:right;
+	padding-right:2px;
+}
+
+.totalRow
+{
+    background-color:#F2F2F2;
+	color:#555;
+	border-right:none;
+	border-left:none;
+	text-align:right;
+	font-weight:bold;
+}
+
+/************ End - For CUW ****************/
+
+/************ Start - Styles for displaying text box and validators in a single line ****************/
+
+.u-valueField
+{
+    float: left;
+}
+
+/************ End - Styles for displaying text box and validators in a single line ****************/
+
+.listCtrlWithoutBorder td 
+{
+    border: 0px;
+}
+
+
+/******************HSG Rewrite ********************************************************************/
+
+.hsgRewrite {
+    color: #002B49;
+}
+
+.hsgRewrite .lable_column  {
+    color: #5f6062;
+    font-family: Arial, Serif; 
+    font-size: 13px !important;
+    margin-right:10px;
+}
+
+.hsgRewrite input[type="text"] {
+    display: inline-block;
+    border: 1px solid #ccc;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    height: 30px;
+    width: 100%;
+
+    font-size: 100%;
+    vertical-align: middle;
+
+    -webkit-transition: border-color 0.2s liner, box-shadow 0.2s linear;
+    -moz-transition:    border-color 0.2s liner, box-shadow 0.2s linear;
+    -ms-transition:     border-color 0.2s liner, box-shadow 0.2s linear;
+    -o-transition:      border-color 0.2s liner, box-shadow 0.2s linear;
+    transition:         border-color 0.2s liner, box-shadow 0.2s linear;
+	font-family: Arial;
+	color:#000000;    
+	padding:5px 7px 5px 7px;
+	margin-bottom: 10px;
+}
+
+.hsgRewrite input[type="radio"], .hsgRewrite input[type="checkbox"] , .hsgRewrite input[type="radio"] + label, .hsgRewrite input[type="checkbox"] + label {
+  border-color: transparent;
+  cursor: pointer;
+  color: #5f6062;
+}
+
+.hsgRewrite select {
+  height: 30px; /* 1 */
+  line-height: 30px;
+  color: #000000;
+  font-family: Arial;
+  font-size: 13px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  padding:5px 7px;
+}
+
+.hsgRewrite .resultsTable td
+{
+    color: #5f6062;
+    font-family: Arial; 
+    font-size: 12px;
+    line-height: 14px;
+    padding-bottom: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px; /*display: block;*/
+    border: 1px solid #fff;
+    
+}
+
+
+.hsgRewrite .resultsTableHeader {
+    color: #444547;
+    font-family: Arial, Serif;
+    font-size: 12px;
+    line-height: 14px;
+    padding-bottom: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+ }
+
+.hsgRewrite .resultsTableHeader th {
+    padding-bottom: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+ }
+ 
+.hsgRewrite .instructionsHeader {
+    color: #002B49;
+    font-family: Arial;
+     font-size: 13px;
+    font-weight: 700 !important;
+    margin-bottom: 0 !important;
+    padding-top:0px;
+    padding-bottom:0px;
+    padding-right:0px;    
+}
+
+.hsgRewrite .instructions {
+    color: #002B49;
+    font-family: Arial;
+    font-size: 13px;
+}
+
+ .hsgRewrite .sectionSeperator {
+    color: #5f6062;
+    font-family: "calluna", serif; 
+    margin: 10px 0px 1px 0px; /* top right bottom left */
+    font-size: 14px;  
+    font-weight:500;   
+    border: 0px; 
+}
+.hsgRewrite .sectionSeperator td{
+    padding-left : 5px;   
+    vertical-align:middle; 
+}
+.hsgRewrite .resultsTable a{
+    color :#8c0c04; 
+}
+.hsgRewrite h1{
+  margin: 10px 0
+}
+
+.hsgRewrite .hsg_SearchByLable
+{
+    color :#8c0c04;
+}
+.hsgRewrite  .resultsTableHeader a
+{
+    color: #444547;
+    font-size: 12px;  
+}
+.hsgRewrite .lableValue_column_bold  {
+     font-weight: 700;
+}
+
+.hsgRewrite input[type="text"]:focus
+{
+    border-color :#52a8ec;
+}
+.hsgRewrite .lableValue_column {
+    color: #5f6062;
+    font-family: Arial, Serif;
+    font-size: 13px !important;
+}
+.hsgRewrite .lableValue_column_wrap {
+    color: #5f6062;
+    font-family: Arial, Serif;
+    font-size: 13px !important;
+    white-space: normal;
+}
+.hsgRewrite .instructionssmall {
+  font-weight: normal;
+}
+.hsgRewrite .dataDisplayredsmall
+{
+  font-weight: normal;
+}
+.hsgRewrite .lable_columnBoldupd 
+{
+    margin-bottom: 0 !important;
+    font-weight : bold;   
+}
+
+.hsgRewrite .hsg_informationMessage
+{
+   font-size: 85%;
+   padding-top:0px;
+   padding-bottom:0px;
+}
+
+.hsgRewrite .hsg_Cancel
+{
+    border-top-right-radius: 5px !important;
+    border-bottom-right-radius: 5px !important;
+}
+
+.lt-ie9 .hsgRewrite .instructionsHeader,
+.lt-ie9 .hsgRewrite input[type="text"],
+.lt-ie9 .hsgRewrite select,
+.lt-ie9 .hsgRewrite .resultsTable td,
+.lt-ie9 .hsgRewrite .resultsTableHeader,
+.lt-ie9 .hsgRewrite .instructions,
+.lt-ie9 .hsgRewrite .sectionSeperator,
+.lt-ie9 .hsgRewrite .lableValue_column,
+.lt-ie9 .hsgRewrite .lable_column,
+.lt-ie9 .hsgRewrite .lableValue_column_wrap,
+.lt-ie9 .hsgRewrite #_TblRadianProductInfo td,
+.lt-ie9 .hsgRewrite #_TblPFBlendedRate td,
+.lt-ie9 .hsgRewrite .fieldLabel,
+.lt-ie9 .hsgRewrite .lable_columnBold,
+.lt-ie9 .hsgRewrite .MI-Nav-item
+{
+    font-family: Palatino, serif;
+}
+
+.hsgRewrite #_TblRadianProductInfo td,
+.hsgRewrite #_TblPFBlendedRate td
+{
+    color: #666666;
+    font-family: Arial;
+    font-size: 13px !important;
+}
+
+.hsgRewrite .fieldLabel
+{
+    color: #000000 !important;
+    font-family: Arial;
+    font-size: 13px !important;
+}
+
+.hsgRewrite .lable_columnBold
+{
+    color: #002B49;
+    font-family: Arial !important;
+    font-size: 13px !important;
+}
+
+.hsgRewrite .sectionLabel
+{
+    color: #002B49;
+    font-size: 16px !important;
+    font-family: "futura-pt", sans-serif;
+    text-transform:uppercase;
+}
+
+.hsgRewrite .MI-Nav-item
+{
+    color: #002B49;
+    font-family: "calluna", serif !important;
+    font-size: 14px !important;
+}
+
+.hsgRewrite .instructions .MI-Nav-item
+{
+    font-size: 13px !important;
+    font-family: Arial !important;
+}
+
+.hsgRewrite .formtable th, td
+{
+    line-height:20px;
+    padding-bottom:8px;
+}
+ #lblCUWMIApplicationDateValue
+ {
+     padding:4px 4px 3px 0px;
+ }

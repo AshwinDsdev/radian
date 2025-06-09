@@ -1,0 +1,47 @@
+/* -----------------------------------------------------------------------------
+   Init
+   -------------------------------------------------------------------------- */
+
+/**
+ * Load application JS.
+ */
+
+/**
+ * Declare application namespace.
+ */
+
+var MI = MI === undefined ? {} : MI;
+
+MI = {
+
+  init : function() {
+
+    /**
+     * Call application events.
+     */
+     this.events();
+
+     $('.lt-ie9 .MI-TableStriped tr:odd').addClass('js-striped');
+  },
+
+  /**
+   * Load application events.
+   */
+  events : function() {
+    $('.lt-ie7 .js-Dropdown').hover(this.ie6ToggleDropdown);
+  },
+
+  /**
+   * Need to display Dropdown-menu on hover. 
+   * IE 6 does not recognize CSS pseudo :hover class which we use 
+   * to display .Dropdown-menu's.
+   */
+  ie6ToggleDropdown : function( e ) {
+    $(e.target)
+      .closest('.js-Dropdown')
+        .toggleClass('is-open');
+  }
+
+}
+
+MI.init();

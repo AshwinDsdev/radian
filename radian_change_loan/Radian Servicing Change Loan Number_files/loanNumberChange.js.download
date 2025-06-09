@@ -1,0 +1,202 @@
+﻿
+// Change the string to upper case.
+function loanNumberUpperCase(CtrlId) {
+    if (CtrlId.value != "") {
+        CtrlId.value = CtrlId.value.toUpperCase();
+    }
+}
+
+// add the 0's to left hand side
+function leftPadCertificate(s) { 
+    var newcert;
+    if (s.length == 8) {
+        newcert = s;
+    }
+    else {
+        while (s.length < 8) {
+            s = "0" + s;
+        }
+        newcert = s;
+    }
+    return newcert;
+}
+
+
+// If all Cert# are empty then display the validator
+function CertificateEmptySearch(sender, args) {
+    var isAllCertempty = false;
+    var grdLoanNumber = $('#_GrdLoanNumberChange');
+    var gridCount = grdLoanNumber[0].rows.length;
+    if (gridCount > 0) {
+        for (var i = 2; i <= gridCount; i++) {
+            var idVal;
+            if (i > 9)
+                idVal = i.toString();
+            else
+                idVal = "0" + i.toString();
+           $('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val($.trim($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val()));
+            if ($.trim($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val()) != "") {
+                isAllCertempty = true;
+            }
+        }
+    }
+    args.IsValid = isAllCertempty;
+}
+
+// Check all Certs# are valid or not 
+function IsValidCertificates(sender, args) {
+    if ($('#_CvDuplicateCert')[0].isvalid == true) {
+        var isValidCert = true;
+        var grdLoanNumberChange = $('#_GrdLoanNumberChange');
+        for (var index1 = 1; index1 < grdLoanNumberChange[0].rows.length; index1++) {
+            var txtCertNum = grdLoanNumberChange[0].rows[index1].cells[0].getElementsByTagName("input")[0].value;
+            var isValid;
+            if ($('#_HdnShowRMAI')[0].value == "Y")
+                isValid = grdLoanNumberChange[0].rows[index1].cells[4].getElementsByTagName("input")[1].value;
+            else
+                isValid = grdLoanNumberChange[0].rows[index1].cells[3].getElementsByTagName("input")[1].value;
+            var borrowerName = grdLoanNumberChange[0].rows[index1].cells[1].innerText;
+            if ((txtCertNum != "") && (borrowerName != "") && (isValid == "False")) {
+                isValidCert = false;
+                break;
+            }
+        }
+        args.IsValid = isValidCert;
+    }
+}
+
+//Firefox Loan Number change issue - Changed innerText to textContent
+//To valdate the cert# with out borrower name the need to display the message.
+function ValidateCertificatesWithOutBorrowerName(sender, args) {
+    if (($('#_CvCertIsValid')[0].isvalid == true) && ($('#_CvDuplicateCert')[0].isvalid == true)) {
+        var isBorrowerNameEmpty = true;
+        var grdLoanNumberChange = $('#_GrdLoanNumberChange');
+        for (var index1 = 1; index1 < grdLoanNumberChange[0].rows.length; index1++) {
+            var txtCertNum = grdLoanNumberChange[0].rows[index1].cells[0].getElementsByTagName("input")[0].value;
+            var borrowerName;
+
+            if (!$.browser.msie) {
+                borrowerName = $.trim(grdLoanNumberChange[0].rows[index1].cells[1].textContent);
+            }
+            else {
+                borrowerName = $.trim(grdLoanNumberChange[0].rows[index1].cells[1].innerText);
+            }
+            if ((txtCertNum != "") && (borrowerName == "")) {
+                isBorrowerNameEmpty = false;
+                break;
+            }
+        }
+        args.IsValid = isBorrowerNameEmpty;
+    }
+}
+
+
+// Check the duplicate certificate number found
+function DuplicateCertificateCheck(sender, args) {
+    var isDuplicateFound = true;
+    var grdLoanNumber = $('#_GrdLoanNumberChange');
+    var gridCount = grdLoanNumber[0].rows.length;
+    if (gridCount > 0) {
+        for (var i = 2; i <= gridCount; i++) {
+            var idVal;
+            if (i > 9)
+                idVal = i.toString();
+            else
+                idVal = "0" + i.toString();
+            for (var j = i + 1; j <= gridCount; j++) {
+                var jVal;
+                if (j > 9)
+                    jVal = j.toString();
+                else
+                    jVal = "0" + j.toString();
+                if ($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val() != "")
+                    $('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val(leftPadCertificate($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val()));
+                if ($('#_GrdLoanNumberChange_ctl' + jVal + '__TxtCertificateNumber').val() != "")
+                    $('#_GrdLoanNumberChange_ctl' + jVal + '__TxtCertificateNumber').val(leftPadCertificate($('#_GrdLoanNumberChange_ctl' + jVal + '__TxtCertificateNumber').val()));
+
+                if (($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val() != "") || ($('#_GrdLoanNumberChange_ctl' + jVal + '__TxtCertificateNumber').val() != "")) {
+                    if ($.trim($('#_GrdLoanNumberChange_ctl' + idVal + '__TxtCertificateNumber').val()) == $.trim($('#_GrdLoanNumberChange_ctl' + jVal + '__TxtCertificateNumber').val())) {
+                        isDuplicateFound = false;
+                        break;
+                    }
+                }
+
+            }
+        }
+    }
+    args.IsValid = isDuplicateFound;
+}
+
+
+/// Clear the record on change of Certificate Number
+function clearLoanNumberRow(CtrlId, caption) {
+    var ctlFnId = CtrlId.id;
+    var splitFnId = ctlFnId.split("_");
+    var dynamicCtrlId = splitFnId[2];
+    var originalCert = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnCertificateNumber').val();
+    var hiddenCert = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').val();
+    if (caption.toLowerCase() == "clear") {
+        clearRow(dynamicCtrlId);
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').removeClass('error');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').addClass('entry_column');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').val('');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnIsClear').val('C');
+        return false;
+
+    } else { // this will execute when KeyUp event fired
+        if (($('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').attr('class') == "error") && (originalCert != hiddenCert)) {
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').removeClass('error');
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').addClass('entry_column');
+            clearRow(dynamicCtrlId);
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnIsClear').val('P');
+        }
+    }
+}
+
+// If it is valid cerificate then dont clear until number changed on certificate text box.
+function validCertificate(CtrlId) {
+    var ctlFnId = CtrlId.id;
+    var splitFnId = ctlFnId.split("_");
+    var dynamicCtrlId = splitFnId[2];
+    var originalCert = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnCertificateNumber').val();
+    var hiddenCert = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').val();
+    if (originalCert != hiddenCert) {
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').removeClass('error');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtCertificateNumber').addClass('entry_column');
+        clearRow(dynamicCtrlId);
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnIsClear').val('P');
+    }
+}
+
+//Firefox Loan Number change issue - Changed innerText to textContent
+// Common function for clear button and certificate number
+function clearRow(dynamicCtrlId) {
+
+    var borrowerName;
+    if (!$.browser.msie) {
+        borrowerName = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblBorrowerName')[0].textContent;
+    }
+    else {
+        borrowerName = $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblBorrowerName')[0].innerText;
+    }
+    if (borrowerName != "") {
+        if (!$.browser.msie) {
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblBorrowerName')[0].textContent = "";
+        }
+        else {
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblBorrowerName')[0].innerText= "";
+        }
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblBorrowerName').addClass('lableValue_column');
+
+        if ($('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblCompanyName')[0] != null)
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__LblCompanyName')[0].textContent = "";
+        if ($('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtLoanNumber')[0] != null) {
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtLoanNumber').css('display', 'none');
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__TxtLoanNumber').val('');
+        }
+        if ($('#_GrdLoanNumberChange_' + dynamicCtrlId + '__ImgBtnClear')[0] != null)
+            $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__ImgBtnClear').css('display','none');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnIsValid').val('false');
+        $('#_GrdLoanNumberChange_' + dynamicCtrlId + '__HdnLegalEntityFlag').val('');
+    }
+}
