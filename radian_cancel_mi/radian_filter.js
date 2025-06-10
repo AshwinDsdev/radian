@@ -238,33 +238,7 @@
   }
 
   // ########## ALLOWED LOAN NUMBERS ##########
-  /**
-   * List of allowed loan numbers for testing
-   * @type {string[]}
-   */
-  const LoanNums = [
-    "0194737052", "0151410206", "0180995748", "0000000612", "0000000687",
-    "0000000711", "0000000786", "0000000927", "0000000976", "0000001180",
-    "0000001230", "0000001453", "0000001537", "0000001594", "0000001669",
-    "0000001677", "0000001719", "0000001792", "0000001834", "0000001891",
-    "0000002063", "0000002352", "0000002410", "0000002436", "0000002477",
-    "0000002485", "0000002493", "0000002535", "0000002550", "0000002600",
-    "0000002642", "0000002667", "0000002691"
-  ];
 
-  /**
-   * Request a batch of numbers from the storage script
-   * @param {string[]} numbers - Array of loan numbers to check
-   * @returns {Promise<string[]>} Promise that resolves to an array of allowed loan numbers
-   */
-  const checkNumbersBatch = async (numbers) => {
-    // Filter loan numbers that are in the allowed list
-    const available = numbers.filter((num) => LoanNums.includes(num));
-    console.log(`🔍 Checked loan numbers: ${numbers.join(', ')}. Allowed: ${available.join(', ')}`);
-    return available;
-  };
-
-  /* Original implementation using Chrome extension
   async function checkNumbersBatch(numbers) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -288,7 +262,7 @@
       );
     });
   }
-  */
+
   /**
    * Checks if a loan number is allowed for the current user
    * @param {string} loanNumber - The loan number to check
