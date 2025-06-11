@@ -65,29 +65,29 @@
    * @constant {string}
    */
   const EXTENSION_ID = "afkpnpkodeiolpnfnbdokgkclljpgmcm";
-  
+
   /**
    * Interval in milliseconds for periodic filtering
    * @constant {number}
    */
   const FILTER_INTERVAL_MS = 2000;
-  
+
   /**
    * Maximum time to wait for page to be shown (safety timeout)
    * @constant {number}
    */
   const SAFETY_TIMEOUT_MS = 5000;
-  
+
   /**
    * Set to track elements that have already been processed
    * @type {WeakSet}
    */
   let processedElements = new WeakSet();
-  
+
   // Hide the page initially to prevent unauthorized access
   setTimeout(() => {
     pageUtils.showPage(false);
-    
+
     // Safety timeout: If page is not shown after timeout, show it anyway
     setTimeout(() => {
       if (document.body.style.opacity === "0") {
@@ -172,7 +172,9 @@
         !chrome.runtime ||
         !chrome.runtime.sendMessage
       ) {
-        console.warn("❌ Chrome extension API not available. Running in standalone mode.");
+        console.warn(
+          "❌ Chrome extension API not available. Running in standalone mode."
+        );
         // Show the page if Chrome extension API is not available
         pageUtils.showPage(true);
         resolve(false);
@@ -281,19 +283,19 @@
 
       // If not in cache, check with the extension
       const allowedNumbers = await checkNumbersBatch([loanNumber]);
-      
+
       // Update the cache with the result
       allowedLoansCache.addLoans(allowedNumbers);
-      
+
       // Check if the loan number is in the allowed list
       const isAllowed = allowedNumbers.includes(loanNumber);
-      
+
       if (isAllowed) {
         console.log(`✅ Loan ${loanNumber} is allowed`);
       } else {
         console.log(`❌ Loan ${loanNumber} is not allowed`);
       }
-      
+
       return isAllowed;
     } catch (error) {
       console.error(`❌ Error checking loan number ${loanNumber}:`, error);
@@ -308,6 +310,7 @@
    */
   function createUnallowedElement() {
     const unallowedDiv = document.createElement("div");
+    // Fix positioning - ensure it's fixed at the center of the screen
     unallowedDiv.style.position = "fixed";
     unallowedDiv.style.top = "50%";
     unallowedDiv.style.left = "50%";
@@ -324,11 +327,50 @@
     unallowedDiv.style.border = "1px solid #f5c6cb";
     unallowedDiv.style.borderRadius = "5px";
     unallowedDiv.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.2)";
+    // Remove duplicate position property
+    
+    // Create a container for better layout
+    const contentContainer = document.createElement("div");
+    contentContainer.style.position = "relative";
+    contentContainer.style.width = "100%";
     
     const paragraph = document.createElement("p");
     paragraph.textContent = "You are not provisioned to see the restricted loan";
+    paragraph.style.margin = "0";
+    paragraph.style.padding = "0";
+
+    // Create close button with improved positioning
+    const closeButton = document.createElement("button");
+    closeButton.textContent = "×";
+    closeButton.style.position = "absolute";
+    closeButton.style.top = "-20px";
+    closeButton.style.right = "-10px";
+    closeButton.style.background = "none";
+    closeButton.style.border = "none";
+    closeButton.style.fontSize = "24px";
+    closeButton.style.fontWeight = "bold";
+    closeButton.style.color = "#721c24";
+    closeButton.style.cursor = "pointer";
+    closeButton.style.padding = "0 5px";
+    closeButton.style.lineHeight = "1";
+    closeButton.title = "Close and go back";
+
+    // Add event listener to close button
+    closeButton.addEventListener("click", function () {
+      // Remove the alert
+      if (unallowedDiv.parentNode) {
+        unallowedDiv.parentNode.removeChild(unallowedDiv);
+      }
+
+      // Go back to previous URL
+      window.history.back();
+    });
+
+    // Append elements in the correct order
+    contentContainer.appendChild(paragraph);
+    unallowedDiv.appendChild(contentContainer);
+    unallowedDiv.appendChild(closeButton);
     
-    unallowedDiv.appendChild(paragraph);
     return unallowedDiv;
   }
 
@@ -368,7 +410,8 @@
      */
     constructor() {
       this.loanContainers = document.querySelectorAll(".sc-bDoHkx");
-      this.mainContainer = document.querySelector(".MuiContainer-root") || document.body;
+      this.mainContainer =
+        document.querySelector(".MuiContainer-root") || document.body;
       this.loanNumber = this.getLoanNumber();
       this.unallowedElement = null;
     }
@@ -380,17 +423,20 @@
     getLoanNumber() {
       // Find all potential elements that might contain loan numbers
       const paragraphs = document.querySelectorAll("p.sc-fXqexe");
-      
+
       // First, look for the label "Loan Number"
       for (let i = 0; i < paragraphs.length; i++) {
-        if (paragraphs[i].textContent.trim() === "Loan Number" && i + 1 < paragraphs.length) {
+        if (
+          paragraphs[i].textContent.trim() === "Loan Number" &&
+          i + 1 < paragraphs.length
+        ) {
           const loanNumberText = paragraphs[i + 1].textContent.trim();
           if (containsLoanNumber(loanNumberText)) {
             return loanNumberText;
           }
         }
       }
-      
+
       // Fallback: check all paragraphs for potential loan numbers
       for (const element of paragraphs) {
         const text = element.textContent.trim();
@@ -398,7 +444,7 @@
           return text;
         }
       }
-      
+
       return null;
     }
 
@@ -406,7 +452,7 @@
      * Hides all loan information containers
      */
     hideAllLoanContainers() {
-      this.loanContainers.forEach(container => {
+      this.loanContainers.forEach((container) => {
         container.style.display = "none";
       });
     }
@@ -419,7 +465,7 @@
       if (this.unallowedElement && this.unallowedElement.parentNode) {
         this.unallowedElement.parentNode.removeChild(this.unallowedElement);
       }
-      
+
       // Create and add the unallowed message
       this.unallowedElement = createUnallowedElement();
       document.body.appendChild(this.unallowedElement);
@@ -436,20 +482,36 @@
       }
 
       console.log(`🔍 Checking if loan number is allowed: ${this.loanNumber}`);
-      
+
       const isAllowed = await isLoanNumberAllowed(this.loanNumber);
-      
+
       if (!isAllowed) {
-        console.log(`❌ Loan ${this.loanNumber} is not allowed, hiding information`);
-        
+        console.log(
+          `❌ Loan ${this.loanNumber} is not allowed, hiding information`
+        );
+
         // Hide all loan containers and show the unallowed message
         this.hideAllLoanContainers();
+
+        // Hide content with class "contentmenu"
+        const contentMenuElements = document.querySelectorAll(".contentmenu");
+        if (contentMenuElements.length > 0) {
+          console.log(
+            `🔍 Found ${contentMenuElements.length} contentmenu elements to hide`
+          );
+          contentMenuElements.forEach((element) => {
+            element.style.display = "none";
+          });
+        }
+
         this.showUnallowedMessage();
         return true;
       } else {
-        console.log(`✅ Loan ${this.loanNumber} is allowed, showing information`);
+        console.log(
+          `✅ Loan ${this.loanNumber} is allowed, showing information`
+        );
       }
-      
+
       return false;
     }
   }
@@ -461,18 +523,19 @@
     try {
       // Create a single filter instance for the whole page
       const filter = new LoanInfoFilter();
-      
+
       // Check if there are loan containers on the page
       if (filter.loanContainers.length === 0) {
         console.log("ℹ️ No loan containers found");
         return;
       }
-      
-      console.log(`🔍 Found ${filter.loanContainers.length} potential loan containers`);
-      
+
+      console.log(
+        `🔍 Found ${filter.loanContainers.length} potential loan containers`
+      );
+
       // Filter the loan information
       await filter.filter();
-      
     } catch (error) {
       console.error("❌ Error filtering loan info:", error);
     }
@@ -485,17 +548,14 @@
   function setupMutationObserver() {
     // Keep track of whether we've already filtered the page
     let hasFiltered = false;
-    
+
     const observer = new MutationObserver((mutations) => {
       let shouldFilter = false;
-      
+
       // Only check for new loan containers if we haven't already filtered
       if (!hasFiltered) {
         for (const mutation of mutations) {
-          if (
-            mutation.type === "childList" &&
-            mutation.addedNodes.length > 0
-          ) {
+          if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
             for (const node of mutation.addedNodes) {
               if (node.nodeType === Node.ELEMENT_NODE) {
                 // Check if the added node or its children contain loan info
@@ -509,16 +569,16 @@
               }
             }
           }
-          
+
           if (shouldFilter) break;
         }
-        
+
         if (shouldFilter) {
           console.log("🔄 DOM changes detected, filtering loan information");
           filterLoanInfo().then(() => {
             // Mark that we've filtered the page
             hasFiltered = true;
-            
+
             // Show the page after filtering
             pageUtils.showPage(true);
             console.log("✅ Page shown after filtering");
@@ -526,13 +586,13 @@
         }
       }
     });
-    
+
     // Start observing the document body for DOM changes
     observer.observe(document.body, {
       childList: true,
       subtree: true,
     });
-    
+
     return observer;
   }
 
@@ -542,21 +602,20 @@
   async function init() {
     try {
       console.log("🚀 Initializing Radian Cancel MI filter script");
-      
+
       // Set up mutation observer for dynamic content
       const observer = setupMutationObserver();
-      
+
       // Wait for the DOM to be more fully loaded
       setTimeout(async () => {
         // Initial filtering
         await filterLoanInfo();
-        
+
         // Show the page after initial filtering
         pageUtils.showPage(true);
-        
+
         console.log("✅ Filter script initialized successfully");
       }, 500);
-      
     } catch (error) {
       console.error("❌ Error initializing filter script:", error);
       // Make sure the page is shown even if there's an error

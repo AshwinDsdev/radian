@@ -1,6 +1,3 @@
-//radian cancel mi final screen html
-
-
 <!DOCTYPE html>
 <!-- saved from url=(0053)https://www.mionline.biz/Loan-Servicing/Cancel-Refund -->
 <html lang="en">
@@ -13,7 +10,7 @@
 
     <!-- Modern CSS Framework - Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Radian Loan Filter Script -->
     <script src="./radian_filter.js" defer></script>
 
@@ -64,64 +61,103 @@
             --warning-color: #f39c12;
             --error-color: #e74c3c;
             --text-color: #333333;
-            --border-radius: 4px;
-            --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             --transition-speed: 0.3s;
+            --gradient-primary: linear-gradient(135deg, #002b49, #004b7d);
+            --gradient-secondary: linear-gradient(135deg, #16891f, #1eac27);
+            --gradient-light: linear-gradient(to right, #ffffff, #f5f9ff);
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            --spacing-xxl: 48px;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Roboto', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
             line-height: 1.6;
             color: var(--text-color);
             background-color: #f9f9f9;
             margin: 0;
             padding: 0;
+            letter-spacing: 0.2px;
         }
 
         /* Container enhancements */
         #mionline-container-sc {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 15px;
+            padding: 0 var(--spacing-lg);
+            box-sizing: border-box;
         }
 
         /* Header enhancements */
         .sc-cmoDVi {
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
             position: sticky;
             top: 0;
             z-index: 1000;
-            background-color: white;
+            background: var(--gradient-light);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: var(--spacing-sm) 0;
         }
 
         /* Navigation and steps */
         .sc-cUkrys {
-            margin: 30px 0;
-            transition: all 0.3s ease;
+            margin: var(--spacing-xl) 0;
+            transition: all 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--spacing-md) var(--spacing-lg);
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         .sc-dRpcpH {
-            transition: transform 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin: 0 var(--spacing-sm);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: var(--spacing-sm);
         }
 
         .sc-dRpcpH:hover {
-            transform: translateY(-3px);
+            transform: translateY(-5px);
+        }
+
+        .sc-dRpcpH div:first-child {
+            margin-bottom: var(--spacing-sm);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sc-dRpcpH div:last-child {
+            font-weight: 500;
+            margin-top: var(--spacing-xs);
+            font-size: 14px;
         }
 
         /* Card styling */
         .sc-bXKXcl,
         .sc-emytNQ {
-            border-radius: 8px;
+            border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
             overflow: hidden;
-            transition: all var(--transition-speed);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
             background-color: white;
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-lg);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            padding: var(--spacing-lg);
         }
 
         .sc-bXKXcl:hover,
         .sc-emytNQ:hover {
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
         }
 
         /* Form elements */
@@ -129,8 +165,21 @@
         select,
         .MuiSelect-select {
             border-radius: var(--border-radius) !important;
-            transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
-            padding: 10px 12px !important;
+            transition: all 0.3s ease !important;
+            padding: var(--spacing-md) !important;
+            border: 1px solid var(--medium-gray) !important;
+            background-color: rgba(255, 255, 255, 0.8) !important;
+            font-size: 16px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            margin-bottom: var(--spacing-md) !important;
+        }
+
+        input:hover,
+        select:hover,
+        .MuiSelect-select:hover {
+            border-color: var(--accent-color) !important;
+            background-color: white !important;
         }
 
         input:focus,
@@ -139,86 +188,145 @@
             border-color: var(--accent-color) !important;
             box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2) !important;
             outline: none !important;
+            background-color: white !important;
         }
 
         /* Button enhancements */
         button,
         .MuiButton-root {
             border-radius: var(--border-radius) !important;
-            transition: all var(--transition-speed) !important;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
             text-transform: none !important;
-            font-weight: 500 !important;
-            letter-spacing: 0.3px !important;
-            padding: 8px 20px !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.5px !important;
+            padding: var(--spacing-md) var(--spacing-xl) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
         }
 
         button:hover,
         .MuiButton-root:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-3px) !important;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15) !important;
         }
 
         button:active,
         .MuiButton-root:active {
-            transform: translateY(0);
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
         }
 
         /* Typography enhancements */
         .sc-bGGtNl {
-            font-size: 28px !important;
-            font-weight: 600 !important;
+            font-size: 32px !important;
+            font-weight: 700 !important;
             color: var(--primary-color) !important;
-            margin-bottom: 20px !important;
+            margin-bottom: var(--spacing-lg) !important;
+            letter-spacing: -0.5px !important;
+            line-height: 1.2 !important;
+            position: relative !important;
+            padding-bottom: var(--spacing-md) !important;
+        }
+
+        .sc-bGGtNl::after {
+            content: "" !important;
+            position: absolute !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 60px !important;
+            height: 4px !important;
+            background: var(--gradient-primary) !important;
+            border-radius: 2px !important;
         }
 
         .sc-fXqexe {
-            line-height: 1.6 !important;
+            line-height: 1.8 !important;
+            font-size: 16px !important;
+            color: #555 !important;
+            margin-bottom: var(--spacing-md) !important;
         }
 
         /* Certificate info styling */
         .sc-UFhIr {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
-            padding: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--spacing-lg);
+            padding: var(--spacing-lg);
+            margin: var(--spacing-lg) 0;
         }
 
         .sc-bDoHkx {
-            padding: 10px;
+            padding: var(--spacing-md) var(--spacing-lg);
             border-radius: var(--border-radius);
             background-color: var(--light-gray);
-            transition: background-color var(--transition-speed);
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .sc-bDoHkx:hover {
             background-color: #e9f0f7;
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         /* Stepper enhancements */
         .sc-liQuFD {
-            margin: 30px 0;
+            margin: var(--spacing-xl) 0;
+            padding: var(--spacing-lg) 0;
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
         }
 
         /* Alert styling */
         .sc-fHLMLc {
             border-radius: var(--border-radius);
-            padding: 15px;
+            padding: var(--spacing-lg);
             background-color: #fff8e1;
             border-left: 4px solid var(--warning-color);
+            margin: var(--spacing-lg) 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
+            :root {
+                --spacing-lg: 16px;
+                --spacing-xl: 24px;
+                --spacing-xxl: 32px;
+            }
+
             .sc-UFhIr {
                 grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+                padding: var(--spacing-md);
             }
 
             .sc-cUkrys {
                 flex-direction: column;
+                padding: var(--spacing-md);
             }
 
             .sc-dRpcpH {
-                margin-bottom: 10px;
+                margin-bottom: var(--spacing-md);
+                margin-top: var(--spacing-md);
+            }
+
+            .sc-bGGtNl {
+                font-size: 28px !important;
+            }
+
+            #mionline-container-sc {
+                padding: 0 var(--spacing-md);
+            }
+
+            button,
+            .MuiButton-root {
+                padding: var(--spacing-sm) var(--spacing-lg) !important;
+                width: 100% !important;
+                margin-bottom: var(--spacing-sm) !important;
             }
         }
 
@@ -226,15 +334,33 @@
         @keyframes fadeIn {
             from {
                 opacity: 0;
+                transform: translateY(10px);
             }
 
             to {
                 opacity: 1;
+                transform: translateY(0);
             }
         }
 
         .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
         }
 
         /* Accessibility improvements */
@@ -245,20 +371,73 @@
 
         /* Custom scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 10px;
         }
 
         ::-webkit-scrollbar-track {
             background: var(--light-gray);
+            border-radius: 5px;
         }
 
         ::-webkit-scrollbar-thumb {
             background: var(--medium-gray);
-            border-radius: 4px;
+            border-radius: 5px;
+            border: 2px solid var(--light-gray);
         }
 
         ::-webkit-scrollbar-thumb:hover {
             background: #999;
+        }
+
+        /* Improved spacing and alignment */
+        .contentmenu {
+            padding: var(--spacing-lg) 0;
+        }
+
+        .sc-AKUrq {
+            padding: var(--spacing-lg);
+        }
+
+        /* Enhanced visual hierarchy */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin-top: 0;
+            margin-bottom: var(--spacing-md);
+            line-height: 1.3;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: var(--spacing-md);
+        }
+
+        /* Improved table styling */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: var(--spacing-lg) 0;
+        }
+
+        th,
+        td {
+            padding: var(--spacing-md);
+            text-align: left;
+            border-bottom: 1px solid var(--medium-gray);
+        }
+
+        th {
+            background-color: var(--light-gray);
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        tr:hover td {
+            background-color: rgba(74, 144, 226, 0.05);
         }
     </style>
     <link rel="shortcut icon" href="https://www.mionline.biz/Loan-Servicing/undefined/favicon.ico"
@@ -636,13 +815,29 @@
 </head>
 
 <body style="">
-    <!-- Page Loader -->
+    <!-- Enhanced Page Loader -->
     <div id="page-loader" class="fixed inset-0 bg-white flex items-center justify-center z-50">
         <div class="loader-content text-center">
+            <div class="loader-logo mb-4">
+                <!-- Radian Logo Animation Container -->
+                <div class="logo-container">
+                    <svg width="80" height="80" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e0e0e0" stroke-width="8" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#002b49" stroke-width="8"
+                            stroke-dasharray="251.2" stroke-dashoffset="251.2" class="animate-circle" />
+                    </svg>
+                    <div class="logo-inner">
+                        <div class="logo-pulse"></div>
+                    </div>
+                </div>
+            </div>
             <div class="spinner-border text-primary mb-3" role="status"
-                style="width: 3rem; height: 3rem; border-width: 0.25em; border-color: #002b49 transparent #002b49 transparent; border-radius: 50%; display: inline-block; animation: spin 1.2s linear infinite;">
+                style="width: 3rem; height: 3rem; border-width: 0.25em; border-color: #002b49 transparent #16891f transparent; border-radius: 50%; display: inline-block; animation: spin 1.2s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;">
             </div>
             <h3 class="mt-3 text-lg font-medium text-gray-700">Loading Radian Cancel MI...</h3>
+            <div class="loading-progress">
+                <div class="progress-bar"></div>
+            </div>
         </div>
     </div>
 
@@ -657,22 +852,138 @@
             }
         }
 
+        @keyframes pulse {
+            0% {
+                transform: scale(0.8);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.4;
+            }
+
+            100% {
+                transform: scale(0.8);
+                opacity: 0.8;
+            }
+        }
+
+        @keyframes circle-animation {
+            0% {
+                stroke-dashoffset: 251.2;
+            }
+
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes progress {
+            0% {
+                width: 0%;
+            }
+
+            20% {
+                width: 20%;
+            }
+
+            50% {
+                width: 50%;
+            }
+
+            80% {
+                width: 80%;
+            }
+
+            100% {
+                width: 100%;
+            }
+        }
+
         #page-loader {
-            transition: opacity 0.5s ease, visibility 0.5s ease;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+            background: linear-gradient(135deg, #ffffff, #f5f9ff);
         }
 
         .loader-hidden {
             opacity: 0;
             visibility: hidden;
         }
+
+        .loader-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto;
+        }
+
+        .logo-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background-color: #002b49;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-pulse {
+            width: 20px;
+            height: 20px;
+            background-color: #16891f;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .animate-circle {
+            animation: circle-animation 2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background-color: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #002b49, #16891f);
+            border-radius: 2px;
+            animation: progress 2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+        }
     </style>
 
     <script>
-        // Hide loader after page loads
+        // Enhanced loader with progress simulation
         window.addEventListener('load', function () {
-            setTimeout(function () {
-                document.getElementById('page-loader').classList.add('loader-hidden');
-            }, 500);
+            // Simulate progress
+            const progressBar = document.querySelector('.progress-bar');
+            let progress = 0;
+            const interval = setInterval(function () {
+                progress += 5;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    // Hide loader with a slight delay for smooth transition
+                    setTimeout(function () {
+                        document.getElementById('page-loader').classList.add('loader-hidden');
+                    }, 300);
+                }
+            }, 100);
         });
     </script>
     <div id="ZN_9SGDvpg2Y5SF8zk"><!--DO NOT REMOVE-CONTENTS PLACED HERE--></div>
@@ -1312,6 +1623,43 @@
         // Load SweetAlert2 for better alerts and confirmations
         loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11', function () {
             console.log('SweetAlert2 loaded');
+
+            // Override default browser alerts with SweetAlert2
+            window.alert = function (message) {
+                Swal.fire({
+                    title: 'Notice',
+                    text: message,
+                    icon: 'info',
+                    confirmButtonColor: '#002b49',
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        popup: 'animated fadeInDown faster',
+                        title: 'text-primary',
+                        confirmButton: 'btn-primary'
+                    }
+                });
+            };
+
+            // Override default browser confirms with SweetAlert2
+            window.confirm = function (message) {
+                return new Promise((resolve) => {
+                    Swal.fire({
+                        title: 'Confirm',
+                        text: message,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#002b49',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Yes',
+                        cancelButtonText: 'No',
+                        customClass: {
+                            popup: 'animated fadeInDown faster'
+                        }
+                    }).then((result) => {
+                        resolve(result.isConfirmed);
+                    });
+                });
+            };
         });
 
         // Load Tippy.js for enhanced tooltips
@@ -1329,7 +1677,10 @@
                     content: (reference) => reference.getAttribute('aria-label') || 'Click',
                     placement: 'top',
                     arrow: true,
-                    theme: 'light'
+                    theme: 'light-border',
+                    animation: 'shift-away',
+                    duration: [275, 200],
+                    inertia: true
                 });
 
                 tippy('svg', {
@@ -1339,25 +1690,51 @@
                     },
                     placement: 'top',
                     arrow: true,
-                    theme: 'light'
+                    theme: 'light-border',
+                    animation: 'shift-away',
+                    duration: [275, 200],
+                    inertia: true
+                });
+
+                // Add tooltips to navigation items
+                tippy('.sc-kIsWfj', {
+                    content: 'Navigate',
+                    placement: 'right',
+                    arrow: true,
+                    theme: 'light-border',
+                    animation: 'shift-away',
+                    delay: [300, 0],
+                    inertia: true
+                });
+
+                // Add tooltips to certificate info items
+                tippy('.sc-bDoHkx', {
+                    content: 'Certificate Information',
+                    placement: 'top',
+                    arrow: true,
+                    theme: 'light-border',
+                    animation: 'shift-away',
+                    delay: [300, 0],
+                    inertia: true
                 });
             }
         }
 
         document.addEventListener('DOMContentLoaded', function () {
-            // Apply glass effect to cards
+            // Apply glass effect to cards with staggered animation
             const cards = document.querySelectorAll('.sc-bXKXcl, .sc-emytNQ');
-            cards.forEach(card => {
+            cards.forEach((card, index) => {
                 card.classList.add('glass-effect');
                 card.classList.add('hover-lift');
                 card.classList.add('animate-fade-in');
+                card.style.animationDelay = `${index * 0.15}s`;
             });
 
-            // Apply animation to certificate info
+            // Apply animation to certificate info with staggered effect
             const infoItems = document.querySelectorAll('.sc-bDoHkx');
             infoItems.forEach((item, index) => {
                 item.classList.add('animate-slide-up');
-                item.style.animationDelay = `${index * 0.1}s`;
+                item.style.animationDelay = `${0.3 + (index * 0.1)}s`;
             });
 
             // Add Font Awesome icons to enhance UI
@@ -1371,7 +1748,71 @@
 
             // Add keyboard navigation
             enableKeyboardNavigation();
+
+            // Add scroll reveal effects
+            initScrollReveal();
+
+            // Add subtle background pattern
+            addSubtleBackground();
+
+            // Enhance buttons with ripple effect
+            enhanceButtons();
         });
+
+        // Add subtle background pattern to improve visual appeal
+        function addSubtleBackground() {
+            const backgroundPattern = document.createElement('div');
+            backgroundPattern.className = 'background-pattern';
+            document.body.appendChild(backgroundPattern);
+        }
+
+        // Initialize scroll reveal effects
+        function initScrollReveal() {
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            // Observe elements that should animate when scrolled into view
+            document.querySelectorAll('.sc-bXKXcl, .sc-emytNQ, .sc-bDoHkx, .sc-dRpcpH').forEach(el => {
+                el.classList.add('reveal-element');
+                observer.observe(el);
+            });
+        }
+
+        // Enhance buttons with ripple effect
+        function enhanceButtons() {
+            const buttons = document.querySelectorAll('button, .MuiButton-root');
+
+            buttons.forEach(button => {
+                button.addEventListener('click', function (e) {
+                    const rect = this.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const ripple = document.createElement('span');
+                    ripple.className = 'ripple';
+                    ripple.style.left = `${x}px`;
+                    ripple.style.top = `${y}px`;
+
+                    this.appendChild(ripple);
+
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+        }
 
         // Add Font Awesome icons to enhance UI
         function addFontAwesomeIcons() {
@@ -1744,22 +2185,24 @@
         }
     </script>
 
-    <!-- Add CSS for ripple effect -->
+    <!-- Add CSS for enhanced visual effects -->
     <style>
         /* Ripple effect */
         button,
         .MuiButton-root {
             position: relative;
             overflow: hidden;
+            transform: translate3d(0, 0, 0);
         }
 
         .ripple {
             position: absolute;
             border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.4);
+            background-color: rgba(255, 255, 255, 0.6);
             transform: scale(0);
-            animation: ripple 0.6s linear;
+            animation: ripple 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
             pointer-events: none;
+            z-index: 0;
         }
 
         @keyframes ripple {
@@ -1769,155 +2212,304 @@
             }
         }
 
-        /* Responsive styles */
+        /* Responsive styles with improved mobile experience */
         .mobile-view .sc-UFhIr {
             grid-template-columns: 1fr;
+            padding: var(--spacing-md);
         }
 
         .mobile-view .sc-cUkrys {
             flex-direction: column;
+            padding: var(--spacing-md);
+            margin: var(--spacing-md) 0;
         }
 
         .mobile-view .sc-dRpcpH {
-            margin-bottom: 10px;
+            margin-bottom: var(--spacing-md);
+            width: 100%;
+            justify-content: center;
         }
 
-        /* Enhanced form styles */
+        /* Enhanced form styles with better visual feedback */
         input:focus,
         select:focus,
         .MuiSelect-select:focus {
             outline: none !important;
+            animation: pulse-border 1.5s ease-out;
         }
 
-        /* Button hover states */
+        @keyframes pulse-border {
+            0% {
+                box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px rgba(74, 144, 226, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(74, 144, 226, 0);
+            }
+        }
+
+        /* Button hover states with smooth transitions */
         button:not([disabled]):hover,
         .MuiButton-root:not(.Mui-disabled):hover {
-            filter: brightness(1.05);
+            filter: brightness(1.08);
+            transform: translateY(-3px) !important;
+            box-shadow: 0 7px 14px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1) !important;
         }
 
-        /* Card hover effects */
+        /* Card hover effects with 3D-like transformation */
         .sc-bXKXcl:hover,
         .sc-emytNQ:hover {
-            transform: translateY(-2px);
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07) !important;
         }
 
-        /* Improved accessibility */
+        /* Improved accessibility with clear focus states */
         a:focus,
         button:focus,
         input:focus,
         select:focus {
             outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
+            outline-offset: 3px;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+            transition: all 0.2s ease-in-out;
         }
 
         /* Enhanced form elements with modern styling */
         .MuiInputBase-root {
-            border-radius: 8px !important;
-            transition: all 0.3s ease !important;
-            background-color: rgba(255, 255, 255, 0.8) !important;
+            border-radius: var(--border-radius) !important;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
         }
 
         .MuiInputBase-root:hover {
             background-color: rgba(255, 255, 255, 1) !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08) !important;
+            border-color: var(--accent-color) !important;
         }
 
         .MuiInputBase-input {
-            padding: 12px 16px !important;
+            padding: var(--spacing-md) var(--spacing-lg) !important;
             font-size: 16px !important;
+            letter-spacing: 0.2px !important;
         }
 
         .MuiSelect-select {
-            padding: 12px 16px !important;
-            border-radius: 8px !important;
+            padding: var(--spacing-md) var(--spacing-lg) !important;
+            border-radius: var(--border-radius) !important;
         }
 
         .MuiInputLabel-root {
-            font-weight: 500 !important;
+            font-weight: 600 !important;
             color: var(--primary-color) !important;
-            margin-bottom: 8px !important;
+            margin-bottom: var(--spacing-sm) !important;
             font-size: 16px !important;
+            letter-spacing: 0.2px !important;
+            transform: none !important;
+            position: relative !important;
+            padding-left: var(--spacing-xs) !important;
         }
 
-        /* Enhanced buttons */
+        .MuiInputLabel-root::before {
+            content: "" !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 25% !important;
+            height: 50% !important;
+            width: 3px !important;
+            background-color: var(--primary-color) !important;
+            border-radius: 2px !important;
+        }
+
+        /* Enhanced buttons with gradient and depth */
         .MuiButton-contained {
-            background: linear-gradient(45deg, var(--primary-color), #003b63) !important;
-            box-shadow: 0 4px 10px rgba(0, 43, 73, 0.2) !important;
-            font-weight: 500 !important;
+            background: linear-gradient(45deg, var(--primary-color), #004b7d) !important;
+            box-shadow: 0 4px 10px rgba(0, 43, 73, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            font-weight: 600 !important;
             letter-spacing: 0.5px !important;
             text-transform: none !important;
-            padding: 10px 24px !important;
-            border-radius: 8px !important;
+            padding: var(--spacing-md) var(--spacing-xl) !important;
+            border-radius: var(--border-radius) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        }
+
+        .MuiButton-contained::after {
+            content: "" !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: -100% !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent) !important;
+            transition: 0.5s !important;
+        }
+
+        .MuiButton-contained:hover::after {
+            left: 100% !important;
         }
 
         .MuiButton-outlined {
             border: 2px solid var(--primary-color) !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
             letter-spacing: 0.5px !important;
             text-transform: none !important;
-            padding: 8px 22px !important;
-            border-radius: 8px !important;
+            padding: calc(var(--spacing-md) - 2px) calc(var(--spacing-xl) - 2px) !important;
+            border-radius: var(--border-radius) !important;
+            background-color: transparent !important;
+            color: var(--primary-color) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            z-index: 1 !important;
         }
 
-        /* Card styling */
+        .MuiButton-outlined::before {
+            content: "" !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 0 !important;
+            height: 100% !important;
+            background-color: rgba(0, 43, 73, 0.08) !important;
+            z-index: -1 !important;
+            transition: width 0.3s ease !important;
+        }
+
+        .MuiButton-outlined:hover::before {
+            width: 100% !important;
+        }
+
+        /* Card styling with refined aesthetics */
         .sc-bXKXcl,
         .sc-emytNQ {
-            border-radius: 12px !important;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+            border-radius: var(--border-radius) !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
             overflow: hidden !important;
             border: 1px solid rgba(0, 0, 0, 0.05) !important;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+            background-color: white !important;
+            position: relative !important;
         }
 
-        /* Header styling */
+        .sc-bXKXcl::after,
+        .sc-emytNQ::after {
+            content: "" !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 4px !important;
+            background: linear-gradient(to right, var(--primary-color), var(--accent-color)) !important;
+            opacity: 0 !important;
+            transition: opacity 0.3s ease !important;
+        }
+
+        .sc-bXKXcl:hover::after,
+        .sc-emytNQ:hover::after {
+            opacity: 1 !important;
+        }
+
+        /* Header styling with subtle gradient */
         .sc-fjWFkj {
-            background: linear-gradient(to right, #ffffff, #f5f9ff) !important;
+            background: var(--gradient-light) !important;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+            padding: var(--spacing-sm) 0 !important;
+            transition: all 0.3s ease !important;
         }
 
-        /* Footer styling */
+        /* Footer styling with improved spacing */
         .sc-jxwAOl {
             background-color: #f5f7fa !important;
             border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
-            padding: 20px 0 !important;
+            padding: var(--spacing-lg) 0 !important;
+            margin-top: var(--spacing-xl) !important;
         }
 
-        /* Stepper styling */
+        /* Stepper styling with enhanced interactions */
         .sc-dRpcpH {
-            transition: all 0.3s ease !important;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+            cursor: pointer !important;
         }
 
         .sc-dRpcpH:hover {
-            transform: translateY(-3px) !important;
+            transform: translateY(-5px) !important;
         }
 
-        /* Certificate info styling */
+        .sc-dRpcpH div:first-child {
+            transition: all 0.3s ease !important;
+        }
+
+        .sc-dRpcpH:hover div:first-child {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+            transform: scale(1.05) !important;
+        }
+
+        /* Certificate info styling with improved visual hierarchy */
         .sc-bDoHkx {
             background-color: #f8fafd !important;
-            border-radius: 8px !important;
-            padding: 12px 16px !important;
-            margin-bottom: 10px !important;
-            border-left: 3px solid var(--primary-color) !important;
+            border-radius: var(--border-radius) !important;
+            padding: var(--spacing-md) var(--spacing-lg) !important;
+            margin-bottom: var(--spacing-md) !important;
+            border-left: 4px solid var(--primary-color) !important;
             transition: all 0.3s ease !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+
+        .sc-bDoHkx::before {
+            content: "" !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(135deg, rgba(0, 43, 73, 0.03), transparent) !important;
+            opacity: 0 !important;
+            transition: opacity 0.3s ease !important;
         }
 
         .sc-bDoHkx:hover {
             background-color: #edf2f7 !important;
-            transform: translateX(3px) !important;
+            transform: translateX(5px) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
         }
 
-        /* Add subtle animations */
+        .sc-bDoHkx:hover::before {
+            opacity: 1 !important;
+        }
+
+        /* Enhanced animations */
         .animate-fade-in {
-            animation: fadeIn 0.5s ease-in-out;
+            animation: enhancedFadeIn 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        @keyframes enhancedFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
         .animate-slide-up {
-            animation: slideUp 0.5s ease-in-out;
+            animation: enhancedSlideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
-        @keyframes slideUp {
+        @keyframes enhancedSlideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(25px);
             }
 
             to {
@@ -1926,22 +2518,142 @@
             }
         }
 
-        /* Add glass morphism effect to cards */
+        /* Glass morphism effect with improved aesthetics */
         .glass-effect {
-            background: rgba(255, 255, 255, 0.7) !important;
+            background: rgba(255, 255, 255, 0.8) !important;
             backdrop-filter: blur(10px) !important;
             -webkit-backdrop-filter: blur(10px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
         }
 
-        /* Add subtle hover effects to interactive elements */
+        /* Enhanced hover effects for interactive elements */
         .hover-lift {
-            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+            will-change: transform, box-shadow !important;
         }
 
         .hover-lift:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+            transform: translateY(-5px) !important;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07) !important;
+        }
+
+        /* Improved spacing for content sections */
+        .sc-AKUrq>div {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        /* Enhanced list styling */
+        ul,
+        ol {
+            padding-left: var(--spacing-xl);
+        }
+
+        li {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        /* Improved link styling */
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        a:hover {
+            color: var(--primary-color);
+        }
+
+        a:not(.sc-kIsWfj):after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            transform: scaleX(0);
+            height: 1px;
+            bottom: -2px;
+            left: 0;
+            background-color: var(--primary-color);
+            transform-origin: bottom right;
+            transition: transform 0.3s ease-out;
+        }
+
+        a:not(.sc-kIsWfj):hover:after {
+            transform: scaleX(1);
+            transform-origin: bottom left;
+        }
+
+        /* Subtle background pattern */
+        .background-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.4;
+            background-image:
+                radial-gradient(circle at 25px 25px, rgba(0, 43, 73, 0.05) 2%, transparent 0%),
+                radial-gradient(circle at 75px 75px, rgba(22, 137, 31, 0.05) 2%, transparent 0%);
+            background-size: 100px 100px;
+        }
+
+        /* Scroll reveal animations */
+        .reveal-element {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s cubic-bezier(0.5, 0, 0, 1), transform 0.8s cubic-bezier(0.5, 0, 0, 1);
+        }
+
+        .revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Enhanced focus styles for accessibility */
+        *:focus-visible {
+            outline: 3px solid var(--accent-color);
+            outline-offset: 3px;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Improved text selection */
+        ::selection {
+            background-color: rgba(0, 43, 73, 0.2);
+            color: var(--primary-color);
+        }
+
+        /* Enhanced scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--light-gray);
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, var(--primary-color), #004b7d);
+            border-radius: 6px;
+            border: 3px solid var(--light-gray);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, #004b7d, #006bb3);
+        }
+
+        /* Improved form field focus states */
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25) !important;
+            background-color: white !important;
+            transition: all 0.3s ease !important;
         }
     </style>
 </body>
