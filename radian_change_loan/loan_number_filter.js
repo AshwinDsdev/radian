@@ -105,22 +105,6 @@ function createUnallowedElement() {
 }
 
 /**
- * Create message for when no records are found
- */
-function onRecordNotFound() {
-  const error = document.createElement("div");
-  error.textContent = "No provisioned loans found";
-  error.style.color = "red";
-  error.style.display = "flex";
-  error.style.justifyContent = "center";
-  error.style.alignItems = "center";
-  error.style.fontSize = "1em";
-  error.style.fontWeight = "bold";
-  error.style.padding = "20px";
-  return error;
-}
-
-/**
  * Create loader to show when trying to establish connection with extension
  */
 function createLoader() {
@@ -206,11 +190,6 @@ async function filterLoanNumbersInTable() {
     } catch (error) {
       console.error("Error checking loan number:", error);
     }
-  }
-  
-  // If no visible rows, show a message
-  if (rows.length > 0 && visibleCount === 0) {
-    table.insertAdjacentElement("afterend", onRecordNotFound());
   }
 }
 
