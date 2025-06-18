@@ -402,7 +402,10 @@ async function processTableRows() {
     `[radian_filter] Processed ${dataRowsCount} rows, removed ${dataRowsRemoved} unauthorized rows`
   );
 
-  tbody.innerHTML = "";
+  // Clear tbody without using innerHTML
+  while (tbody.firstChild) {
+    tbody.removeChild(tbody.firstChild);
+  }
 
   if (allowedRows.length === 0) {
     if (dataRowsCount === 1 && dataRowsRemoved === 1) {
@@ -581,8 +584,7 @@ async function waitForTable(maxAttempts = 10, delay = 300) {
       return true;
     }
     console.log(
-      `[radian_filter] Table not found, waiting (attempt ${
-        i + 1
+      `[radian_filter] Table not found, waiting (attempt ${i + 1
       }/${maxAttempts})`
     );
     await new Promise((resolve) => setTimeout(resolve, delay));

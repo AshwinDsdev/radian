@@ -148,7 +148,9 @@ function createLoader() {
 function createLoaderElement() {
   const loader = document.createElement("div");
   loader.id = "loaderOverlay";
-  loader.innerHTML = `<div class="spinner"></div>`;
+  const spinner = document.createElement("div");
+  spinner.className = "spinner";
+  loader.appendChild(spinner);
   return loader;
 }
 
@@ -165,9 +167,9 @@ async function filterLoanNumbersInTable() {
 
   // Get all rows in the table (skip the header row)
   const rows = table.querySelectorAll("tr.mioResultsTableRow, tr.mioResultsTableRowAlternating");
-  
+
   let visibleCount = 0;
-  
+
   // Process each row
   for (const row of rows) {
     // Find the loan number input in the row
