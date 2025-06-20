@@ -35,6 +35,19 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
           type: "ping",
         },
         (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "❌ Chrome runtime error:",
+              chrome.runtime.lastError.message
+            );
+            timeoutId = setTimeout(() => {
+              attempts++;
+              delay *= 2; // Exponential backoff (100ms → 200ms → 400ms...)
+              sendPing();
+            }, delay);
+            return;
+          }
+
           if (response?.result === "pong") {
             console.log("✅ Listener detected!");
             clearTimeout(timeoutId);
@@ -69,8 +82,12 @@ async function checkNumbersBatch(numbers) {
       (response) => {
         if (chrome.runtime.lastError) {
           return reject(chrome.runtime.lastError.message);
-        } else if (response.error) {
-          return reject(response.error);
+        } else if (!response || response.error) {
+          return reject(response?.error || "Invalid response received");
+        }
+
+        if (!response.result || typeof response.result !== "object") {
+          return reject("Invalid result format received");
         }
 
         const available = Object.keys(response.result).filter(
@@ -84,36 +101,66 @@ async function checkNumbersBatch(numbers) {
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
 /**
+ * Apply styles to an element safely
+ */
+function applyElementStyles(element, styles) {
+  if (!element || !styles) return;
+
+  Object.entries(styles).forEach(([property, value]) => {
+    element.style[property] = value;
+  });
+}
+
+/**
  * Create unauthorized access message element
  */
 function createUnauthorizedElement() {
-  const unauthorized = document.createElement("div");
-  unauthorized.innerHTML = `
-    <div style="
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 200px;
-      background-color: #f8f9fa;
-      border: 2px solid #dc3545;
-      border-radius: 8px;
-      margin: 20px;
-    ">
-      <div style="
-        text-align: center;
-        color: #dc3545;
-        font-size: 18px;
-        font-weight: bold;
-        padding: 20px;
-      ">
-        <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 10px;"></i>
-        <br>
-        You are not authorized to view restricted loans
-      </div>
-    </div>
-  `;
-  
-  return unauthorized;
+  const unauthorizedContainer = document.createElement("div");
+
+  // Apply container styles
+  applyElementStyles(unauthorizedContainer, {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "200px",
+    backgroundColor: "#f8f9fa",
+    border: "2px solid #dc3545",
+    borderRadius: "8px",
+    margin: "20px",
+  });
+
+  const messageContainer = document.createElement("div");
+
+  // Apply message container styles
+  applyElementStyles(messageContainer, {
+    textAlign: "center",
+    color: "#dc3545",
+    fontSize: "18px",
+    fontWeight: "bold",
+    padding: "20px",
+  });
+
+  // Create icon element
+  const iconElement = document.createElement("i");
+  iconElement.className = "fas fa-exclamation-triangle";
+  applyElementStyles(iconElement, {
+    fontSize: "24px",
+    marginBottom: "10px",
+  });
+
+  // Create text content
+  const textElement = document.createElement("div");
+  textElement.textContent = "You are not authorized to view restricted loans";
+  applyElementStyles(textElement, {
+    marginTop: "10px",
+  });
+
+  // Assemble the elements
+  messageContainer.appendChild(iconElement);
+  messageContainer.appendChild(textElement);
+  unauthorizedContainer.appendChild(messageContainer);
+
+  return unauthorizedContainer;
 }
 
 /**
@@ -160,12 +207,21 @@ function createLoader() {
 function createLoaderElement() {
   const loader = document.createElement("div");
   loader.id = "loaderOverlay";
-  loader.innerHTML = `
-    <div class="spinner"></div>
-    <div style="margin-left: 20px; font-size: 16px; color: #2b6cb0;">
-      Verifying loan access permissions...
-    </div>
-  `;
+
+  const spinner = document.createElement("div");
+  spinner.className = "spinner";
+
+  const loadingText = document.createElement("div");
+  loadingText.textContent = "Verifying loan access permissions...";
+  applyElementStyles(loadingText, {
+    marginLeft: "20px",
+    fontSize: "16px",
+    color: "#2b6cb0",
+  });
+
+  loader.appendChild(spinner);
+  loader.appendChild(loadingText);
+
   return loader;
 }
 
@@ -175,9 +231,18 @@ function createLoaderElement() {
 function showLoader() {
   const style = createLoader();
   const loader = createLoaderElement();
-  
-  document.head.appendChild(style);
-  document.body.appendChild(loader);
+
+  // Safe DOM manipulation with null checks
+  const documentHead = document.head;
+  const documentBody = document.body;
+
+  if (documentHead && style) {
+    documentHead.appendChild(style);
+  }
+
+  if (documentBody && loader) {
+    documentBody.appendChild(loader);
+  }
 }
 
 /**
@@ -185,9 +250,13 @@ function showLoader() {
  */
 function hideLoader() {
   const loader = document.getElementById("loaderOverlay");
-  if (loader) {
+  if (loader && loader.parentNode) {
     loader.classList.add("hidden");
-    setTimeout(() => loader.remove(), 300);
+    setTimeout(() => {
+      if (loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+    }, 300);
   }
 }
 
@@ -198,82 +267,71 @@ async function checkServicerLoanAccess() {
   try {
     // Show loader while checking
     showLoader();
-    
+
     // Wait for extension listener
     await waitForListener();
-    
-    // Find the servicer loan number element
-    const servicerLoanElement = document.querySelector("#lblServicerLoanNumVal");
-    
+
+    // Find the servicer loan number element with safe DOM access
+    const servicerLoanElement = document.querySelector(
+      "#lblServicerLoanNumVal"
+    );
+
     if (!servicerLoanElement) {
       console.log("No servicer loan number element found");
       hideLoader();
       return;
     }
-    
-    const loanNumber = servicerLoanElement.textContent.trim();
-    
+
+    const loanNumber = servicerLoanElement.textContent
+      ? servicerLoanElement.textContent.trim()
+      : "";
+
     if (!loanNumber) {
       console.log("No loan number found in element");
       hideLoader();
       return;
     }
-    
+
     console.log(`Checking access for loan number: ${loanNumber}`);
-    
+
     // Check if loan is restricted
     const allowedLoans = await checkNumbersBatch([loanNumber]);
-    
+
     if (allowedLoans.length === 0) {
       // Loan is restricted - hide content and show unauthorized message
       console.log(`Loan ${loanNumber} is restricted - hiding content`);
-      
+
       // Find the main content container (you may need to adjust this selector)
-      const mainContent = document.querySelector("body") || document.documentElement;
-      
-      // Hide all existing content
-      const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-      allElements.forEach(element => {
-        if (element.id !== "loaderOverlay") {
-          element.style.display = "none";
-        }
-      });
-      
+      const mainContent =
+        document.querySelector("body") || document.documentElement;
+
+      // Hide all existing content safely
+      const allElements = document.querySelectorAll(
+        "body > *:not(script):not(style)"
+      );
+      if (allElements && allElements.length > 0) {
+        allElements.forEach((element) => {
+          if (element && element.id !== "loaderOverlay") {
+            element.style.display = "none";
+          }
+        });
+      }
+
       // Show unauthorized message
       const unauthorizedElement = createUnauthorizedElement();
-      document.body.appendChild(unauthorizedElement);
-      
+      const documentBody = document.body;
+      if (documentBody && unauthorizedElement) {
+        documentBody.appendChild(unauthorizedElement);
+      }
     } else {
       console.log(`Loan ${loanNumber} is authorized - showing content`);
     }
-    
+
     // Hide loader
     hideLoader();
-    
   } catch (error) {
     console.error("Error checking loan access:", error);
     hideLoader();
-    
-    // Show error message
-    const errorElement = document.createElement("div");
-    errorElement.innerHTML = `
-      <div style="
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 200px;
-        background-color: #fff3cd;
-        border: 2px solid #ffc107;
-        border-radius: 8px;
-        margin: 20px;
-        color: #856404;
-        font-size: 16px;
-        font-weight: bold;
-      ">
-        Error: Unable to verify loan access permissions. Please try again later.
-      </div>
-    `;
-    document.body.appendChild(errorElement);
   }
 }
 
