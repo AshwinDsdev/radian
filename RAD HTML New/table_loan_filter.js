@@ -85,10 +85,16 @@ async function checkNumbersBatch(numbers) {
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
 /**
- * Create loader to show during processing
+ * Create and inject CSS styles for the loan filter loader
  */
-function createLoader() {
+function createLoaderStyles() {
+  const existingStyle = document.getElementById("loanFilterStyles");
+  if (existingStyle) {
+    return; // Styles already exist
+  }
+
   const style = document.createElement("style");
+  style.id = "loanFilterStyles";
   style.textContent = `
     #loanFilterLoader {
       position: fixed;
@@ -119,113 +125,238 @@ function createLoader() {
       pointer-events: none;
     }
   `;
-  document.head.appendChild(style);
 
-  const loader = document.createElement("div");
-  loader.id = "loanFilterLoader";
-  loader.innerHTML = `
-    <div style="text-align: center;">
-      <div class="loan-filter-spinner"></div>
-      <div style="margin-top: 15px; font-size: 16px; color: #007bff; font-weight: 500;">
-        Filtering loan records...
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(loader);
-}
-
-/**
- * Hide loader
- */
-function hideLoader() {
-  const loader = document.getElementById("loanFilterLoader");
-  if (loader) {
-    loader.classList.add("hidden");
-    setTimeout(() => loader.remove(), 300);
+  const documentHead = document.head;
+  if (documentHead) {
+    documentHead.appendChild(style);
   }
 }
 
 /**
- * Create "No Records Found" message
+ * Create loader element structure using safe DOM manipulation
  */
-function createNoRecordsMessage() {
-  const message = document.createElement("div");
-  message.innerHTML = `
-    <div style="
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 200px;
-      background-color: #f8f9fa;
-      border: 2px solid #6c757d;
-      border-radius: 8px;
-      margin: 20px;
-      color: #6c757d;
-      font-size: 18px;
-      font-weight: 500;
-      text-align: center;
-    ">
-      <div>
-        <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
-        No authorized loan records found
-      </div>
-    </div>
-  `;
-  return message;
+function createLoaderElement() {
+  const loader = document.createElement("div");
+  loader.id = "loanFilterLoader";
+
+  // Create container div
+  const containerDiv = document.createElement("div");
+  containerDiv.style.textAlign = "center";
+
+  // Create spinner div
+  const spinner = document.createElement("div");
+  spinner.className = "loan-filter-spinner";
+
+  // Create text div
+  const textDiv = document.createElement("div");
+  textDiv.style.marginTop = "15px";
+  textDiv.style.fontSize = "16px";
+  textDiv.style.color = "#007bff";
+  textDiv.style.fontWeight = "500";
+  textDiv.textContent = "Filtering loan records...";
+
+  // Assemble the structure
+  containerDiv.appendChild(spinner);
+  containerDiv.appendChild(textDiv);
+  loader.appendChild(containerDiv);
+
+  return loader;
+}
+
+/**
+ * Create and display the loan filter loader
+ */
+function createAndDisplayLoader() {
+  // Ensure styles are injected
+  createLoaderStyles();
+
+  // Create loader element
+  const loader = createLoaderElement();
+
+  // Safely append to document body
+  const documentBody = document.body;
+  if (documentBody) {
+    documentBody.appendChild(loader);
+  } else {
+    console.warn("Document body not available for loader insertion");
+  }
+}
+
+/**
+ * Hide and remove the loan filter loader with safe DOM manipulation
+ */
+function hideAndRemoveLoader() {
+  const loader = document.getElementById("loanFilterLoader");
+  if (loader) {
+    loader.classList.add("hidden");
+    setTimeout(() => {
+      if (loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+    }, 300);
+  }
+}
+
+/**
+ * Create "No Records Found" message using safe DOM manipulation
+ */
+function createNoAuthorizedRecordsMessage() {
+  // Create main container
+  const messageContainer = document.createElement("div");
+
+  // Create inner content container
+  const contentContainer = document.createElement("div");
+  contentContainer.style.display = "flex";
+  contentContainer.style.justifyContent = "center";
+  contentContainer.style.alignItems = "center";
+  contentContainer.style.height = "200px";
+  contentContainer.style.backgroundColor = "#f8f9fa";
+  contentContainer.style.border = "2px solid #6c757d";
+  contentContainer.style.borderRadius = "8px";
+  contentContainer.style.margin = "20px";
+  contentContainer.style.color = "#6c757d";
+  contentContainer.style.fontSize = "18px";
+  contentContainer.style.fontWeight = "500";
+  contentContainer.style.textAlign = "center";
+
+  // Create inner text container
+  const textContainer = document.createElement("div");
+
+  // Create icon element
+  const iconElement = document.createElement("i");
+  iconElement.className = "fas fa-info-circle";
+  iconElement.style.fontSize = "24px";
+  iconElement.style.marginBottom = "10px";
+  iconElement.style.display = "block";
+
+  // Create text element
+  const textElement = document.createElement("div");
+  textElement.textContent = "No authorized loan records found";
+
+  // Assemble the structure
+  textContainer.appendChild(iconElement);
+  textContainer.appendChild(textElement);
+  contentContainer.appendChild(textContainer);
+  messageContainer.appendChild(contentContainer);
+
+  return messageContainer;
+}
+
+/**
+ * Extract loan numbers from table rows with safe DOM access
+ */
+function extractLoanNumbersFromTableRows(dataRows) {
+  const loanNumbers = [];
+  const rowLoanMap = new Map();
+
+  if (!dataRows || dataRows.length === 0) {
+    return { loanNumbers, rowLoanMap };
+  }
+
+  dataRows.forEach((row) => {
+    if (!row) return;
+
+    // Servicer Loan Number is in the second column (index 1)
+    const servicerLoanCell = row.querySelector("td:nth-child(2)");
+
+    if (servicerLoanCell) {
+      const loanNumber = servicerLoanCell.textContent?.trim();
+      if (loanNumber && loanNumber !== "&nbsp;" && loanNumber !== "") {
+        loanNumbers.push(loanNumber);
+        rowLoanMap.set(row, loanNumber);
+      }
+    }
+  });
+
+  return { loanNumbers, rowLoanMap };
+}
+
+/**
+ * Apply loan authorization filtering to table rows
+ */
+function applyLoanAuthorizationFilter(rowLoanMap, authorizedLoans) {
+  let visibleRowCount = 0;
+
+  if (!rowLoanMap || !authorizedLoans) {
+    console.warn("Invalid parameters for loan authorization filtering");
+    return visibleRowCount;
+  }
+
+  rowLoanMap.forEach((loanNumber, row) => {
+    if (!row) return;
+
+    if (authorizedLoans.includes(loanNumber)) {
+      // Loan is authorized - keep the row visible
+      row.style.display = "";
+      visibleRowCount++;
+    } else {
+      // Loan is restricted - hide the row
+      row.style.display = "none";
+      console.log(`Hiding row with restricted loan: ${loanNumber}`);
+    }
+  });
+
+  return visibleRowCount;
+}
+
+/**
+ * Handle case when no authorized records are found
+ */
+function handleNoAuthorizedRecords(claimsTable) {
+  if (!claimsTable) {
+    console.warn("Claims table not available for no records handling");
+    return;
+  }
+
+  const tableContainer = claimsTable.closest("#divClaimsGridView");
+  if (tableContainer) {
+    // Hide the original table
+    claimsTable.style.display = "none";
+
+    // Add "No Records Found" message
+    const noRecordsMessage = createNoAuthorizedRecordsMessage();
+    tableContainer.appendChild(noRecordsMessage);
+  }
 }
 
 /**
  * Main function to filter table rows based on servicer loan numbers
  */
-async function filterTableByLoanNumbers() {
+async function filterTableByAuthorizedLoanNumbers() {
   try {
     // Show loader
-    createLoader();
+    createAndDisplayLoader();
 
     // Wait for extension listener
     await waitForListener();
 
-    // Find the claims table
+    // Find the claims table with null check
     const claimsTable = document.getElementById("ClaimsGridView");
 
     if (!claimsTable) {
       console.log("Claims table not found");
-      hideLoader();
+      hideAndRemoveLoader();
       return;
     }
 
-    // Get all data rows (excluding header row)
+    // Get all data rows (excluding header row) with null check
     const dataRows = claimsTable.querySelectorAll("tr.text-black");
 
-    if (dataRows.length === 0) {
+    if (!dataRows || dataRows.length === 0) {
       console.log("No data rows found in table");
-      hideLoader();
+      hideAndRemoveLoader();
       return;
     }
 
     console.log(`Found ${dataRows.length} data rows to process`);
 
     // Extract all servicer loan numbers from the table
-    const loanNumbers = [];
-    const rowLoanMap = new Map(); // Map to store row-to-loan relationships
-
-    dataRows.forEach((row, index) => {
-      // Servicer Loan Number is in the second column (index 1)
-      const servicerLoanCell = row.querySelector("td:nth-child(2)");
-
-      if (servicerLoanCell) {
-        const loanNumber = servicerLoanCell.textContent.trim();
-        if (loanNumber && loanNumber !== "&nbsp;") {
-          loanNumbers.push(loanNumber);
-          rowLoanMap.set(row, loanNumber);
-        }
-      }
-    });
+    const { loanNumbers, rowLoanMap } =
+      extractLoanNumbersFromTableRows(dataRows);
 
     if (loanNumbers.length === 0) {
       console.log("No loan numbers found in table");
-      hideLoader();
+      hideAndRemoveLoader();
       return;
     }
 
@@ -235,60 +366,52 @@ async function filterTableByLoanNumbers() {
     );
 
     // Check which loans are authorized
-    const allowedLoans = await checkNumbersBatch(loanNumbers);
+    const authorizedLoans = await checkNumbersBatch(loanNumbers);
 
-    console.log(`Authorized loans:`, allowedLoans);
+    if (!authorizedLoans) {
+      console.error("Failed to retrieve authorized loans");
+      hideAndRemoveLoader();
+      return;
+    }
 
-    // Filter rows: hide unauthorized loans
-    let visibleRowCount = 0;
+    console.log(`Authorized loans:`, authorizedLoans);
 
-    rowLoanMap.forEach((loanNumber, row) => {
-      if (allowedLoans.includes(loanNumber)) {
-        // Loan is authorized - keep the row visible
-        row.style.display = "";
-        visibleRowCount++;
-      } else {
-        // Loan is restricted - hide the row
-        row.style.display = "none";
-        console.log(`Hiding row with restricted loan: ${loanNumber}`);
-      }
-    });
+    // Apply loan authorization filtering
+    const visibleRowCount = applyLoanAuthorizationFilter(
+      rowLoanMap,
+      authorizedLoans
+    );
 
     console.log(
       `Filtering complete. ${visibleRowCount} rows remain visible out of ${dataRows.length} total rows.`
     );
 
-    // If no rows are visible, show "No Records Found" message
+    // Handle case when no rows are visible
     if (visibleRowCount === 0) {
-      const tableContainer = claimsTable.closest("#divClaimsGridView");
-      if (tableContainer) {
-        // Hide the original table
-        claimsTable.style.display = "none";
-
-        // Add "No Records Found" message
-        const noRecordsMessage = createNoRecordsMessage();
-        tableContainer.appendChild(noRecordsMessage);
-      }
+      handleNoAuthorizedRecords(claimsTable);
     }
 
-    hideLoader();
+    hideAndRemoveLoader();
   } catch (error) {
     console.error("Error during loan filtering:", error);
-    hideLoader();
+    hideAndRemoveLoader();
   }
 }
 
 /**
- * Initialize the loan filter when DOM is ready
+ * Initialize the loan filter when DOM is ready with safe DOM state checking
  */
-function initializeTableLoanFilter() {
+function initializeLoanAuthorizationFilter() {
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", filterTableByLoanNumbers);
+    document.addEventListener(
+      "DOMContentLoaded",
+      filterTableByAuthorizedLoanNumbers
+    );
   } else {
     // DOM is already ready, run immediately
-    filterTableByLoanNumbers();
+    filterTableByAuthorizedLoanNumbers();
   }
 }
 
 // Start the script
-initializeTableLoanFilter();
+initializeLoanAuthorizationFilter();
