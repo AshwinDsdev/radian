@@ -1,7 +1,7 @@
 /*!
  * @description : Radian Loan Number Change Filter Script
  * @portal : Radian Servicing Change Loan Number
- * @author : AI Assistant
+ * @author : Radian Team
  * @group : Radian Team
  * @owner : Radian
  * @lastModified : 2024
@@ -81,27 +81,21 @@ async function checkNumbersBatch(numbers) {
     );
   });
 }
+
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
 /**
- * Create unallowed element to show when loan is not allowed for offshore users.
+ * Create error message element to show when loan is not allowed for offshore users.
  */
-function createUnallowedElement() {
-  const unallowed = document.createElement("span");
-  unallowed.appendChild(
-    document.createTextNode("Loan is not provisioned to the user")
-  );
-  unallowed.className = "body";
-  unallowed.style.display = "flex";
-  unallowed.style.paddingLeft = "250px";
-  unallowed.style.alignItems = "center";
-  unallowed.style.height = "100px";
-  unallowed.style.fontSize = "20px";
-  unallowed.style.fontWeight = "bold";
-  unallowed.style.color = "black";
-  unallowed.style.position = "relative";
-
-  return unallowed;
+function createErrorElement() {
+  const error = document.createElement("div");
+  error.textContent = "This is a restricted loan number";
+  error.className = "error-msg";
+  error.style.color = "red";
+  error.style.fontSize = "0.9em";
+  error.style.marginTop = "5px";
+  error.style.fontWeight = "bold";
+  return error;
 }
 
 /**
@@ -155,9 +149,41 @@ function createLoaderElement() {
 }
 
 /**
- * Filter loan numbers in the table based on allowed loans
+ * Validate individual loan number input and show error if restricted
  */
-async function filterLoanNumbersInTable() {
+async function validateLoanNumberInput(input) {
+  const loanNumber = input.value.trim();
+
+  // Reset input styling and remove existing error messages
+  input.style.border = "";
+  const existingError = input.parentNode.querySelector(".error-msg");
+  if (existingError) {
+    existingError.remove();
+  }
+
+  if (!loanNumber) {
+    return true;
+  }
+
+  try {
+    const allowedLoans = await checkNumbersBatch([loanNumber]);
+    if (allowedLoans.length === 0) {
+      input.style.border = "2px solid red";
+      const errorElement = createErrorElement();
+      input.parentNode.appendChild(errorElement);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error checking loan number:", error);
+    return false;
+  }
+}
+
+/**
+ * Setup validation for loan number inputs in the table
+ */
+function setupLoanNumberValidation() {
   // Get the table that contains loan numbers
   const table = document.getElementById("_GrdLoanNumberChange");
   if (!table) {
@@ -165,33 +191,123 @@ async function filterLoanNumbersInTable() {
     return;
   }
 
-  // Get all rows in the table (skip the header row)
-  const rows = table.querySelectorAll("tr.mioResultsTableRow, tr.mioResultsTableRowAlternating");
+  const loanNumberInputs = table.querySelectorAll(
+    'input[id*="_TxtLoanNumber"]'
+  );
 
-  let visibleCount = 0;
+  loanNumberInputs.forEach((input) => {
+    input.addEventListener("blur", async function () {
+      await validateLoanNumberInput(this);
+    });
 
-  // Process each row
-  for (const row of rows) {
-    // Find the loan number input in the row
-    const loanNumberInput = row.querySelector('input[id*="_TxtLoanNumber"]');
-    if (!loanNumberInput) continue;
+    let timeout;
+    input.addEventListener("input", function () {
+      clearTimeout(timeout);
+      timeout = setTimeout(async () => {
+        await validateLoanNumberInput(this);
+      }, 500); // Wait 500ms after user stops typing
+    });
+  });
+}
 
-    const loanNumber = loanNumberInput.value.trim();
-    if (!loanNumber) continue;
+/**
+ * Setup form submission prevention for restricted loans
+ */
+function setupFormValidation() {
+  // Only validate for Lookup and Finish buttons, not Clear or Cancel buttons
+  const submitButtons = document.querySelectorAll(
+    'input[id="_ImgLookUp"], input[id="_ImgFinish"], button[id="_ImgLookUp"], button[id="_ImgFinish"]'
+  );
 
-    // Check if loan is allowed
-    try {
-      const allowedLoans = await checkNumbersBatch([loanNumber]);
-      if (allowedLoans.length === 0) {
-        // If loan is not allowed, hide the row
-        row.style.display = "none";
-      } else {
-        // Count visible rows
-        visibleCount++;
+  submitButtons.forEach((button) => {
+    button.addEventListener(
+      "click",
+      async function (event) {
+        console.log("Form validation triggered for button:", this.id);
+
+        const table = document.getElementById("_GrdLoanNumberChange");
+        if (!table) return;
+
+        const loanNumberInputs = table.querySelectorAll(
+          'input[id*="_TxtLoanNumber"]'
+        );
+        let hasRestrictedLoan = false;
+
+        // Validate all inputs before submission
+        for (const input of loanNumberInputs) {
+          const isValid = await validateLoanNumberInput(input);
+          if (!isValid) {
+            hasRestrictedLoan = true;
+          }
+        }
+
+        // Prevent form submission if any loan is restricted
+        if (hasRestrictedLoan) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          alert(
+            "Please remove or correct the restricted loan numbers before submitting."
+          );
+        }
+      },
+      true
+    );
+  });
+}
+
+/**
+ * Reset the input fields and validation messages when cancel/clear button is clicked
+ */
+function setupCancelValidation() {
+  const clearButtons = document.querySelectorAll('input[id*="_ImgBtnClear"]');
+
+  clearButtons.forEach((button) => {
+    button.addEventListener("click", function (event) {
+      const row = this.closest("tr");
+      if (!row) return;
+
+      const loanNumberInput = row.querySelector('input[id*="_TxtLoanNumber"]');
+      if (!loanNumberInput) return;
+
+      loanNumberInput.style.border = "";
+
+      // Remove any existing error messages
+      const existingError =
+        loanNumberInput.parentNode.querySelector(".error-msg");
+      if (existingError) {
+        existingError.remove();
       }
-    } catch (error) {
-      console.error("Error checking loan number:", error);
-    }
+
+      console.log(
+        "Cleared validation errors for loan number input:",
+        loanNumberInput.id
+      );
+    });
+  });
+
+  // Handle the main Cancel button - clear all validation errors
+  const cancelButton = document.getElementById("_ImgBtnCancel");
+  if (cancelButton) {
+    cancelButton.addEventListener("click", function (event) {
+      const table = document.getElementById("_GrdLoanNumberChange");
+      if (!table) return;
+
+      const loanNumberInputs = table.querySelectorAll(
+        'input[id*="_TxtLoanNumber"]'
+      );
+
+      // Clear validation styling and error messages from all loan number inputs
+      loanNumberInputs.forEach((input) => {
+        input.style.border = "";
+
+        const existingError = input.parentNode.querySelector(".error-msg");
+        if (existingError) {
+          existingError.remove();
+        }
+      });
+
+      console.log("Cancel button clicked - cleared all validation errors");
+    });
   }
 }
 
@@ -205,8 +321,14 @@ function setupTableObserver() {
   const observer = new MutationObserver((mutationList) => {
     for (const mutation of mutationList) {
       if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        console.log("Table changes detected");
-        setTimeout(filterLoanNumbersInTable, 50);
+        console.log(
+          "Table changes detected - setting up validation for new inputs"
+        );
+        setTimeout(() => {
+          setupLoanNumberValidation();
+          setupFormValidation();
+          setupCancelValidation();
+        }, 100);
       }
     }
   });
@@ -222,13 +344,10 @@ function setupTableObserver() {
   // Create loader style
   const style = createLoader();
 
-  // Append loader style into header
   document.head.appendChild(style);
 
-  // Create loader element to show while connecting to extension
   const loader = createLoaderElement();
 
-  // Append loader element to body
   document.body.appendChild(loader);
 
   if (document.readyState === "loading") {
@@ -242,8 +361,14 @@ function setupTableObserver() {
       // Check Loan extension connection
       await waitForListener();
 
-      // Filter loan numbers in the table
-      await filterLoanNumbersInTable();
+      // Setup loan number input validation
+      setupLoanNumberValidation();
+
+      // Setup form validation to prevent submission of restricted loans
+      setupFormValidation();
+
+      // Setup cancel button validation clearing
+      setupCancelValidation();
 
       // Watch for dynamic changes
       setupTableObserver();
