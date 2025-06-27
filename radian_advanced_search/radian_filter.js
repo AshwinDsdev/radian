@@ -36,8 +36,7 @@ const allowedLoansCache = {
 
   isCacheValid() {
     return (
-      this.lastUpdated > 0 &&
-      Date.now() - this.lastUpdated < this.cacheTimeout
+      this.lastUpdated > 0 && Date.now() - this.lastUpdated < this.cacheTimeout
     );
   },
 
@@ -87,10 +86,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         },
         (response) => {
           if (chrome.runtime.lastError) {
-            console.warn(
-              "Chrome extension error:",
-              chrome.runtime.lastError
-            );
+            console.warn("Chrome extension error:", chrome.runtime.lastError);
             attempts++;
             if (attempts >= maxRetries) {
               showPage(true);
@@ -193,7 +189,6 @@ async function isLoanNumberAllowed(loanNumber) {
       allowedLoansCache.isCacheValid() &&
       allowedLoansCache.isAllowed(loanNumber)
     ) {
-      console.log(`[radian_filter] Loan ${loanNumber} is allowed (from cache)`);
       return true;
     }
 
@@ -202,7 +197,6 @@ async function isLoanNumberAllowed(loanNumber) {
     const isAllowed = allowedNumbers.includes(loanNumber);
     return isAllowed;
   } catch (error) {
-    console.error("[radian_filter] Error checking loan number:", error);
     return false;
   }
 }
@@ -279,27 +273,16 @@ class TableRowFilter {
 
   async filter() {
     if (!this.loanNumber) {
-      console.log("[radian_filter] No loan number to check");
       return false;
     }
 
-    console.log(
-      "[radian_filter] Checking if loan number is allowed:",
-      this.loanNumber
-    );
     const isAllowed = await isLoanNumberAllowed(this.loanNumber);
-    console.log("[radian_filter] Loan number check result:", {
-      loanNumber: this.loanNumber,
-      isAllowed,
-    });
 
     if (!isAllowed) {
-      console.log("[radian_filter] Loan number not allowed, hiding row");
       this.hide();
       return true;
     }
 
-    console.log("[radian_filter] Loan number allowed, showing row");
     return false;
   }
 
@@ -315,10 +298,6 @@ class TableRowFilter {
             columnCount = headerRow.cells.length;
           }
         }
-
-        console.log(
-          `[radian_filter] Removing row with loan number: ${this.loanNumber}, column count: ${columnCount}`
-        );
 
         this.parent.removeChild(this.row);
       } catch (error) {
@@ -336,27 +315,23 @@ async function processTableRows() {
 
   const table = document.querySelector("table.sc-jBIHhB");
   if (!table) {
-    console.log("[radian_filter] No table found with class sc-jBIHhB");
     showPage(true);
     return;
   }
 
   const tbody = table.querySelector("tbody");
   if (!tbody) {
-    console.log("[radian_filter] No tbody found in table");
     showPage(true);
     return;
   }
 
   const headerRow = table.querySelector("thead tr");
   if (!headerRow) {
-    console.log("[radian_filter] No header row found in table");
     showPage(true);
     return;
   }
 
   const columnCount = headerRow.cells.length;
-  console.log(`[radian_filter] Table has ${columnCount} columns`);
 
   const originalRows = Array.from(tbody.querySelectorAll("tr"));
   const allowedRows = [];
@@ -378,14 +353,9 @@ async function processTableRows() {
       }
 
       if (!loanNumber) {
-        console.log("[radian_filter] No loan number found in row");
         allowedRows.push(row);
         continue;
       }
-
-      console.log(
-        `[radian_filter] Processing row with loan number: ${loanNumber}`
-      );
       const isAllowed = await isLoanNumberAllowed(loanNumber);
 
       if (isAllowed) {
@@ -398,14 +368,12 @@ async function processTableRows() {
     }
   }
 
-  console.log(
-    `[radian_filter] Processed ${dataRowsCount} rows, removed ${dataRowsRemoved} unauthorized rows`
-  );
-
   // Clear tbody without using innerHTML
   while (tbody.firstChild) {
     tbody.removeChild(tbody.firstChild);
   }
+
+  let actualDisplayedRows = 0;
 
   if (allowedRows.length === 0) {
     if (dataRowsCount === 1 && dataRowsRemoved === 1) {
@@ -414,9 +382,7 @@ async function processTableRows() {
         .querySelector("td")
         .setAttribute("colspan", columnCount.toString());
       tbody.appendChild(unallowedElement);
-      console.log(
-        "[radian_filter] Showing restricted loan message for single restricted result"
-      );
+      actualDisplayedRows = 0; // No actual data rows to display
     } else {
       const noResultsRow = document.createElement("tr");
       const td = document.createElement("td");
@@ -425,19 +391,114 @@ async function processTableRows() {
       td.style.textAlign = "center";
       noResultsRow.appendChild(td);
       tbody.appendChild(noResultsRow);
-      console.log("[radian_filter] Showing no results message");
+      actualDisplayedRows = 0; // No actual data rows to display
     }
   } else {
+    // Count only actual data rows (exclude rows with colspan like headers/messages)
+    actualDisplayedRows = allowedRows.filter((row) => {
+      return !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
+    }).length;
+
     allowedRows.forEach((row) => {
       const clonedRow = row.cloneNode(true);
       tbody.appendChild(clonedRow);
     });
-    console.log(
-      `[radian_filter] Added ${allowedRows.length} allowed rows to table`
-    );
   }
 
+  // Update pagination counts
+  updatePaginationCounts(actualDisplayedRows);
+
   showPage(true);
+}
+
+/**
+ * Update pagination counts to reflect the actual number of filtered rows
+ */
+function updatePaginationCounts(actualRowCount) {
+  try {
+    // Primary target: find the pagination element with class "number_styling"
+    const paginationElement = document.querySelector(".number_styling");
+
+    if (paginationElement) {
+      updateSinglePaginationElement(paginationElement, actualRowCount);
+    } else {
+      console.log(
+        "[radian_filter] Primary pagination element (.number_styling) not found"
+      );
+    }
+
+    // Fallback: search for other common pagination patterns
+    const alternativePaginationSelectors = [
+      ".pagination-info",
+      ".results-count",
+      ".page-info",
+      ".styling_ordering .number_styling", // More specific selector
+      '[class*="pagination"] [class*="number"]',
+      '[class*="results"] [class*="count"]',
+      '[class*="page"] [class*="info"]',
+    ];
+
+    let alternativeFound = false;
+    alternativePaginationSelectors.forEach((selector) => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach((element) => {
+        if (updateSinglePaginationElement(element, actualRowCount)) {
+          alternativeFound = true;
+        }
+      });
+    });
+
+    // Last resort: search for any element containing pagination-like text pattern
+    if (!paginationElement && !alternativeFound) {
+      const allElements = document.querySelectorAll("*");
+      for (const element of allElements) {
+        const text = element.textContent?.trim() || "";
+        if (text.match(/^\d+\s*-\s*\d+\s*of\s*\d+$/)) {
+          updateSinglePaginationElement(element, actualRowCount);
+          break;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[radian_filter] Error updating pagination counts:", error);
+  }
+}
+
+/**
+ * Update a single pagination element
+ */
+function updateSinglePaginationElement(element, actualRowCount) {
+  try {
+    const originalText = element.textContent?.trim() || "";
+
+    // Check if this element contains pagination-like text
+    if (!originalText.match(/\d+\s*-\s*\d+\s*of\s*\d+/)) {
+      return false;
+    }
+
+    // Extract the original total count from the text (e.g., "1 - 10 of 174930")
+    const totalMatch = originalText.match(/of\s*(\d+)/);
+    const originalTotal = totalMatch ? totalMatch[1] : "0";
+
+    let newText;
+    if (actualRowCount === 0) {
+      newText = `0 - 0 of ${originalTotal}`;
+    } else if (actualRowCount === 1) {
+      newText = `1 - 1 of ${originalTotal}`;
+    } else {
+      // For multiple rows, show 1 to actualRowCount
+      newText = `1 - ${actualRowCount} of ${originalTotal}`;
+    }
+
+    element.textContent = newText;
+    return true;
+  } catch (error) {
+    console.error(
+      "[radian_filter] Error updating single pagination element:",
+      error
+    );
+    return false;
+  }
 }
 
 /**
@@ -493,12 +554,9 @@ async function processGenericElements() {
  */
 async function processPage() {
   try {
-    console.log("[radian_filter] Processing page...");
-
     await processTableRows();
 
     showPage(true);
-    console.log("[radian_filter] Page processing complete");
   } catch (error) {
     console.error("Error processing page:", error);
     showPage(true);
@@ -580,17 +638,37 @@ async function waitForTable(maxAttempts = 10, delay = 300) {
   for (let i = 0; i < maxAttempts; i++) {
     const table = document.querySelector("table.sc-jBIHhB");
     if (table) {
-      console.log("[radian_filter] Table found, proceeding with filtering");
       return true;
     }
-    console.log(
-      `[radian_filter] Table not found, waiting (attempt ${i + 1
-      }/${maxAttempts})`
-    );
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  console.warn("[radian_filter] Table not found after maximum attempts");
   return false;
+}
+
+/**
+ * Manually refresh pagination counts based on current table state
+ */
+function refreshPaginationCounts() {
+  try {
+    const table = document.querySelector("table.sc-jBIHhB");
+    if (!table) {
+      return;
+    }
+
+    const tbody = table.querySelector("tbody");
+    if (!tbody) {
+      return;
+    }
+
+    // Count actual data rows (exclude rows with colspan like messages)
+    const dataRows = Array.from(tbody.querySelectorAll("tr")).filter((row) => {
+      return !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
+    });
+
+    updatePaginationCounts(dataRows.length);
+  } catch (error) {
+    console.error("[radian_filter] Error refreshing pagination counts:", error);
+  }
 }
 
 /**
@@ -600,9 +678,6 @@ function setupTableUpdateListeners() {
   const searchButtons = document.querySelectorAll("button");
   searchButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      console.log(
-        "[radian_filter] Button clicked, will process table after delay"
-      );
       showPage(false);
       setTimeout(async () => {
         await waitForTable(5, 200);
@@ -615,9 +690,6 @@ function setupTableUpdateListeners() {
   searchInputs.forEach((input) => {
     input.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
-        console.log(
-          "[radian_filter] Enter pressed in search input, will process table after delay"
-        );
         showPage(false);
         setTimeout(async () => {
           await waitForTable(5, 200);
@@ -633,21 +705,16 @@ function setupTableUpdateListeners() {
  */
 async function initialize() {
   try {
-    console.log("[radian_filter] Initializing filter script");
-
     // Hide the page initially
     setTimeout(() => {
       showPage(false);
     }, 100);
 
-    const listener = await waitForListener();
-    if (!listener) return;
+    // const listener = await waitForListener();
+    // if (!listener) return;
 
     const tableReady = await waitForTable();
     if (!tableReady) {
-      console.warn(
-        "[radian_filter] Table not found, showing page without filtering"
-      );
       showPage(true);
       return;
     }
@@ -657,7 +724,6 @@ async function initialize() {
       setupTableUpdateListeners();
     }, 500);
   } catch (error) {
-    console.error("Error initializing filter:", error);
     showPage(true);
   }
 }
@@ -676,3 +742,10 @@ if (document.readyState === "loading") {
 } else {
   setTimeout(initialize, 1000);
 }
+
+window.radianFilter = {
+  refreshPaginationCounts,
+  updatePaginationCounts,
+  processPage,
+  allowedLoansCache,
+};

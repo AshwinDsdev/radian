@@ -292,11 +292,42 @@ function applyLoanAuthorizationFilter(rowLoanMap, authorizedLoans) {
     } else {
       // Loan is restricted - hide the row
       row.style.display = "none";
-      console.log(`Hiding row with restricted loan: ${loanNumber}`);
     }
   });
 
   return visibleRowCount;
+}
+
+/**
+ * Update pagination display based on filtered results
+ */
+function updatePaginationDisplay(visibleRowCount, totalRowCount) {
+  try {
+    // Find the pagination row with the results text
+    const paginationRow = document.querySelector(
+      ".pagingDiv.pagingDivNewStyle td"
+    );
+
+    if (paginationRow) {
+      // Extract original total from existing text or use totalRowCount parameter
+      const currentText = paginationRow.textContent.trim();
+      const totalMatch = currentText.match(/of\s+(\d+)\s+results/i);
+      const originalTotal = totalMatch
+        ? parseInt(totalMatch[1])
+        : totalRowCount;
+
+      // Update pagination text based on visible count
+      if (visibleRowCount === 0) {
+        paginationRow.textContent = `Displaying 0-0 of ${originalTotal} results`;
+      } else {
+        paginationRow.textContent = `Displaying 1-${visibleRowCount} of ${originalTotal} results`;
+      }
+    } else {
+      console.warn("Pagination element not found for update");
+    }
+  } catch (error) {
+    console.error("Error updating pagination display:", error);
+  }
 }
 
 /**
@@ -328,13 +359,12 @@ async function filterTableByAuthorizedLoanNumbers() {
     createAndDisplayLoader();
 
     // Wait for extension listener
-    await waitForListener();
+    // await waitForListener();
 
     // Find the claims table with null check
     const claimsTable = document.getElementById("ClaimsGridView");
 
     if (!claimsTable) {
-      console.log("Claims table not found");
       hideAndRemoveLoader();
       return;
     }
@@ -343,27 +373,18 @@ async function filterTableByAuthorizedLoanNumbers() {
     const dataRows = claimsTable.querySelectorAll("tr.text-black");
 
     if (!dataRows || dataRows.length === 0) {
-      console.log("No data rows found in table");
       hideAndRemoveLoader();
       return;
     }
-
-    console.log(`Found ${dataRows.length} data rows to process`);
 
     // Extract all servicer loan numbers from the table
     const { loanNumbers, rowLoanMap } =
       extractLoanNumbersFromTableRows(dataRows);
 
     if (loanNumbers.length === 0) {
-      console.log("No loan numbers found in table");
       hideAndRemoveLoader();
       return;
     }
-
-    console.log(
-      `Checking authorization for ${loanNumbers.length} loan numbers:`,
-      loanNumbers
-    );
 
     // Check which loans are authorized
     const authorizedLoans = await checkNumbersBatch(loanNumbers);
@@ -374,17 +395,14 @@ async function filterTableByAuthorizedLoanNumbers() {
       return;
     }
 
-    console.log(`Authorized loans:`, authorizedLoans);
-
     // Apply loan authorization filtering
     const visibleRowCount = applyLoanAuthorizationFilter(
       rowLoanMap,
       authorizedLoans
     );
 
-    console.log(
-      `Filtering complete. ${visibleRowCount} rows remain visible out of ${dataRows.length} total rows.`
-    );
+    // Update pagination display with filtered results
+    updatePaginationDisplay(visibleRowCount, dataRows.length);
 
     // Handle case when no rows are visible
     if (visibleRowCount === 0) {
