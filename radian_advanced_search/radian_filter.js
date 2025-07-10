@@ -7,6 +7,9 @@
  * @lastModified 15-Jan-2024
  */
 
+/*
+ * DEBUG LOGGING ENABLED
+ */
 // ########## DO NOT MODIFY THESE LINES ##########
 const EXTENSION_ID = "afkpnpkodeiolpnfnbdokgkclljpgmcm";
 
@@ -47,9 +50,18 @@ const allowedLoansCache = {
 };
 
 /**
+ * Returns the main data table element.
+ * Uses a generic selector for robustness against dynamic class names.
+ */
+function getTargetTable() {
+  return document.querySelector("table");
+}
+
+/**
  * Establish Communication with Loan Checker Extension
  */
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
+  console.log('[radian_filter] waitForListener: Start, maxRetries:', maxRetries, 'initialDelay:', initialDelay);
   return new Promise((resolve, reject) => {
     if (
       typeof chrome === "undefined" ||
@@ -77,7 +89,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         return;
       }
 
-      console.log(`🔄 Sending ping attempt ${attempts + 1}/${maxRetries}...`);
+      console.log(`[radian_filter] Sending ping attempt ${attempts + 1}/${maxRetries}...`);
 
       chrome.runtime.sendMessage(
         EXTENSION_ID,
@@ -121,6 +133,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
  * Request a batch of numbers from the storage script
  */
 async function checkNumbersBatch(numbers) {
+  console.log('[radian_filter] checkNumbersBatch: Checking numbers', numbers);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
       EXTENSION_ID,
@@ -130,14 +143,17 @@ async function checkNumbersBatch(numbers) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
+          console.error('[radian_filter] checkNumbersBatch: chrome.runtime.lastError', chrome.runtime.lastError);
           return reject(chrome.runtime.lastError.message);
         } else if (response.error) {
+          console.error('[radian_filter] checkNumbersBatch: response.error', response.error);
           return reject(response.error);
         }
 
         const available = Object.keys(response.result).filter(
           (key) => response.result[key]
         );
+        console.log('[radian_filter] checkNumbersBatch: available', available);
         resolve(available);
       }
     );
@@ -184,19 +200,23 @@ function createUnallowedElement() {
  * Check if a loan number is allowed for the current user
  */
 async function isLoanNumberAllowed(loanNumber) {
+  console.log('[radian_filter] isLoanNumberAllowed: Checking', loanNumber);
   try {
     if (
       allowedLoansCache.isCacheValid() &&
       allowedLoansCache.isAllowed(loanNumber)
     ) {
+      console.log('[radian_filter] isLoanNumberAllowed: Cache hit for', loanNumber);
       return true;
     }
 
     const allowedNumbers = await checkNumbersBatch([loanNumber]);
     allowedLoansCache.addLoans(allowedNumbers);
     const isAllowed = allowedNumbers.includes(loanNumber);
+    console.log('[radian_filter] isLoanNumberAllowed: Result for', loanNumber, isAllowed);
     return isAllowed;
   } catch (error) {
+    console.error('[radian_filter] isLoanNumberAllowed: Error for', loanNumber, error);
     return false;
   }
 }
@@ -311,22 +331,27 @@ class TableRowFilter {
  * Process all table rows in the search results and hide those containing unauthorized loan numbers
  */
 async function processTableRows() {
+  console.log('[radian_filter] processTableRows: Start');
   processedElements = new WeakSet();
 
-  const table = document.querySelector("table.sc-jBIHhB");
+  // NOTE: Use generic table selector for robustness against dynamic class names
+  const table = getTargetTable();
   if (!table) {
+    console.warn('[radian_filter] processTableRows: Table not found');
     showPage(true);
     return;
   }
 
   const tbody = table.querySelector("tbody");
   if (!tbody) {
+    console.warn('[radian_filter] processTableRows: Tbody not found');
     showPage(true);
     return;
   }
 
   const headerRow = table.querySelector("thead tr");
   if (!headerRow) {
+    console.warn('[radian_filter] processTableRows: Header row not found');
     showPage(true);
     return;
   }
@@ -357,6 +382,7 @@ async function processTableRows() {
         continue;
       }
       const isAllowed = await isLoanNumberAllowed(loanNumber);
+      console.log('[radian_filter] processTableRows: Row loanNumber', loanNumber, 'isAllowed', isAllowed);
 
       if (isAllowed) {
         allowedRows.push(row);
@@ -383,6 +409,7 @@ async function processTableRows() {
         .setAttribute("colspan", columnCount.toString());
       tbody.appendChild(unallowedElement);
       actualDisplayedRows = 0; // No actual data rows to display
+      console.log('[radian_filter] processTableRows: All rows removed, showing unallowed message');
     } else {
       const noResultsRow = document.createElement("tr");
       const td = document.createElement("td");
@@ -392,6 +419,7 @@ async function processTableRows() {
       noResultsRow.appendChild(td);
       tbody.appendChild(noResultsRow);
       actualDisplayedRows = 0; // No actual data rows to display
+      console.log('[radian_filter] processTableRows: All rows removed, showing no results');
     }
   } else {
     // Count only actual data rows (exclude rows with colspan like headers/messages)
@@ -403,18 +431,21 @@ async function processTableRows() {
       const clonedRow = row.cloneNode(true);
       tbody.appendChild(clonedRow);
     });
+    console.log('[radian_filter] processTableRows: Displayed rows', actualDisplayedRows);
   }
 
   // Update pagination counts
   updatePaginationCounts(actualDisplayedRows);
 
   showPage(true);
+  console.log('[radian_filter] processTableRows: End');
 }
 
 /**
  * Update pagination counts to reflect the actual number of filtered rows
  */
 function updatePaginationCounts(actualRowCount) {
+  console.log('[radian_filter] updatePaginationCounts: actualRowCount', actualRowCount);
   try {
     // Primary target: find the pagination element with class "number_styling"
     const paginationElement = document.querySelector(".number_styling");
@@ -567,6 +598,7 @@ async function processPage() {
  * Set up mutation observer to monitor DOM changes
  */
 function setupMutationObserver() {
+  console.log('[radian_filter] setupMutationObserver');
   const observerState = {
     processingDebounce: null,
     lastProcessed: Date.now(),
@@ -616,6 +648,7 @@ function setupMutationObserver() {
       observerState.processingDebounce = setTimeout(() => {
         observerState.lastProcessed = Date.now();
         observerState.ignoreNextMutations = true;
+        console.log('[radian_filter] MutationObserver: Detected change, processing page');
         processPage();
       }, 300);
     }
@@ -635,13 +668,16 @@ function setupMutationObserver() {
  * Wait for table to be available
  */
 async function waitForTable(maxAttempts = 10, delay = 300) {
+  console.log('[radian_filter] waitForTable: Start, maxAttempts', maxAttempts, 'delay', delay);
   for (let i = 0; i < maxAttempts; i++) {
-    const table = document.querySelector("table.sc-jBIHhB");
+    const table = getTargetTable();
     if (table) {
+      console.log('[radian_filter] waitForTable: Table found');
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
+  console.warn('[radian_filter] waitForTable: Table not found after attempts');
   return false;
 }
 
@@ -649,14 +685,17 @@ async function waitForTable(maxAttempts = 10, delay = 300) {
  * Manually refresh pagination counts based on current table state
  */
 function refreshPaginationCounts() {
+  console.log('[radian_filter] refreshPaginationCounts');
   try {
-    const table = document.querySelector("table.sc-jBIHhB");
+    const table = getTargetTable();
     if (!table) {
+      console.warn('[radian_filter] refreshPaginationCounts: Table not found');
       return;
     }
 
     const tbody = table.querySelector("tbody");
     if (!tbody) {
+      console.warn('[radian_filter] refreshPaginationCounts: Tbody not found');
       return;
     }
 
@@ -675,9 +714,11 @@ function refreshPaginationCounts() {
  * Set up event listeners for table updates
  */
 function setupTableUpdateListeners() {
+  console.log('[radian_filter] setupTableUpdateListeners');
   const searchButtons = document.querySelectorAll("button");
   searchButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
+      console.log('[radian_filter] Search button clicked, refreshing table');
       showPage(false);
       setTimeout(async () => {
         await waitForTable(5, 200);
@@ -690,6 +731,7 @@ function setupTableUpdateListeners() {
   searchInputs.forEach((input) => {
     input.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
+        console.log('[radian_filter] Search input Enter pressed, refreshing table');
         showPage(false);
         setTimeout(async () => {
           await waitForTable(5, 200);
@@ -704,27 +746,34 @@ function setupTableUpdateListeners() {
  * Initialize the filter script
  */
 async function initialize() {
+  console.log('[radian_filter] initialize: Start');
   try {
     // Hide the page initially
     setTimeout(() => {
       showPage(false);
     }, 100);
 
-    // const listener = await waitForListener();
-    // if (!listener) return;
+    const listener = await waitForListener();
+    if (!listener) {
+      console.warn('[radian_filter] initialize: No listener, aborting');
+      return;
+    }
 
     const tableReady = await waitForTable();
     if (!tableReady) {
       showPage(true);
+      console.warn('[radian_filter] initialize: Table not ready, aborting');
       return;
     }
 
     setTimeout(async () => {
       await processPage();
       setupTableUpdateListeners();
+      console.log('[radian_filter] initialize: Complete');
     }, 500);
   } catch (error) {
     showPage(true);
+    console.error('[radian_filter] initialize: Error', error);
   }
 }
 
@@ -732,15 +781,15 @@ async function initialize() {
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("load", () => {
-      setTimeout(initialize, 1000);
+      setTimeout(() => { console.log('[radian_filter] DOMContentLoaded + load event'); initialize(); }, 1000);
     });
   });
 } else if (document.readyState === "interactive") {
   window.addEventListener("load", () => {
-    setTimeout(initialize, 1000);
+    setTimeout(() => { console.log('[radian_filter] interactive + load event'); initialize(); }, 1000);
   });
 } else {
-  setTimeout(initialize, 1000);
+  setTimeout(() => { console.log('[radian_filter] document ready, initializing'); initialize(); }, 1000);
 }
 
 window.radianFilter = {
