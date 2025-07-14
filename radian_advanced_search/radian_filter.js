@@ -56,30 +56,33 @@ const allowedLoansCache = {
 function getTargetTable() {
   // Try multiple selectors to find the data table
   const selectors = [
-    'table',
+    "table",
     'table[class*="table"]',
     'table[class*="data"]',
     'table[class*="grid"]',
-    '.table table',
-    '.data-table table',
-    '.results table'
+    ".table table",
+    ".data-table table",
+    ".results table",
   ];
 
   for (const selector of selectors) {
     const table = document.querySelector(selector);
     if (table) {
       // Verify it's a data table by checking for tbody or multiple rows
-      const tbody = table.querySelector('tbody');
-      const rows = table.querySelectorAll('tr');
+      const tbody = table.querySelector("tbody");
+      const rows = table.querySelectorAll("tr");
 
       if (tbody || rows.length > 1) {
-        console.log('[radian_filter] getTargetTable: Found table with selector:', selector);
+        console.log(
+          "[radian_filter] getTargetTable: Found table with selector:",
+          selector
+        );
         return table;
       }
     }
   }
 
-  console.log('[radian_filter] getTargetTable: No suitable table found');
+  console.log("[radian_filter] getTargetTable: No suitable table found");
   return null;
 }
 
@@ -87,7 +90,12 @@ function getTargetTable() {
  * Establish Communication with Loan Checker Extension
  */
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
-  console.log('[radian_filter] waitForListener: Start, maxRetries:', maxRetries, 'initialDelay:', initialDelay);
+  console.log(
+    "[radian_filter] waitForListener: Start, maxRetries:",
+    maxRetries,
+    "initialDelay:",
+    initialDelay
+  );
   return new Promise((resolve, reject) => {
     if (
       typeof chrome === "undefined" ||
@@ -115,7 +123,9 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         return;
       }
 
-      console.log(`[radian_filter] Sending ping attempt ${attempts + 1}/${maxRetries}...`);
+      console.log(
+        `[radian_filter] Sending ping attempt ${attempts + 1}/${maxRetries}...`
+      );
 
       chrome.runtime.sendMessage(
         EXTENSION_ID,
@@ -159,9 +169,9 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
  * Request a batch of numbers from the storage script
  */
 async function checkNumbersBatch(numbers) {
-  console.log('[radian_filter] checkNumbersBatch: Checking numbers', numbers);
+  console.log("[radian_filter] checkNumbersBatch: Checking numbers", numbers);
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
+    chrome.runtime?.sendMessage(
       EXTENSION_ID,
       {
         type: "queryLoans",
@@ -169,17 +179,23 @@ async function checkNumbersBatch(numbers) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[radian_filter] checkNumbersBatch: chrome.runtime.lastError', chrome.runtime.lastError);
+          console.error(
+            "[radian_filter] checkNumbersBatch: chrome.runtime.lastError",
+            chrome.runtime.lastError
+          );
           return reject(chrome.runtime.lastError.message);
         } else if (response.error) {
-          console.error('[radian_filter] checkNumbersBatch: response.error', response.error);
+          console.error(
+            "[radian_filter] checkNumbersBatch: response.error",
+            response.error
+          );
           return reject(response.error);
         }
 
         const available = Object.keys(response.result).filter(
           (key) => response.result[key]
         );
-        console.log('[radian_filter] checkNumbersBatch: available', available);
+        console.log("[radian_filter] checkNumbersBatch: available", available);
         resolve(available);
       }
     );
@@ -226,23 +242,34 @@ function createUnallowedElement() {
  * Check if a loan number is allowed for the current user
  */
 async function isLoanNumberAllowed(loanNumber) {
-  console.log('[radian_filter] isLoanNumberAllowed: Checking', loanNumber);
+  console.log("[radian_filter] isLoanNumberAllowed: Checking", loanNumber);
   try {
     if (
       allowedLoansCache.isCacheValid() &&
       allowedLoansCache.isAllowed(loanNumber)
     ) {
-      console.log('[radian_filter] isLoanNumberAllowed: Cache hit for', loanNumber);
+      console.log(
+        "[radian_filter] isLoanNumberAllowed: Cache hit for",
+        loanNumber
+      );
       return true;
     }
 
     const allowedNumbers = await checkNumbersBatch([loanNumber]);
     allowedLoansCache.addLoans(allowedNumbers);
     const isAllowed = allowedNumbers.includes(loanNumber);
-    console.log('[radian_filter] isLoanNumberAllowed: Result for', loanNumber, isAllowed);
+    console.log(
+      "[radian_filter] isLoanNumberAllowed: Result for",
+      loanNumber,
+      isAllowed
+    );
     return isAllowed;
   } catch (error) {
-    console.error('[radian_filter] isLoanNumberAllowed: Error for', loanNumber, error);
+    console.error(
+      "[radian_filter] isLoanNumberAllowed: Error for",
+      loanNumber,
+      error
+    );
     return false;
   }
 }
@@ -357,27 +384,27 @@ class TableRowFilter {
  * Process all table rows in the search results and hide those containing unauthorized loan numbers
  */
 async function processTableRows() {
-  console.log('[radian_filter] processTableRows: Start');
+  console.log("[radian_filter] processTableRows: Start");
   processedElements = new WeakSet();
 
   // NOTE: Use generic table selector for robustness against dynamic class names
   const table = getTargetTable();
   if (!table) {
-    console.warn('[radian_filter] processTableRows: Table not found');
+    console.warn("[radian_filter] processTableRows: Table not found");
     showPage(true);
     return;
   }
 
   const tbody = table.querySelector("tbody");
   if (!tbody) {
-    console.warn('[radian_filter] processTableRows: Tbody not found');
+    console.warn("[radian_filter] processTableRows: Tbody not found");
     showPage(true);
     return;
   }
 
   const headerRow = table.querySelector("thead tr");
   if (!headerRow) {
-    console.warn('[radian_filter] processTableRows: Header row not found');
+    console.warn("[radian_filter] processTableRows: Header row not found");
     showPage(true);
     return;
   }
@@ -408,7 +435,12 @@ async function processTableRows() {
         continue;
       }
       const isAllowed = await isLoanNumberAllowed(loanNumber);
-      console.log('[radian_filter] processTableRows: Row loanNumber', loanNumber, 'isAllowed', isAllowed);
+      console.log(
+        "[radian_filter] processTableRows: Row loanNumber",
+        loanNumber,
+        "isAllowed",
+        isAllowed
+      );
 
       if (isAllowed) {
         allowedRows.push(row);
@@ -435,7 +467,9 @@ async function processTableRows() {
         .setAttribute("colspan", columnCount.toString());
       tbody.appendChild(unallowedElement);
       actualDisplayedRows = 0; // No actual data rows to display
-      console.log('[radian_filter] processTableRows: All rows removed, showing unallowed message');
+      console.log(
+        "[radian_filter] processTableRows: All rows removed, showing unallowed message"
+      );
     } else {
       const noResultsRow = document.createElement("tr");
       const td = document.createElement("td");
@@ -445,7 +479,9 @@ async function processTableRows() {
       noResultsRow.appendChild(td);
       tbody.appendChild(noResultsRow);
       actualDisplayedRows = 0; // No actual data rows to display
-      console.log('[radian_filter] processTableRows: All rows removed, showing no results');
+      console.log(
+        "[radian_filter] processTableRows: All rows removed, showing no results"
+      );
     }
   } else {
     // Count only actual data rows (exclude rows with colspan like headers/messages)
@@ -457,21 +493,27 @@ async function processTableRows() {
       const clonedRow = row.cloneNode(true);
       tbody.appendChild(clonedRow);
     });
-    console.log('[radian_filter] processTableRows: Displayed rows', actualDisplayedRows);
+    console.log(
+      "[radian_filter] processTableRows: Displayed rows",
+      actualDisplayedRows
+    );
   }
 
   // Update pagination counts
   updatePaginationCounts(actualDisplayedRows);
 
   showPage(true);
-  console.log('[radian_filter] processTableRows: End');
+  console.log("[radian_filter] processTableRows: End");
 }
 
 /**
  * Update pagination counts to reflect the actual number of filtered rows
  */
 function updatePaginationCounts(actualRowCount) {
-  console.log('[radian_filter] updatePaginationCounts: actualRowCount', actualRowCount);
+  console.log(
+    "[radian_filter] updatePaginationCounts: actualRowCount",
+    actualRowCount
+  );
   try {
     // Primary target: find the pagination element with class "number_styling"
     const paginationElement = document.querySelector(".number_styling");
@@ -624,7 +666,7 @@ async function processPage() {
  * Set up mutation observer to monitor DOM changes
  */
 function setupMutationObserver() {
-  console.log('[radian_filter] setupMutationObserver');
+  console.log("[radian_filter] setupMutationObserver");
   const observerState = {
     processingDebounce: null,
     lastProcessed: Date.now(),
@@ -650,25 +692,36 @@ function setupMutationObserver() {
         for (const node of mutation.addedNodes) {
           if (node.nodeType === 1) {
             // Check if a table was added
-            if (node.nodeName === "TABLE" || (node.querySelector && node.querySelector("table"))) {
+            if (
+              node.nodeName === "TABLE" ||
+              (node.querySelector && node.querySelector("table"))
+            ) {
               newTableDetected = true;
               shouldProcess = true;
-              console.log('[radian_filter] MutationObserver: New table detected');
+              console.log(
+                "[radian_filter] MutationObserver: New table detected"
+              );
               break;
             }
 
             // Check if table rows were added
-            if (node.nodeName === "TR" || (node.querySelector && node.querySelector("tr"))) {
+            if (
+              node.nodeName === "TR" ||
+              (node.querySelector && node.querySelector("tr"))
+            ) {
               tableChanged = true;
               shouldProcess = true;
-              console.log('[radian_filter] MutationObserver: Table rows added');
+              console.log("[radian_filter] MutationObserver: Table rows added");
             }
 
             // Check if tbody was added (common in dynamic tables)
-            if (node.nodeName === "TBODY" || (node.querySelector && node.querySelector("tbody"))) {
+            if (
+              node.nodeName === "TBODY" ||
+              (node.querySelector && node.querySelector("tbody"))
+            ) {
               tableChanged = true;
               shouldProcess = true;
-              console.log('[radian_filter] MutationObserver: Tbody added');
+              console.log("[radian_filter] MutationObserver: Tbody added");
             }
           }
         }
@@ -685,7 +738,9 @@ function setupMutationObserver() {
       ) {
         tableChanged = true;
         shouldProcess = true;
-        console.log('[radian_filter] MutationObserver: Table attribute changed');
+        console.log(
+          "[radian_filter] MutationObserver: Table attribute changed"
+        );
       }
     }
 
@@ -696,7 +751,10 @@ function setupMutationObserver() {
         observerState.lastProcessed = Date.now();
         observerState.isProcessing = true;
 
-        console.log('[radian_filter] MutationObserver: Processing changes, newTable:', newTableDetected);
+        console.log(
+          "[radian_filter] MutationObserver: Processing changes, newTable:",
+          newTableDetected
+        );
 
         try {
           if (newTableDetected) {
@@ -706,14 +764,19 @@ function setupMutationObserver() {
               showPage(false);
               await processPage();
             } else {
-              console.warn('[radian_filter] MutationObserver: New table not ready after waiting');
+              console.warn(
+                "[radian_filter] MutationObserver: New table not ready after waiting"
+              );
             }
           } else {
             // Regular table update
             await processPage();
           }
         } catch (error) {
-          console.error('[radian_filter] MutationObserver: Error processing changes:', error);
+          console.error(
+            "[radian_filter] MutationObserver: Error processing changes:",
+            error
+          );
           showPage(true);
         } finally {
           observerState.isProcessing = false;
@@ -736,16 +799,21 @@ function setupMutationObserver() {
  * Wait for table to be available
  */
 async function waitForTable(maxAttempts = 10, delay = 300) {
-  console.log('[radian_filter] waitForTable: Start, maxAttempts', maxAttempts, 'delay', delay);
+  console.log(
+    "[radian_filter] waitForTable: Start, maxAttempts",
+    maxAttempts,
+    "delay",
+    delay
+  );
   for (let i = 0; i < maxAttempts; i++) {
     const table = getTargetTable();
     if (table) {
-      console.log('[radian_filter] waitForTable: Table found');
+      console.log("[radian_filter] waitForTable: Table found");
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  console.warn('[radian_filter] waitForTable: Table not found after attempts');
+  console.warn("[radian_filter] waitForTable: Table not found after attempts");
   return false;
 }
 
@@ -753,7 +821,12 @@ async function waitForTable(maxAttempts = 10, delay = 300) {
  * Wait for table to be available with longer timeout for dynamic content
  */
 async function waitForDynamicTable(maxAttempts = 30, delay = 500) {
-  console.log('[radian_filter] waitForDynamicTable: Start, maxAttempts', maxAttempts, 'delay', delay);
+  console.log(
+    "[radian_filter] waitForDynamicTable: Start, maxAttempts",
+    maxAttempts,
+    "delay",
+    delay
+  );
   for (let i = 0; i < maxAttempts; i++) {
     const table = getTargetTable();
     if (table) {
@@ -761,13 +834,17 @@ async function waitForDynamicTable(maxAttempts = 30, delay = 500) {
       const tbody = table.querySelector("tbody");
       const rows = tbody ? tbody.querySelectorAll("tr") : [];
       if (rows.length > 0) {
-        console.log('[radian_filter] waitForDynamicTable: Table with data found');
+        console.log(
+          "[radian_filter] waitForDynamicTable: Table with data found"
+        );
         return true;
       }
     }
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  console.warn('[radian_filter] waitForDynamicTable: Table with data not found after attempts');
+  console.warn(
+    "[radian_filter] waitForDynamicTable: Table with data not found after attempts"
+  );
   return false;
 }
 
@@ -775,17 +852,17 @@ async function waitForDynamicTable(maxAttempts = 30, delay = 500) {
  * Manually refresh pagination counts based on current table state
  */
 function refreshPaginationCounts() {
-  console.log('[radian_filter] refreshPaginationCounts');
+  console.log("[radian_filter] refreshPaginationCounts");
   try {
     const table = getTargetTable();
     if (!table) {
-      console.warn('[radian_filter] refreshPaginationCounts: Table not found');
+      console.warn("[radian_filter] refreshPaginationCounts: Table not found");
       return;
     }
 
     const tbody = table.querySelector("tbody");
     if (!tbody) {
-      console.warn('[radian_filter] refreshPaginationCounts: Tbody not found');
+      console.warn("[radian_filter] refreshPaginationCounts: Tbody not found");
       return;
     }
 
@@ -804,23 +881,29 @@ function refreshPaginationCounts() {
  * Set up event listeners for table updates
  */
 function setupTableUpdateListeners() {
-  console.log('[radian_filter] setupTableUpdateListeners');
+  console.log("[radian_filter] setupTableUpdateListeners");
 
   // Listen for search buttons
   const searchButtons = document.querySelectorAll("button");
   searchButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      console.log('[radian_filter] Search button clicked, preparing for table update');
+      console.log(
+        "[radian_filter] Search button clicked, preparing for table update"
+      );
       showPage(false);
 
       // Use a longer timeout to wait for the table to be created and populated
       setTimeout(async () => {
-        console.log('[radian_filter] Waiting for dynamic table after search...');
+        console.log(
+          "[radian_filter] Waiting for dynamic table after search..."
+        );
         const tableReady = await waitForDynamicTable(20, 500);
         if (tableReady) {
           await processPage();
         } else {
-          console.warn('[radian_filter] Table not ready after search, showing page anyway');
+          console.warn(
+            "[radian_filter] Table not ready after search, showing page anyway"
+          );
           showPage(true);
         }
       }, 1500);
@@ -832,16 +915,22 @@ function setupTableUpdateListeners() {
   searchInputs.forEach((input) => {
     input.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
-        console.log('[radian_filter] Search input Enter pressed, preparing for table update');
+        console.log(
+          "[radian_filter] Search input Enter pressed, preparing for table update"
+        );
         showPage(false);
-        
+
         setTimeout(async () => {
-          console.log('[radian_filter] Waiting for dynamic table after Enter...');
+          console.log(
+            "[radian_filter] Waiting for dynamic table after Enter..."
+          );
           const tableReady = await waitForDynamicTable(20, 500);
           if (tableReady) {
             await processPage();
           } else {
-            console.warn('[radian_filter] Table not ready after Enter, showing page anyway');
+            console.warn(
+              "[radian_filter] Table not ready after Enter, showing page anyway"
+            );
             showPage(true);
           }
         }, 1500);
@@ -854,14 +943,20 @@ function setupTableUpdateListeners() {
  * Initialize the filter script
  */
 async function initialize() {
-  console.log('[radian_filter] initialize: Start');
+  console.log("[radian_filter] initialize: Start");
   try {
+    await waitForListener();
     const initialTable = getTargetTable();
 
-    console.log('[radian_filter] initialize: Initial table exists:', !!initialTable);
+    console.log(
+      "[radian_filter] initialize: Initial table exists:",
+      !!initialTable
+    );
 
     if (initialTable) {
-      console.log('[radian_filter] initialize: Initial table found, processing immediately');
+      console.log(
+        "[radian_filter] initialize: Initial table found, processing immediately"
+      );
       showPage(false);
 
       const tableReady = await waitForTable();
@@ -869,14 +964,12 @@ async function initialize() {
         await processPage();
       } else {
         showPage(true);
-        console.warn('[radian_filter] initialize: Initial table not ready');
+        console.warn("[radian_filter] initialize: Initial table not ready");
       }
-    } else if (hasSearch) {
-      console.log('[radian_filter] initialize: No initial table but search functionality detected - waiting for dynamic content');
-      // Don't hide the page - let user see the search interface
-      showPage(true);
     } else {
-      console.log('[radian_filter] initialize: No table and no search functionality - showing page as-is');
+      console.log(
+        "[radian_filter] initialize: No table and no search functionality - showing page as-is"
+      );
       showPage(true);
     }
 
@@ -889,10 +982,10 @@ async function initialize() {
     // Set up periodic table check as fallback for dynamic content
     setupPeriodicTableCheck();
 
-    console.log('[radian_filter] initialize: Complete');
+    console.log("[radian_filter] initialize: Complete");
   } catch (error) {
     showPage(true);
-    console.error('[radian_filter] initialize: Error', error);
+    console.error("[radian_filter] initialize: Error", error);
   }
 }
 
@@ -911,8 +1004,8 @@ function setupPeriodicTableCheck() {
 
     const table = getTargetTable();
     if (table) {
-      const tbody = table.querySelector('tbody');
-      const rows = tbody ? tbody.querySelectorAll('tr') : [];
+      const tbody = table.querySelector("tbody");
+      const rows = tbody ? tbody.querySelectorAll("tr") : [];
 
       // Check if this is a new table with data that we haven't processed
       if (rows.length > 0) {
@@ -929,7 +1022,9 @@ function setupPeriodicTableCheck() {
         }
 
         if (hasUnprocessedData) {
-          console.log('[radian_filter] setupPeriodicTableCheck: Found unprocessed table data, processing...');
+          console.log(
+            "[radian_filter] setupPeriodicTableCheck: Found unprocessed table data, processing..."
+          );
           showPage(false);
           await processPage();
           lastTableCheck = now;
@@ -943,15 +1038,24 @@ function setupPeriodicTableCheck() {
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("load", () => {
-      setTimeout(() => { console.log('[radian_filter] DOMContentLoaded + load event'); initialize(); }, 1000);
+      setTimeout(() => {
+        console.log("[radian_filter] DOMContentLoaded + load event");
+        initialize();
+      }, 1000);
     });
   });
 } else if (document.readyState === "interactive") {
   window.addEventListener("load", () => {
-    setTimeout(() => { console.log('[radian_filter] interactive + load event'); initialize(); }, 1000);
+    setTimeout(() => {
+      console.log("[radian_filter] interactive + load event");
+      initialize();
+    }, 1000);
   });
 } else {
-  setTimeout(() => { console.log('[radian_filter] document ready, initializing'); initialize(); }, 1000);
+  setTimeout(() => {
+    console.log("[radian_filter] document ready, initializing");
+    initialize();
+  }, 1000);
 }
 
 window.radianFilter = {
