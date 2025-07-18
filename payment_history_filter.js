@@ -304,9 +304,11 @@ async function clickMIInformationTab() {
 /**
  * Wait for payment history table to become visible
  */
-async function waitForPaymentHistoryTable(maxAttempts = 30, interval = 500) {
+async function waitForPaymentHistoryTable(maxAttempts = 120, interval = 500) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
+    let currentInterval = interval;
+    const maxInterval = 2000; // Cap at 2 seconds
 
     function checkForTable() {
       const tableSelectors = [
@@ -349,10 +351,23 @@ async function waitForPaymentHistoryTable(maxAttempts = 30, interval = 500) {
         if (attempts === 1) {
           console.log("⏳ Waiting for payment history table to load...");
         }
-        setTimeout(checkForTable, interval);
+
+        // Show progress for long waits
+        if (attempts % 20 === 0) {
+          const elapsed = Math.round((attempts * currentInterval) / 1000);
+          console.log(`⏳ Still waiting for payment table... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+        }
+
+        // Use exponential backoff for efficiency
+        if (attempts > 30) {
+          currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+        }
+
+        setTimeout(checkForTable, currentInterval);
       } else {
-        console.warn("⚠️ Payment history table not found after maximum attempts");
-        reject(new Error("Payment history table not found"));
+        const totalTime = Math.round((attempts * interval) / 1000);
+        console.warn(`⚠️ Payment history table not found after maximum attempts (${totalTime}s total)`);
+        reject(new Error(`Payment history table not found after ${totalTime}s`));
       }
     }
 
@@ -1152,9 +1167,11 @@ async function clickPaymentHistoryTab() {
   });
 }
 
-async function waitForPaymentHistoryTable(maxAttempts = 30, interval = 500) {
+async function waitForPaymentHistoryTable(maxAttempts = 120, interval = 500) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
+    let currentInterval = interval;
+    const maxInterval = 2000;
     
     function checkForTable() {
       const tableSelectors = [
@@ -1194,9 +1211,22 @@ async function waitForPaymentHistoryTable(maxAttempts = 30, interval = 500) {
         resolve(paymentTable);
       } else if (++attempts < maxAttempts) {
         if (attempts === 1) console.log("⏳ Waiting for payment history table to load...");
-        setTimeout(checkForTable, interval);
+        
+        // Show progress for long waits
+        if (attempts % 20 === 0) {
+          const elapsed = Math.round((attempts * currentInterval) / 1000);
+          console.log("⏳ Still waiting for payment table... (" + elapsed + "s elapsed, attempt " + attempts + "/" + maxAttempts + ")");
+        }
+        
+        // Use exponential backoff for efficiency
+        if (attempts > 30) {
+          currentInterval = Math.min(currentInterval * 1.1, maxInterval);
+        }
+        
+        setTimeout(checkForTable, currentInterval);
       } else {
-        reject(new Error("Payment history table not found"));
+        const totalTime = Math.round((attempts * interval) / 1000);
+        reject(new Error("Payment history table not found after " + totalTime + "s"));
       }
     }
     
@@ -1410,7 +1440,53 @@ function initializePaymentHistoryFilter() {
   }
 }
 
-// Start the injected script
+// URL change monitoring for injected script
+let injectedCurrentUrl = window.location.href;
+let injectedIsProcessing = false;
+
+function handleInjectedUrlChange() {
+  const newUrl = window.location.href;
+  
+  if (newUrl !== injectedCurrentUrl && !injectedIsProcessing) {
+    console.log("[injected] URL changed from " + injectedCurrentUrl + " to " + newUrl);
+    injectedCurrentUrl = newUrl;
+    
+    setTimeout(() => {
+      console.log("[injected] Retriggering due to URL change...");
+      injectedIsProcessing = true;
+      initializePaymentHistoryFilter();
+      injectedIsProcessing = false;
+    }, 1000);
+  }
+}
+
+// Setup URL monitoring for injected script
+function setupInjectedUrlMonitoring() {
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function() {
+    originalPushState.apply(history, arguments);
+    handleInjectedUrlChange();
+  };
+  
+  history.replaceState = function() {
+    originalReplaceState.apply(history, arguments);
+    handleInjectedUrlChange();
+  };
+  
+  window.addEventListener('popstate', handleInjectedUrlChange);
+  window.addEventListener('hashchange', handleInjectedUrlChange);
+  
+  setInterval(() => {
+    if (window.location.href !== injectedCurrentUrl) {
+      handleInjectedUrlChange();
+    }
+  }, 2000);
+}
+
+// Start the injected script with URL monitoring
+setupInjectedUrlMonitoring();
 initializePaymentHistoryFilter();
 
 // ########## INJECTED SCRIPT END ##########
@@ -1420,7 +1496,7 @@ initializePaymentHistoryFilter();
 }
 
 /**
- * Inject script into iframe using inline code
+ * Inject script into iframe using inline code with enhanced error handling
  */
 function injectInlineScript(doc) {
   if (!doc) {
@@ -1433,26 +1509,62 @@ function injectInlineScript(doc) {
     return;
   }
 
+  // Wait for document to be ready if it's still loading
+  if (doc.readyState === 'loading') {
+    console.log('[payment_history_filter] [DEBUG] Document still loading, waiting...');
+    return new Promise((resolve) => {
+      doc.addEventListener('DOMContentLoaded', () => {
+        console.log('[payment_history_filter] [DEBUG] Document loaded, proceeding with injection');
+        resolve(injectInlineScript(doc));
+      }, { once: true });
+    });
+  }
+
   const script = doc.createElement('script');
   script.type = 'text/javascript';
   script.setAttribute('data-payment-history-filter', 'true');
   script.textContent = getScriptSourceCode();
 
-  const head = doc.head || doc.getElementsByTagName('head')[0] || doc.documentElement;
-  if (head) {
-    head.appendChild(script);
-    console.log('[payment_history_filter] [DEBUG] Inline script injected successfully');
+  // Try multiple injection targets with fallbacks
+  let injectionTarget = null;
+  const targets = [
+    doc.head,
+    doc.getElementsByTagName('head')[0],
+    doc.body,
+    doc.getElementsByTagName('body')[0],
+    doc.documentElement
+  ];
+
+  for (const target of targets) {
+    if (target) {
+      injectionTarget = target;
+      break;
+    }
+  }
+
+  if (injectionTarget) {
+    injectionTarget.appendChild(script);
+    console.log(`[payment_history_filter] [DEBUG] Inline script injected successfully into ${injectionTarget.tagName}`);
   } else {
-    console.warn('[payment_history_filter] [DEBUG] Could not find head element for script injection');
+    console.warn('[payment_history_filter] [DEBUG] Could not find any suitable injection target');
+
+    // Last resort: wait for DOM elements to be available
+    setTimeout(() => {
+      console.log('[payment_history_filter] [DEBUG] Retrying injection after delay...');
+      injectInlineScript(doc);
+    }, 1000);
   }
 }
 
 /**
- * Poll for iframe by src pattern
+ * Poll for iframe by src pattern with enhanced timeout and server-aware polling
  */
-function pollForIframeBySrc(doc, srcPattern, maxAttempts = 30, interval = 300) {
+function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
+    let currentInterval = interval;
+    const maxInterval = 2000; // Cap at 2 seconds
+
     function check() {
       if (attempts === 0) {
         const allIframes = Array.from(doc.getElementsByTagName('iframe'));
@@ -1468,11 +1580,26 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 30, interval = 300) {
         console.log(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
         resolve(iframe);
       } else if (++attempts < maxAttempts) {
-        if (attempts === 1) console.log(`[payment_history_filter] [DEBUG] Waiting for iframe with src pattern "${srcPattern}"...`);
-        setTimeout(check, interval);
+        if (attempts === 1) {
+          console.log(`[payment_history_filter] [DEBUG] Waiting for iframe with src pattern "${srcPattern}"...`);
+        }
+
+        // Show progress for long waits
+        if (attempts % 10 === 0) {
+          const elapsed = Math.round((attempts * currentInterval) / 1000);
+          console.log(`[payment_history_filter] [DEBUG] Still waiting for "${srcPattern}" iframe... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+        }
+
+        // Use exponential backoff for efficiency, but cap the interval
+        if (attempts > 20) {
+          currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+        }
+
+        setTimeout(check, currentInterval);
       } else {
-        console.warn(`[payment_history_filter] [DEBUG] Iframe with src pattern "${srcPattern}" not found after ${maxAttempts} attempts.`);
-        reject(new Error(`Iframe with src pattern "${srcPattern}" not found`));
+        const totalTime = Math.round((attempts * interval) / 1000);
+        console.warn(`[payment_history_filter] [DEBUG] Iframe with src pattern "${srcPattern}" not found after ${maxAttempts} attempts (${totalTime}s total).`);
+        reject(new Error(`Iframe with src pattern "${srcPattern}" not found after ${totalTime}s`));
       }
     }
     check();
@@ -1484,9 +1611,12 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 30, interval = 300) {
  */
 function injectIntoFourLevelDeepIframe() {
   // Poll for the first iframe (contentBlock-iframe)
-  function pollForFirstIframe(maxAttempts = 30, interval = 300) {
+  function pollForFirstIframe(maxAttempts = 120, interval = 500) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
+      let currentInterval = interval;
+      const maxInterval = 2000; // Cap at 2 seconds
+
       function check() {
         const contentBlockIframe = document.getElementById('contentBlock-iframe');
 
@@ -1494,11 +1624,26 @@ function injectIntoFourLevelDeepIframe() {
           console.log('[payment_history_filter] [DEBUG] Found contentBlock-iframe on attempt', attempts + 1);
           resolve(contentBlockIframe);
         } else if (++attempts < maxAttempts) {
-          if (attempts === 1) console.log('[payment_history_filter] [DEBUG] Waiting for contentBlock-iframe...');
-          setTimeout(check, interval);
+          if (attempts === 1) {
+            console.log('[payment_history_filter] [DEBUG] Waiting for contentBlock-iframe...');
+          }
+
+          // Show progress for long waits
+          if (attempts % 10 === 0) {
+            const elapsed = Math.round((attempts * currentInterval) / 1000);
+            console.log(`[payment_history_filter] [DEBUG] Still waiting for contentBlock-iframe... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+          }
+
+          // Use exponential backoff for efficiency, but cap the interval
+          if (attempts > 20) {
+            currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+          }
+
+          setTimeout(check, currentInterval);
         } else {
-          console.warn('[payment_history_filter] [DEBUG] contentBlock-iframe not found after', maxAttempts, 'attempts.');
-          reject(new Error('contentBlock-iframe not found'));
+          const totalTime = Math.round((attempts * interval) / 1000);
+          console.warn('[payment_history_filter] [DEBUG] contentBlock-iframe not found after', maxAttempts, `attempts (${totalTime}s total).`);
+          reject(new Error(`contentBlock-iframe not found after ${totalTime}s`));
         }
       }
       check();
@@ -1511,36 +1656,292 @@ function injectIntoFourLevelDeepIframe() {
       console.log('[payment_history_filter] [DEBUG] Starting 4-level deep iframe injection...');
 
       // Level 1: Wait for contentBlock-iframe (mionlineNavigation.html)
+      console.log('[payment_history_filter] [DEBUG] Level 1: Waiting for contentBlock-iframe...');
       const level1Iframe = await pollForFirstIframe();
       const level1Doc = level1Iframe.contentDocument;
 
       // Level 2: Wait for iframe in mionlineNavigation.html (InquiryMIInformation.html)
+      console.log('[payment_history_filter] [DEBUG] Level 2: Waiting for InquiryMIInformation iframe...');
       const level2Iframe = await pollForIframeBySrc(level1Doc, 'InquiryMIInformation');
       const level2Doc = level2Iframe.contentDocument;
 
       // Level 3: Wait for iframe in InquiryMIInformation.html (payhist_viewAll.html)
+      console.log('[payment_history_filter] [DEBUG] Level 3: Waiting for payhist_viewAll iframe...');
       const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
       const level3Doc = level3Iframe.contentDocument;
 
       // Level 4: Wait for document to be ready and inject script
+      console.log('[payment_history_filter] [DEBUG] Level 4: Preparing payhist_viewAll document...');
       if (level3Doc.readyState === 'loading') {
         console.log('[payment_history_filter] [DEBUG] Waiting for level 3 iframe DOMContentLoaded...');
         await new Promise((res) => level3Doc.addEventListener('DOMContentLoaded', res, { once: true }));
       }
 
       // Inject inline script into the deepest level (payhist_viewAll.html)
-      injectInlineScript(level3Doc);
+      console.log('[payment_history_filter] [DEBUG] Level 4: Injecting script into payhist_viewAll...');
+      const injectionResult = injectInlineScript(level3Doc);
+
+      // Handle async injection if document was still loading
+      if (injectionResult instanceof Promise) {
+        await injectionResult;
+      }
+
       console.log('[payment_history_filter] [DEBUG] 4-level deep iframe injection complete.');
 
     } catch (e) {
       console.warn('[payment_history_filter] [DEBUG] 4-level deep iframe injection failed:', e);
+
+      // Enhanced error recovery: retry after delay for server-related issues
+      if (e.message.includes('not found after') && e.message.includes('s')) {
+        console.log('[payment_history_filter] [DEBUG] Server appears slow, implementing recovery strategy...');
+
+        // Wait a bit longer and try a simplified approach
+        setTimeout(() => {
+          console.log('[payment_history_filter] [DEBUG] Attempting recovery injection...');
+
+          // Try to find any payhist iframe that might have loaded by now
+          const allIframes = document.querySelectorAll('iframe');
+          for (const iframe of allIframes) {
+            try {
+              if (iframe.src && iframe.src.includes('payhist') &&
+                iframe.contentDocument && iframe.contentWindow) {
+                console.log('[payment_history_filter] [DEBUG] Found payhist iframe during recovery, injecting...');
+                injectInlineScript(iframe.contentDocument);
+                break;
+              }
+            } catch (recoveryError) {
+              // Ignore individual iframe access errors during recovery
+            }
+          }
+        }, 5000); // Wait 5 seconds before recovery attempt
+      }
     }
   })();
 }
 
-// Start injection process
+// ########## URL CHANGE MONITORING ##########
+
+/**
+ * Track current URL to detect changes
+ */
+let currentUrl = window.location.href;
+let isProcessing = false;
+let urlChangeTimeout = null;
+
+/**
+ * Handle URL change and retrigger script
+ */
+function handleUrlChange() {
+  const newUrl = window.location.href;
+
+  if (newUrl !== currentUrl && !isProcessing) {
+    console.log(`[payment_history_filter] 🔄 URL changed from ${currentUrl} to ${newUrl}`);
+    currentUrl = newUrl;
+
+    // Clear any existing timeout to avoid multiple rapid triggers
+    if (urlChangeTimeout) {
+      clearTimeout(urlChangeTimeout);
+    }
+
+    // Debounce URL changes to avoid rapid-fire triggers
+    urlChangeTimeout = setTimeout(() => {
+      console.log('[payment_history_filter] 🚀 Retriggering script due to URL change...');
+
+      // Reset processing flag and restart injection
+      isProcessing = false;
+
+      // Clear any existing injected scripts to avoid duplicates
+      const existingScripts = document.querySelectorAll('script[data-payment-history-filter="true"]');
+      existingScripts.forEach(script => script.remove());
+
+      // Also clear any injected scripts in iframes
+      clearExistingIframeScripts();
+
+      // Restart the injection process
+      restartInjectionProcess();
+
+    }, 1000); // Wait 1 second after URL change to ensure page is stable
+  }
+}
+
+/**
+ * Clear existing injected scripts from all accessible iframes
+ */
+function clearExistingIframeScripts() {
+  try {
+    const allIframes = document.querySelectorAll('iframe');
+
+    allIframes.forEach(iframe => {
+      try {
+        if (iframe.contentDocument) {
+          const existingScripts = iframe.contentDocument.querySelectorAll('script[data-payment-history-filter="true"]');
+          existingScripts.forEach(script => {
+            console.log('[payment_history_filter] 🧹 Clearing existing script from iframe');
+            script.remove();
+          });
+        }
+      } catch (e) {
+        // Ignore cross-origin access errors
+      }
+    });
+  } catch (e) {
+    console.warn('[payment_history_filter] Could not clear iframe scripts:', e);
+  }
+}
+
+/**
+ * Restart the entire injection process from the beginning
+ */
+function restartInjectionProcess() {
+  console.log('[payment_history_filter] 🔄 Restarting injection process...');
+
+  // Reset state
+  isProcessing = true;
+
+  // Wait a bit for page to stabilize after URL change
+  setTimeout(() => {
+    console.log('[payment_history_filter] 📍 Starting fresh injection after URL change');
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(injectIntoFourLevelDeepIframe, 500);
+      }, { once: true });
+    } else {
+      setTimeout(injectIntoFourLevelDeepIframe, 500);
+    }
+
+    isProcessing = false;
+  }, 1500);
+}
+
+/**
+ * Set up URL change monitoring
+ */
+function setupUrlChangeMonitoring() {
+  console.log('[payment_history_filter] 🔍 Setting up URL change monitoring...');
+
+  // Monitor pushState and replaceState (for SPA navigation)
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function () {
+    originalPushState.apply(history, arguments);
+    handleUrlChange();
+  };
+
+  history.replaceState = function () {
+    originalReplaceState.apply(history, arguments);
+    handleUrlChange();
+  };
+
+  // Monitor popstate events (back/forward button)
+  window.addEventListener('popstate', handleUrlChange);
+
+  // Monitor hash changes
+  window.addEventListener('hashchange', handleUrlChange);
+
+  // Monitor for new iframe creation and iframe src changes
+  setupIframeMonitoring();
+
+  // Periodic URL check as fallback (for edge cases)
+  setInterval(() => {
+    if (window.location.href !== currentUrl) {
+      handleUrlChange();
+    }
+  }, 2000);
+
+  console.log('[payment_history_filter] ✅ URL change monitoring setup complete');
+}
+
+/**
+ * Set up iframe monitoring for src changes and new iframe creation
+ */
+function setupIframeMonitoring() {
+  // Track existing iframe src values
+  const iframeSrcMap = new Map();
+
+  function trackIframeSources() {
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach((iframe, index) => {
+      const currentSrc = iframe.src || '';
+      const iframeId = iframe.id || `iframe-${index}`;
+
+      if (iframeSrcMap.get(iframeId) !== currentSrc) {
+        if (iframeSrcMap.has(iframeId)) {
+          console.log(`[payment_history_filter] 🔄 Iframe ${iframeId} src changed to: ${currentSrc}`);
+          // Trigger script restart if iframe src contains payment history indicators
+          if (currentSrc.includes('payhist') || currentSrc.includes('InquiryMIInformation')) {
+            handleUrlChange();
+          }
+        }
+        iframeSrcMap.set(iframeId, currentSrc);
+      }
+    });
+  }
+
+  // Initial tracking
+  trackIframeSources();
+
+  // Monitor for new iframes and iframe changes using MutationObserver
+  const iframeObserver = new MutationObserver((mutations) => {
+    let iframeChanges = false;
+
+    mutations.forEach((mutation) => {
+      // Check for new iframes
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === 'IFRAME' || node.querySelector('iframe')) {
+              iframeChanges = true;
+            }
+          }
+        });
+      }
+
+      // Check for iframe attribute changes (src, etc.)
+      if (mutation.type === 'attributes' &&
+        mutation.target.tagName === 'IFRAME' &&
+        (mutation.attributeName === 'src' || mutation.attributeName === 'data-src')) {
+        iframeChanges = true;
+      }
+    });
+
+    if (iframeChanges) {
+      console.log('[payment_history_filter] 🔄 Iframe changes detected');
+      trackIframeSources();
+    }
+  });
+
+  iframeObserver.observe(document.body || document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['src', 'data-src']
+  });
+
+  // Periodic iframe monitoring as fallback
+  setInterval(trackIframeSources, 3000);
+
+  console.log('[payment_history_filter] 🔍 Iframe monitoring setup complete');
+}
+
+// ########## END URL CHANGE MONITORING ##########
+
+// Start injection process with URL monitoring
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', injectIntoFourLevelDeepIframe);
+  document.addEventListener('DOMContentLoaded', () => {
+    isProcessing = true;
+    setupUrlChangeMonitoring();
+    setTimeout(() => {
+      injectIntoFourLevelDeepIframe();
+      isProcessing = false;
+    }, 1000);
+  });
 } else {
-  injectIntoFourLevelDeepIframe();
+  isProcessing = true;
+  setupUrlChangeMonitoring();
+  setTimeout(() => {
+    injectIntoFourLevelDeepIframe();
+    isProcessing = false;
+  }, 1000);
 } 
