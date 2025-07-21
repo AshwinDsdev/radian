@@ -843,6 +843,81 @@ function getScriptSourceCode() {
 // ########## INJECTED SCRIPT START ##########
 const EXTENSION_ID = "hellpeipojbghaaopdnddjakinlmocjl";
 
+// Enhanced iframe polling function for live site compatibility
+function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    let currentInterval = interval;
+    const maxInterval = 2000;
+
+    function check() {
+      if (attempts === 0) {
+        const allIframes = Array.from(doc.getElementsByTagName('iframe'));
+        console.log("[DEBUG] Polling for iframe with src pattern: " + srcPattern + ". Found iframes:",
+          allIframes.map(f => ({ id: f.id, src: f.src }))
+        );
+      }
+
+      const iframes = Array.from(doc.getElementsByTagName('iframe'));
+      let iframe = null;
+
+      // Try to find iframe by src pattern first
+      iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
+      
+      // If not found by src, try to find by specific ID patterns for live site
+      if (!iframe) {
+        if (srcPattern.includes('InquiryMIInformation')) {
+          // Look for live site iframe ID: frmMIOnlineContent
+          iframe = iframes.find(f => f.id === 'frmMIOnlineContent');
+          if (iframe) {
+            console.log("[DEBUG] Found InquiryMIInformation iframe by ID: frmMIOnlineContent");
+          }
+        } else if (srcPattern.includes('payhist')) {
+          // Look for live site iframe ID: containerTab_tabPaymentHistory_frmPaymentHistory
+          iframe = iframes.find(f => f.id === 'containerTab_tabPaymentHistory_frmPaymentHistory');
+          if (iframe) {
+            console.log("[DEBUG] Found payhist iframe by ID: containerTab_tabPaymentHistory_frmPaymentHistory");
+          }
+        }
+      }
+
+      if (iframe) {
+        if (iframe.contentWindow && iframe.contentDocument) {
+          console.log("[DEBUG] Found and accessed iframe with pattern: " + srcPattern + " on attempt " + (attempts + 1));
+          resolve(iframe);
+          return;
+        } else {
+          console.warn("[DEBUG] Found iframe but NOT ACCESSIBLE. Src: " + iframe.src + ", ID: " + iframe.id);
+          reject(new Error("Iframe not accessible (cross-origin): " + srcPattern));
+          return;
+        }
+      }
+
+      if (++attempts < maxAttempts) {
+        if (attempts === 1) {
+          console.log("[DEBUG] Waiting for iframe with pattern: " + srcPattern);
+        }
+
+        if (attempts % 10 === 0) {
+          const elapsed = Math.round((attempts * currentInterval) / 1000);
+          console.log("[DEBUG] Still waiting for " + srcPattern + " iframe... (" + elapsed + "s elapsed, attempt " + attempts + "/" + maxAttempts + ")");
+        }
+
+        if (attempts > 20) {
+          currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+        }
+
+        setTimeout(check, currentInterval);
+      } else {
+        const totalTime = Math.round((attempts * interval) / 1000);
+        console.warn("[DEBUG] Iframe not found after " + maxAttempts + " attempts (" + totalTime + "s total): " + srcPattern);
+        reject(new Error("Iframe not found after " + totalTime + "s: " + srcPattern));
+      }
+    }
+    check();
+  });
+}
+
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
   return new Promise((resolve, reject) => {
     if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
@@ -1559,9 +1634,79 @@ function setupInjectedUrlMonitoring() {
   }, 2000);
 }
 
+// Main injection logic for 4-level iframe structure on live site
+function injectIntoFourLevelDeepIframeLive() {
+  (async function () {
+    try {
+      console.log("[DEBUG] Starting 4-level deep iframe injection for live site...");
+      
+      // For the injected script, we start from the current context
+      // Level 1: Current context is already inside level 1
+      let currentDoc = document;
+      
+      // Check if we need to navigate up to find the right context
+      try {
+        if (window.frameElement && window.frameElement.ownerDocument) {
+          currentDoc = window.frameElement.ownerDocument;
+          console.log("[DEBUG] Found parent document via frameElement");
+        }
+      } catch (e) {
+        console.log("[DEBUG] Using current document as starting point");
+      }
+
+      // Level 2: Look for InquiryMIInformation iframe (ID: frmMIOnlineContent)
+      console.log("[DEBUG] Level 2: Looking for InquiryMIInformation iframe...");
+      const level2Iframe = await pollForIframeBySrc(currentDoc, 'InquiryMIInformation');
+      const level2Doc = level2Iframe.contentDocument;
+      
+      console.log("[DEBUG] Level 2: Found iframe with src:", level2Iframe.src, "ID:", level2Iframe.id);
+
+      // Level 3: Look for payhist_viewAll iframe (ID: containerTab_tabPaymentHistory_frmPaymentHistory)
+      console.log("[DEBUG] Level 3: Looking for payhist_viewAll iframe...");
+      const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
+      
+      console.log("[DEBUG] Level 3: Found iframe with src:", level3Iframe.src, "ID:", level3Iframe.id);
+      
+      // Check if this iframe is accessible and has the expected content
+      if (level3Iframe.contentDocument) {
+        console.log("[DEBUG] Level 3 iframe is accessible, checking content...");
+        initializePaymentHistoryFilter();
+      } else {
+        console.warn("[DEBUG] Level 3 iframe is not accessible (cross-origin)");
+      }
+
+    } catch (e) {
+      console.warn("[DEBUG] Live site 4-level injection failed:", e);
+      // Fallback: just run the filter in current context
+      console.log("[DEBUG] Falling back to current context filter");
+      initializePaymentHistoryFilter();
+    }
+  })();
+}
+
+// Enhanced URL monitoring for injected script
+let injectedCurrentUrl = window.location.href;
+let injectedIsProcessing = false;
+
+function handleInjectedUrlChange() {
+  const newUrl = window.location.href;
+  
+  if (newUrl !== injectedCurrentUrl && !injectedIsProcessing) {
+    console.log("[injected] URL changed from " + injectedCurrentUrl + " to " + newUrl);
+    injectedCurrentUrl = newUrl;
+    
+    setTimeout(() => {
+      console.log("[injected] Retriggering due to URL change...");
+      injectedIsProcessing = true;
+      injectIntoFourLevelDeepIframeLive();
+      injectedIsProcessing = false;
+    }, 1000);
+  }
+}
+
 // Start the injected script with URL monitoring
 setupInjectedUrlMonitoring();
-initializePaymentHistoryFilter();
+injectIntoFourLevelDeepIframeLive();
 
 // ########## INJECTED SCRIPT END ##########
 `;
@@ -1648,17 +1793,37 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
       }
 
       const iframes = Array.from(doc.getElementsByTagName('iframe'));
-      const iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
+      let iframe = null;
+
+      // Try to find iframe by src pattern first
+      iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
+
+      // If not found by src, try to find by specific ID patterns for live site
+      if (!iframe) {
+        if (srcPattern.includes('InquiryMIInformation')) {
+          // Look for live site iframe ID: frmMIOnlineContent
+          iframe = iframes.find(f => f.id === 'frmMIOnlineContent');
+          if (iframe) {
+            console.log(`[payment_history_filter] [DEBUG] Found InquiryMIInformation iframe by ID: frmMIOnlineContent`);
+          }
+        } else if (srcPattern.includes('payhist')) {
+          // Look for live site iframe ID: containerTab_tabPaymentHistory_frmPaymentHistory
+          iframe = iframes.find(f => f.id === 'containerTab_tabPaymentHistory_frmPaymentHistory');
+          if (iframe) {
+            console.log(`[payment_history_filter] [DEBUG] Found payhist iframe by ID: containerTab_tabPaymentHistory_frmPaymentHistory`);
+          }
+        }
+      }
 
       if (iframe) {
-        // Iframe with matching src pattern found, now check if accessible
+        // Iframe with matching src pattern or ID found, now check if accessible
         if (iframe.contentWindow && iframe.contentDocument) {
           console.log(`[payment_history_filter] [DEBUG] Found and accessed iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
           resolve(iframe);
           return;
         } else {
           // Iframe found but not accessible, likely a cross-origin issue.
-          console.warn(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" but it is NOT ACCESSIBLE. This is likely a cross-origin security restriction. Iframe src: ${iframe.src}`);
+          console.warn(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" but it is NOT ACCESSIBLE. This is likely a cross-origin security restriction. Iframe src: ${iframe.src}, ID: ${iframe.id}`);
           // We can stop polling here since it will never become accessible.
           reject(new Error(`Iframe with src pattern "${srcPattern}" is not accessible (cross-origin).`));
           return;
@@ -1704,7 +1869,20 @@ function injectIntoFourLevelDeepIframe() {
       const maxInterval = 2000; // Cap at 2 seconds
 
       function check() {
-        const contentBlockIframe = document.getElementById('contentBlock-iframe');
+        // First try the standard ID
+        let contentBlockIframe = document.getElementById('contentBlock-iframe');
+
+        // If not found, try alternative selectors for live site
+        if (!contentBlockIframe) {
+          const allIframes = document.querySelectorAll('iframe');
+          console.log('[payment_history_filter] [DEBUG] contentBlock-iframe not found by ID, trying alternatives. Found iframes:',
+            Array.from(allIframes).map(f => ({ id: f.id, src: f.src })));
+
+          // Look for iframe that might contain mionlineNavigation
+          contentBlockIframe = Array.from(allIframes).find(f =>
+            f.src && (f.src.includes('mionlineNavigation') || f.src.includes('Navigation'))
+          );
+        }
 
         if (contentBlockIframe && contentBlockIframe.contentWindow && contentBlockIframe.contentDocument) {
           console.log('[payment_history_filter] [DEBUG] Found contentBlock-iframe on attempt', attempts + 1);
@@ -1741,20 +1919,31 @@ function injectIntoFourLevelDeepIframe() {
     try {
       console.log('[payment_history_filter] [DEBUG] Starting 4-level deep iframe injection...');
 
+      // Debug: Show all iframes at the start
+      const topLevelIframes = document.querySelectorAll('iframe');
+      console.log('[payment_history_filter] [DEBUG] Top-level iframes found:',
+        Array.from(topLevelIframes).map(f => ({ id: f.id, src: f.src })));
+
       // Level 1: Wait for contentBlock-iframe (mionlineNavigation.html)
       console.log('[payment_history_filter] [DEBUG] Level 1: Waiting for contentBlock-iframe...');
       const level1Iframe = await pollForFirstIframe();
       const level1Doc = level1Iframe.contentDocument;
+
+      console.log('[payment_history_filter] [DEBUG] Level 1: Found iframe with src:', level1Iframe.src);
 
       // Level 2: Wait for iframe in mionlineNavigation.html (InquiryMIInformation.html)
       console.log('[payment_history_filter] [DEBUG] Level 2: Waiting for InquiryMIInformation iframe...');
       const level2Iframe = await pollForIframeBySrc(level1Doc, 'InquiryMIInformation');
       const level2Doc = level2Iframe.contentDocument;
 
+      console.log('[payment_history_filter] [DEBUG] Level 2: Found iframe with src:', level2Iframe.src, 'ID:', level2Iframe.id);
+
       // Level 3: Wait for iframe in InquiryMIInformation.html (payhist_viewAll.html)
       console.log('[payment_history_filter] [DEBUG] Level 3: Waiting for payhist_viewAll iframe...');
       const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
       const level3Doc = level3Iframe.contentDocument;
+
+      console.log('[payment_history_filter] [DEBUG] Level 3: Found iframe with src:', level3Iframe.src, 'ID:', level3Iframe.id);
 
       // Level 4: Wait for document to be ready and inject script
       console.log('[payment_history_filter] [DEBUG] Level 4: Preparing payhist_viewAll document...');
@@ -1777,6 +1966,9 @@ function injectIntoFourLevelDeepIframe() {
     } catch (e) {
       console.warn('[payment_history_filter] [DEBUG] 4-level deep iframe injection failed:', e);
 
+      // Log detailed error information
+      console.log('[payment_history_filter] [DEBUG] Error details - Message:', e.message, 'Stack:', e.stack);
+
       // Enhanced error recovery: retry after delay for server-related issues
       if (e.message.includes('not found after') && e.message.includes('s')) {
         console.log('[payment_history_filter] [DEBUG] Server appears slow, implementing recovery strategy...');
@@ -1786,19 +1978,33 @@ function injectIntoFourLevelDeepIframe() {
           console.log('[payment_history_filter] [DEBUG] Attempting recovery injection...');
 
           // Try to find any payhist iframe that might have loaded by now
-          const allIframes = document.querySelectorAll('iframe');
-          for (const iframe of allIframes) {
-            try {
-              if (iframe.src && iframe.src.includes('payhist') &&
-                iframe.contentDocument && iframe.contentWindow) {
-                console.log('[payment_history_filter] [DEBUG] Found payhist iframe during recovery, injecting...');
-                injectInlineScript(iframe.contentDocument);
-                break;
+          function recursiveIframeSearch(doc, depth = 0) {
+            if (depth > 5) return; // Prevent infinite recursion
+
+            const iframes = doc.querySelectorAll('iframe');
+            console.log('[payment_history_filter] [DEBUG] Depth', depth, '- Found iframes:',
+              Array.from(iframes).map(f => ({ id: f.id, src: f.src })));
+
+            for (const iframe of iframes) {
+              try {
+                if (iframe.src && iframe.src.includes('payhist') &&
+                  iframe.contentDocument && iframe.contentWindow) {
+                  console.log('[payment_history_filter] [DEBUG] Found payhist iframe during recovery at depth', depth, '- injecting...');
+                  injectInlineScript(iframe.contentDocument);
+                  return;
+                }
+
+                // Recursively search in accessible iframes
+                if (iframe.contentDocument) {
+                  recursiveIframeSearch(iframe.contentDocument, depth + 1);
+                }
+              } catch (recoveryError) {
+                console.log('[payment_history_filter] [DEBUG] Recovery search error at depth', depth, ':', recoveryError.message);
               }
-            } catch (recoveryError) {
-              // Ignore individual iframe access errors during recovery
             }
           }
+
+          recursiveIframeSearch(document);
         }, 5000); // Wait 5 seconds before recovery attempt
       }
     }
