@@ -663,18 +663,22 @@ async function checkPaymentHistoryLoanAccess() {
       console.log("✅ Extension listener connected successfully");
     } catch (error) {
       console.warn("⚠️ Extension listener not available:", error.message);
+      console.log("🔓 No extension available - allowing unrestricted access to payment history");
 
       try {
         await clickMIInformationTab();
-        LoaderManager.updateText("Proceeding without access restrictions");
+        LoaderManager.updateText("Extension not available - proceeding without restrictions");
+        console.log("✅ Returned to MI Information tab - no restrictions applied");
       } catch (fallbackError) {
         console.warn("⚠️ Could not return to MI Information tab:", fallbackError);
+        LoaderManager.updateText("Extension not available - no restrictions applied");
       }
 
       setTimeout(() => LoaderManager.hide(), 1000);
-      return;
+      return; // EXIT COMPLETELY - do not proceed with loan checking
     }
 
+    // Only proceed with loan checking if extension is available
     LoaderManager.updateText("Step 1: Clicking Payment History tab...");
     console.log("📋 Step 1: Clicking Payment History tab...");
     await clickPaymentHistoryTab();
@@ -1326,17 +1330,22 @@ async function checkPaymentHistoryLoanAccess() {
       console.log("✅ Extension listener connected successfully");
     } catch (error) {
       console.warn("⚠️ Extension listener not available:", error.message);
+      console.log("🔓 No extension available - allowing unrestricted access to payment history");
       
       try {
         await clickMIInformationTab();
-        updateLoaderText("Proceeding without access restrictions");
+        updateLoaderText("Extension not available - proceeding without restrictions");
+        console.log("✅ Returned to MI Information tab - no restrictions applied");
       } catch (fallbackError) {
         console.warn("⚠️ Could not return to MI Information tab:", fallbackError);
+        updateLoaderText("Extension not available - no restrictions applied");
       }
       
       setTimeout(() => hideLoader(), 1000);
-      return;
+      return; // EXIT COMPLETELY - do not proceed with loan checking
     }
+
+    // Only proceed with loan checking if extension is available
 
     updateLoaderText("Step 1: Clicking Payment History tab...");
     await clickPaymentHistoryTab();
@@ -1568,7 +1577,7 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
     function check() {
       if (attempts === 0) {
         const allIframes = Array.from(doc.getElementsByTagName('iframe'));
-        console.log(`[payment_history_filter] [DEBUG] Found iframes in doc:`,
+        console.log(`[payment_history_filter] [DEBUG] Polling for iframe with src pattern "${srcPattern}". Found iframes in doc:`,
           allIframes.map(f => ({ id: f.id, src: f.src }))
         );
       }
@@ -1576,10 +1585,22 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
       const iframes = Array.from(doc.getElementsByTagName('iframe'));
       const iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
 
-      if (iframe && iframe.contentWindow && iframe.contentDocument) {
-        console.log(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
-        resolve(iframe);
-      } else if (++attempts < maxAttempts) {
+      if (iframe) {
+        // Iframe with matching src pattern found, now check if accessible
+        if (iframe.contentWindow && iframe.contentDocument) {
+          console.log(`[payment_history_filter] [DEBUG] Found and accessed iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
+          resolve(iframe);
+          return;
+        } else {
+          // Iframe found but not accessible, likely a cross-origin issue.
+          console.warn(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" but it is NOT ACCESSIBLE. This is likely a cross-origin security restriction. Iframe src: ${iframe.src}`);
+          // We can stop polling here since it will never become accessible.
+          reject(new Error(`Iframe with src pattern "${srcPattern}" is not accessible (cross-origin).`));
+          return;
+        }
+      }
+
+      if (++attempts < maxAttempts) {
         if (attempts === 1) {
           console.log(`[payment_history_filter] [DEBUG] Waiting for iframe with src pattern "${srcPattern}"...`);
         }
