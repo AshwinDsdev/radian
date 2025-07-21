@@ -545,6 +545,13 @@ const LoaderManager = {
  * Hide the entire InquiryMIInformation.html iframe when loan is restricted
  */
 function hideInquiryMIInformationIframe() {
+  // Double-check that extension is available before applying restrictions
+  if (!isExtensionAvailable()) {
+    console.error("🚨 CRITICAL ERROR: hideInquiryMIInformationIframe called without extension availability!");
+    console.error("🚨 This should NEVER happen. Extension must be connected before applying restrictions.");
+    return;
+  }
+
   try {
     const currentFrame = window.frameElement;
     if (!currentFrame) {
@@ -646,9 +653,22 @@ function hideCurrentFrameContent() {
 }
 
 /**
+ * Global flag to prevent multiple script executions
+ */
+window.paymentHistoryFilterRunning = window.paymentHistoryFilterRunning || false;
+
+/**
  * Main function to check payment history loan number and handle restrictions
  */
 async function checkPaymentHistoryLoanAccess() {
+  // Prevent multiple executions
+  if (window.paymentHistoryFilterRunning) {
+    console.log("⚠️ Payment history filter already running, skipping execution");
+    return;
+  }
+
+  window.paymentHistoryFilterRunning = true;
+
   try {
     console.log("🔄 Starting payment history access check process...");
 
@@ -658,8 +678,9 @@ async function checkPaymentHistoryLoanAccess() {
     LoaderManager.updateText("Connecting to extension...");
     console.log("🔗 Waiting for extension listener...");
 
+    let extensionConnected = false;
     try {
-      await waitForListener();
+      extensionConnected = await waitForListener();
       console.log("✅ Extension listener connected successfully");
     } catch (error) {
       console.warn("⚠️ Extension listener not available:", error.message);
@@ -674,8 +695,19 @@ async function checkPaymentHistoryLoanAccess() {
         LoaderManager.updateText("Extension not available - no restrictions applied");
       }
 
-      setTimeout(() => LoaderManager.hide(), 1000);
+      console.log("[DEBUG] Hiding loader due to extension connection failure (catch block)");
+      LoaderManager.hide();
+      console.log("[DEBUG] Loader should now be hidden (catch block)");
       return; // EXIT COMPLETELY - do not proceed with loan checking
+    }
+
+    if (!extensionConnected) {
+      console.warn("⚠️ Extension connection was not successful (resolved false)");
+      LoaderManager.updateText("Extension not available - proceeding without restrictions");
+      console.log("[DEBUG] Hiding loader due to extension connection failure (resolved false)");
+      LoaderManager.hide();
+      console.log("[DEBUG] Loader should now be hidden (resolved false)");
+      return;
     }
 
     // Only proceed with loan checking if extension is available
@@ -694,7 +726,7 @@ async function checkPaymentHistoryLoanAccess() {
     if (!lenderLoanElement) {
       console.log("No lender loan number element found");
       LoaderManager.updateText("Error: Loan number element not found");
-      setTimeout(() => LoaderManager.hide(), 2000);
+      LoaderManager.hide();
       return;
     }
     console.log("Lender loan number element found:", lenderLoanElement);
@@ -706,7 +738,7 @@ async function checkPaymentHistoryLoanAccess() {
     if (!loanNumber) {
       console.log("No loan number found in element");
       LoaderManager.updateText("Error: Loan number not found");
-      setTimeout(() => LoaderManager.hide(), 2000);
+      LoaderManager.hide();
       return;
     }
 
@@ -730,7 +762,7 @@ async function checkPaymentHistoryLoanAccess() {
         LoaderManager.updateText("Warning: Could not return to MI Information tab");
       }
 
-      setTimeout(() => LoaderManager.hide(), 1000);
+      LoaderManager.hide();
     }
 
     console.log("✅ Payment history access check process completed");
@@ -746,7 +778,10 @@ async function checkPaymentHistoryLoanAccess() {
       LoaderManager.updateText("Error: Could not return to MI Information tab");
     }
 
-    setTimeout(() => LoaderManager.hide(), 2000);
+    LoaderManager.hide();
+  } finally {
+    // Reset the flag when execution completes
+    window.paymentHistoryFilterRunning = false;
   }
 }
 
@@ -1023,6 +1058,13 @@ function hideLoader() {
 }
 
 function hideInquiryMIInformationIframe() {
+  // Double-check that extension is available before applying restrictions
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+    console.error("🚨 CRITICAL ERROR: hideInquiryMIInformationIframe called without extension availability!");
+    console.error("🚨 This should NEVER happen. Extension must be connected before applying restrictions.");
+    return;
+  }
+
   try {
     const currentFrame = window.frameElement;
     if (!currentFrame) {
@@ -1317,6 +1359,14 @@ async function clickMIInformationTab() {
 }
 
 async function checkPaymentHistoryLoanAccess() {
+  // Prevent multiple executions
+  if (window.paymentHistoryFilterRunning) {
+    console.log("⚠️ Payment history filter already running, skipping execution");
+    return;
+  }
+
+  window.paymentHistoryFilterRunning = true;
+
   try {
     console.log("🔄 Starting payment history access check process...");
     showLoader();
@@ -1325,8 +1375,9 @@ async function checkPaymentHistoryLoanAccess() {
     updateLoaderText("Connecting to extension...");
     console.log("🔗 Waiting for extension listener...");
     
+    let extensionConnected = false;
     try {
-      await waitForListener();
+      extensionConnected = await waitForListener();
       console.log("✅ Extension listener connected successfully");
     } catch (error) {
       console.warn("⚠️ Extension listener not available:", error.message);
@@ -1341,8 +1392,19 @@ async function checkPaymentHistoryLoanAccess() {
         updateLoaderText("Extension not available - no restrictions applied");
       }
       
-      setTimeout(() => hideLoader(), 1000);
+      console.log("[DEBUG] Hiding loader due to extension connection failure (catch block)");
+      hideLoader();
+      console.log("[DEBUG] Loader should now be hidden (catch block)");
       return; // EXIT COMPLETELY - do not proceed with loan checking
+    }
+
+    if (!extensionConnected) {
+      console.warn("⚠️ Extension connection was not successful (resolved false)");
+      updateLoaderText("Extension not available - proceeding without restrictions");
+      console.log("[DEBUG] Hiding loader due to extension connection failure (resolved false)");
+      hideLoader();
+      console.log("[DEBUG] Loader should now be hidden (resolved false)");
+      return;
     }
 
     // Only proceed with loan checking if extension is available
@@ -1405,6 +1467,9 @@ async function checkPaymentHistoryLoanAccess() {
     }
     
     setTimeout(() => hideLoader(), 2000);
+  } finally {
+    // Reset the flag when execution completes
+    window.paymentHistoryFilterRunning = false;
   }
 }
 
