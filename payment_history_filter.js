@@ -843,6 +843,66 @@ function getScriptSourceCode() {
 // ########## INJECTED SCRIPT START ##########
 const EXTENSION_ID = "hellpeipojbghaaopdnddjakinlmocjl";
 
+// Wait for iframe content to load (injected version)
+async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1000) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+
+    function checkContent() {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) {
+          console.log("[DEBUG] Iframe contentDocument not accessible (attempt " + (attempts + 1) + ")");
+          if (++attempts < maxAttempts) {
+            setTimeout(checkContent, interval);
+          } else {
+            reject(new Error('Iframe contentDocument not accessible'));
+          }
+          return;
+        }
+
+        const hasBody = doc.body && doc.body.children.length > 0;
+        const hasHead = doc.head && doc.head.children.length > 0;
+        const hasIframes = doc.querySelectorAll('iframe').length > 0;
+        const hasContent = doc.documentElement.textContent.trim().length > 100;
+
+        console.log("[DEBUG] Iframe content check (attempt " + (attempts + 1) + "):", {
+          hasBody: hasBody,
+          hasHead: hasHead,
+          hasIframes: hasIframes,
+          hasContent: hasContent,
+          bodyChildren: doc.body ? doc.body.children.length : 0,
+          totalText: doc.documentElement.textContent.trim().length,
+          readyState: doc.readyState
+        });
+
+        if (hasBody || hasIframes || hasContent || doc.readyState === 'complete') {
+          console.log("[DEBUG] Iframe content loaded successfully after " + (attempts + 1) + " attempts");
+          resolve(doc);
+          return;
+        }
+
+        if (++attempts < maxAttempts) {
+          console.log("[DEBUG] Iframe content not ready, waiting... (attempt " + attempts + "/" + maxAttempts + ")");
+          setTimeout(checkContent, interval);
+        } else {
+          console.warn("[DEBUG] Iframe content failed to load after " + maxAttempts + " attempts");
+          reject(new Error("Iframe content not loaded after " + (maxAttempts * interval / 1000) + "s"));
+        }
+      } catch (error) {
+        console.error("[DEBUG] Error checking iframe content:", error);
+        if (++attempts < maxAttempts) {
+          setTimeout(checkContent, interval);
+        } else {
+          reject(error);
+        }
+      }
+    }
+
+    checkContent();
+  });
+}
+
 // Enhanced iframe polling function for live site compatibility
 function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
   return new Promise((resolve, reject) => {
@@ -1657,14 +1717,16 @@ function injectIntoFourLevelDeepIframeLive() {
       // Level 2: Look for InquiryMIInformation iframe (ID: frmMIOnlineContent)
       console.log("[DEBUG] Level 2: Looking for InquiryMIInformation iframe...");
       const level2Iframe = await pollForIframeBySrc(currentDoc, 'InquiryMIInformation');
-      const level2Doc = level2Iframe.contentDocument;
-      
       console.log("[DEBUG] Level 2: Found iframe with src:", level2Iframe.src, "ID:", level2Iframe.id);
+      
+      // Level 2.5: Wait for level 2 iframe content to load
+      console.log("[DEBUG] Level 2.5: Waiting for level 2 iframe content to load...");
+      const level2Doc = await waitForIframeContentLoaded(level2Iframe);
+      console.log("[DEBUG] Level 2.5: Level 2 iframe content loaded");
 
       // Level 3: Look for payhist_viewAll iframe (ID: containerTab_tabPaymentHistory_frmPaymentHistory)
       console.log("[DEBUG] Level 3: Looking for payhist_viewAll iframe...");
       const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
-      
       console.log("[DEBUG] Level 3: Found iframe with src:", level3Iframe.src, "ID:", level3Iframe.id);
       
       // Check if this iframe is accessible and has the expected content
@@ -1779,6 +1841,8 @@ function injectInlineScript(doc) {
  * Poll for iframe by src pattern with enhanced timeout and server-aware polling
  */
 function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
+
+  console.log(`[payment_history_filter] [DEBUG] Polling for iframe in Document:`, doc);
   return new Promise((resolve, reject) => {
     let attempts = 0;
     let currentInterval = interval;
@@ -1927,30 +1991,35 @@ function injectIntoFourLevelDeepIframe() {
       // Level 1: Wait for contentBlock-iframe (mionlineNavigation.html)
       console.log('[payment_history_filter] [DEBUG] Level 1: Waiting for contentBlock-iframe...');
       const level1Iframe = await pollForFirstIframe();
-      const level1Doc = level1Iframe.contentDocument;
-
       console.log('[payment_history_filter] [DEBUG] Level 1: Found iframe with src:', level1Iframe.src);
+
+      // Level 1.5: Wait for iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 1.5: Waiting for iframe content to load...');
+      const level1Doc = await waitForIframeContentLoaded(level1Iframe);
+      console.log('[payment_history_filter] [DEBUG] Level 1.5: Iframe content loaded, proceeding...');
 
       // Level 2: Wait for iframe in mionlineNavigation.html (InquiryMIInformation.html)
       console.log('[payment_history_filter] [DEBUG] Level 2: Waiting for InquiryMIInformation iframe...');
       const level2Iframe = await pollForIframeBySrc(level1Doc, 'InquiryMIInformation');
-      const level2Doc = level2Iframe.contentDocument;
-
       console.log('[payment_history_filter] [DEBUG] Level 2: Found iframe with src:', level2Iframe.src, 'ID:', level2Iframe.id);
+
+      // Level 2.5: Wait for level 2 iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 2.5: Waiting for level 2 iframe content to load...');
+      const level2Doc = await waitForIframeContentLoaded(level2Iframe);
+      console.log('[payment_history_filter] [DEBUG] Level 2.5: Level 2 iframe content loaded, proceeding...');
 
       // Level 3: Wait for iframe in InquiryMIInformation.html (payhist_viewAll.html)
       console.log('[payment_history_filter] [DEBUG] Level 3: Waiting for payhist_viewAll iframe...');
       const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
-      const level3Doc = level3Iframe.contentDocument;
-
       console.log('[payment_history_filter] [DEBUG] Level 3: Found iframe with src:', level3Iframe.src, 'ID:', level3Iframe.id);
 
-      // Level 4: Wait for document to be ready and inject script
+      // Level 3.5: Wait for level 3 iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 3.5: Waiting for level 3 iframe content to load...');
+      const level3Doc = await waitForIframeContentLoaded(level3Iframe);
+
+      // Level 4: Inject script into final iframe
       console.log('[payment_history_filter] [DEBUG] Level 4: Preparing payhist_viewAll document...');
-      if (level3Doc.readyState === 'loading') {
-        console.log('[payment_history_filter] [DEBUG] Waiting for level 3 iframe DOMContentLoaded...');
-        await new Promise((res) => level3Doc.addEventListener('DOMContentLoaded', res, { once: true }));
-      }
+      console.log('[payment_history_filter] [DEBUG] Level 4: Final document ready state:', level3Doc.readyState);
 
       // Inject inline script into the deepest level (payhist_viewAll.html)
       console.log('[payment_history_filter] [DEBUG] Level 4: Injecting script into payhist_viewAll...');
@@ -2236,4 +2305,71 @@ if (document.readyState === 'loading') {
     injectIntoFourLevelDeepIframe();
     isProcessing = false;
   }, 1000);
-} 
+}
+
+/**
+ * Wait for iframe document to be fully loaded and populated
+ */
+async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1000) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+
+    function checkContent() {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) {
+          console.log(`[payment_history_filter] [DEBUG] Iframe contentDocument not accessible (attempt ${attempts + 1})`);
+          if (++attempts < maxAttempts) {
+            setTimeout(checkContent, interval);
+          } else {
+            reject(new Error('Iframe contentDocument not accessible'));
+          }
+          return;
+        }
+
+        // Check if document has meaningful content
+        const hasBody = doc.body && doc.body.children.length > 0;
+        const hasHead = doc.head && doc.head.children.length > 0;
+        const hasIframes = doc.querySelectorAll('iframe').length > 0;
+        const hasContent = doc.documentElement.textContent.trim().length > 100;
+
+        console.log(`[payment_history_filter] [DEBUG] Iframe content check (attempt ${attempts + 1}):`, {
+          hasBody,
+          hasHead,
+          hasIframes,
+          hasContent,
+          bodyChildren: doc.body ? doc.body.children.length : 0,
+          totalText: doc.documentElement.textContent.trim().length,
+          readyState: doc.readyState
+        });
+
+        // Consider loaded if it has body content OR nested iframes OR substantial text
+        if (hasBody || hasIframes || hasContent || doc.readyState === 'complete') {
+          console.log(`[payment_history_filter] [DEBUG] Iframe content loaded successfully after ${attempts + 1} attempts`);
+          resolve(doc);
+          return;
+        }
+
+        if (++attempts < maxAttempts) {
+          console.log(`[payment_history_filter] [DEBUG] Iframe content not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
+          setTimeout(checkContent, interval);
+        } else {
+          console.warn(`[payment_history_filter] [DEBUG] Iframe content failed to load after ${maxAttempts} attempts`);
+          reject(new Error(`Iframe content not loaded after ${maxAttempts * interval / 1000}s`));
+        }
+      } catch (error) {
+        console.error(`[payment_history_filter] [DEBUG] Error checking iframe content:`, error);
+        if (++attempts < maxAttempts) {
+          setTimeout(checkContent, interval);
+        } else {
+          reject(error);
+        }
+      }
+    }
+
+    // Start checking immediately
+    checkContent();
+  });
+}
+
+// ... existing code ...
