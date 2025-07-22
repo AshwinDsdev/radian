@@ -745,8 +745,9 @@ async function checkPaymentHistoryLoanAccess() {
     LoaderManager.updateText(`Step 4: Verifying access for loan ${loanNumber}...`);
     console.log(`🔍 Step 4: Checking access for loan number: ${loanNumber}`);
     const allowedLoans = await checkNumbersBatch([loanNumber]);
+    console.log("Result of checkNumbersBatch:", allowedLoans);
 
-    if (allowedLoans.length === 0) {
+    if (!allowedLoans || allowedLoans.length === 0) {
       LoaderManager.updateText("Access denied - Hiding restricted content...");
       console.log(`🚫 Loan ${loanNumber} is restricted - hiding entire InquiryMIInformation.html iframe`);
 
@@ -843,144 +844,9 @@ function getScriptSourceCode() {
 // ########## INJECTED SCRIPT START ##########
 const EXTENSION_ID = "hellpeipojbghaaopdnddjakinlmocjl";
 
-// Wait for iframe content to load (injected version)
-async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1000) {
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-
-    function checkContent() {
-      try {
-        const doc = iframe.contentDocument;
-        if (!doc) {
-          console.log("[DEBUG] Iframe contentDocument not accessible (attempt " + (attempts + 1) + ")");
-          if (++attempts < maxAttempts) {
-            setTimeout(checkContent, interval);
-          } else {
-            reject(new Error('Iframe contentDocument not accessible'));
-          }
-          return;
-        }
-
-        const hasBody = doc.body && doc.body.children.length > 0;
-        const hasHead = doc.head && doc.head.children.length > 0;
-        const hasIframes = doc.querySelectorAll('iframe').length > 0;
-        const hasContent = doc.documentElement.textContent.trim().length > 100;
-
-        console.log("[DEBUG] Iframe content check (attempt " + (attempts + 1) + "):", {
-          hasBody: hasBody,
-          hasHead: hasHead,
-          hasIframes: hasIframes,
-          hasContent: hasContent,
-          bodyChildren: doc.body ? doc.body.children.length : 0,
-          totalText: doc.documentElement.textContent.trim().length,
-          readyState: doc.readyState
-        });
-
-        if (hasBody || hasIframes || hasContent || doc.readyState === 'complete') {
-          console.log("[DEBUG] Iframe content loaded successfully after " + (attempts + 1) + " attempts");
-          resolve(doc);
-          return;
-        }
-
-        if (++attempts < maxAttempts) {
-          console.log("[DEBUG] Iframe content not ready, waiting... (attempt " + attempts + "/" + maxAttempts + ")");
-          setTimeout(checkContent, interval);
-        } else {
-          console.warn("[DEBUG] Iframe content failed to load after " + maxAttempts + " attempts");
-          reject(new Error("Iframe content not loaded after " + (maxAttempts * interval / 1000) + "s"));
-        }
-      } catch (error) {
-        console.error("[DEBUG] Error checking iframe content:", error);
-        if (++attempts < maxAttempts) {
-          setTimeout(checkContent, interval);
-        } else {
-          reject(error);
-        }
-      }
-    }
-
-    checkContent();
-  });
-}
-
-// Enhanced iframe polling function for live site compatibility
-function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    let currentInterval = interval;
-    const maxInterval = 2000;
-
-    function check() {
-      if (attempts === 0) {
-        const allIframes = Array.from(doc.getElementsByTagName('iframe'));
-        console.log("[DEBUG] Polling for iframe with src pattern: " + srcPattern + ". Found iframes:",
-          allIframes.map(f => ({ id: f.id, src: f.src }))
-        );
-      }
-
-      const iframes = Array.from(doc.getElementsByTagName('iframe'));
-      let iframe = null;
-
-      // Try to find iframe by src pattern first
-      iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
-      
-      // If not found by src, try to find by specific ID patterns for live site
-      if (!iframe) {
-        if (srcPattern.includes('InquiryMIInformation')) {
-          // Look for live site iframe ID: frmMIOnlineContent
-          iframe = iframes.find(f => f.id === 'frmMIOnlineContent');
-          if (iframe) {
-            console.log("[DEBUG] Found InquiryMIInformation iframe by ID: frmMIOnlineContent");
-          }
-        } else if (srcPattern.includes('payhist')) {
-          // Look for live site iframe ID: containerTab_tabPaymentHistory_frmPaymentHistory
-          iframe = iframes.find(f => f.id === 'containerTab_tabPaymentHistory_frmPaymentHistory');
-          if (iframe) {
-            console.log("[DEBUG] Found payhist iframe by ID: containerTab_tabPaymentHistory_frmPaymentHistory");
-          }
-        }
-      }
-
-      if (iframe) {
-        if (iframe.contentWindow && iframe.contentDocument) {
-          console.log("[DEBUG] Found and accessed iframe with pattern: " + srcPattern + " on attempt " + (attempts + 1));
-          resolve(iframe);
-          return;
-        } else {
-          console.warn("[DEBUG] Found iframe but NOT ACCESSIBLE. Src: " + iframe.src + ", ID: " + iframe.id);
-          reject(new Error("Iframe not accessible (cross-origin): " + srcPattern));
-          return;
-        }
-      }
-
-      if (++attempts < maxAttempts) {
-        if (attempts === 1) {
-          console.log("[DEBUG] Waiting for iframe with pattern: " + srcPattern);
-        }
-
-        if (attempts % 10 === 0) {
-          const elapsed = Math.round((attempts * currentInterval) / 1000);
-          console.log("[DEBUG] Still waiting for " + srcPattern + " iframe... (" + elapsed + "s elapsed, attempt " + attempts + "/" + maxAttempts + ")");
-        }
-
-        if (attempts > 20) {
-          currentInterval = Math.min(currentInterval * 1.2, maxInterval);
-        }
-
-        setTimeout(check, currentInterval);
-      } else {
-        const totalTime = Math.round((attempts * interval) / 1000);
-        console.warn("[DEBUG] Iframe not found after " + maxAttempts + " attempts (" + totalTime + "s total): " + srcPattern);
-        reject(new Error("Iframe not found after " + totalTime + "s: " + srcPattern));
-      }
-    }
-    check();
-  });
-}
-
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
   return new Promise((resolve, reject) => {
-    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+    if (!isExtensionAvailable()) {
       console.warn("❌ Chrome extension API not available. Running in standalone mode.");
       resolve(false);
       return;
@@ -998,26 +864,28 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         return;
       }
 
+
       try {
         chrome.runtime.sendMessage(
           EXTENSION_ID,
           { type: "ping" },
           (response) => {
             if (chrome.runtime.lastError) {
-              console.warn("Chrome extension error:", chrome.runtime.lastError);
-              attempts++;
-              if (attempts >= maxRetries) {
-                reject(new Error("Chrome extension error"));
-                return;
-              }
-              timeoutId = setTimeout(sendPing, delay);
+              console.warn("❌ Chrome runtime error:", chrome.runtime.lastError.message);
+              timeoutId = setTimeout(() => {
+                attempts++;
+                delay *= 2;
+                sendPing();
+              }, delay);
               return;
             }
 
             if (response?.result === "pong") {
+              console.log("✅ Listener detected!");
               clearTimeout(timeoutId);
               resolve(true);
             } else {
+              console.warn("❌ No listener detected, retrying...");
               timeoutId = setTimeout(() => {
                 attempts++;
                 delay *= 2;
@@ -1036,9 +904,10 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
   });
 }
 
+// Define loan numbers directly in the injected script for standalone mode
 async function checkNumbersBatch(numbers) {
   return new Promise((resolve, reject) => {
-    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+    if (!isExtensionAvailable()) {
       console.warn("❌ Chrome extension API not available. Running in standalone mode.");
       resolve([]);
       return;
@@ -1193,13 +1062,6 @@ function hideLoader() {
 }
 
 function hideInquiryMIInformationIframe() {
-  // Double-check that extension is available before applying restrictions
-  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
-    console.error("🚨 CRITICAL ERROR: hideInquiryMIInformationIframe called without extension availability!");
-    console.error("🚨 This should NEVER happen. Extension must be connected before applying restrictions.");
-    return;
-  }
-
   try {
     const currentFrame = window.frameElement;
     if (!currentFrame) {
@@ -1348,11 +1210,9 @@ async function clickPaymentHistoryTab() {
   });
 }
 
-async function waitForPaymentHistoryTable(maxAttempts = 120, interval = 500) {
+async function waitForPaymentHistoryTable(maxAttempts = 30, interval = 500) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
-    let currentInterval = interval;
-    const maxInterval = 2000;
     
     function checkForTable() {
       const tableSelectors = [
@@ -1392,22 +1252,9 @@ async function waitForPaymentHistoryTable(maxAttempts = 120, interval = 500) {
         resolve(paymentTable);
       } else if (++attempts < maxAttempts) {
         if (attempts === 1) console.log("⏳ Waiting for payment history table to load...");
-        
-        // Show progress for long waits
-        if (attempts % 20 === 0) {
-          const elapsed = Math.round((attempts * currentInterval) / 1000);
-          console.log("⏳ Still waiting for payment table... (" + elapsed + "s elapsed, attempt " + attempts + "/" + maxAttempts + ")");
-        }
-        
-        // Use exponential backoff for efficiency
-        if (attempts > 30) {
-          currentInterval = Math.min(currentInterval * 1.1, maxInterval);
-        }
-        
-        setTimeout(checkForTable, currentInterval);
+        setTimeout(checkForTable, interval);
       } else {
-        const totalTime = Math.round((attempts * interval) / 1000);
-        reject(new Error("Payment history table not found after " + totalTime + "s"));
+        reject(new Error("Payment history table not found"));
       }
     }
     
@@ -1494,14 +1341,6 @@ async function clickMIInformationTab() {
 }
 
 async function checkPaymentHistoryLoanAccess() {
-  // Prevent multiple executions
-  if (window.paymentHistoryFilterRunning) {
-    console.log("⚠️ Payment history filter already running, skipping execution");
-    return;
-  }
-
-  window.paymentHistoryFilterRunning = true;
-
   try {
     console.log("🔄 Starting payment history access check process...");
     showLoader();
@@ -1510,39 +1349,22 @@ async function checkPaymentHistoryLoanAccess() {
     updateLoaderText("Connecting to extension...");
     console.log("🔗 Waiting for extension listener...");
     
-    let extensionConnected = false;
     try {
-      extensionConnected = await waitForListener();
+      await waitForListener();
       console.log("✅ Extension listener connected successfully");
     } catch (error) {
       console.warn("⚠️ Extension listener not available:", error.message);
-      console.log("🔓 No extension available - allowing unrestricted access to payment history");
       
       try {
         await clickMIInformationTab();
-        updateLoaderText("Extension not available - proceeding without restrictions");
-        console.log("✅ Returned to MI Information tab - no restrictions applied");
+        updateLoaderText("Proceeding without access restrictions");
       } catch (fallbackError) {
         console.warn("⚠️ Could not return to MI Information tab:", fallbackError);
-        updateLoaderText("Extension not available - no restrictions applied");
       }
       
-      console.log("[DEBUG] Hiding loader due to extension connection failure (catch block)");
-      hideLoader();
-      console.log("[DEBUG] Loader should now be hidden (catch block)");
-      return; // EXIT COMPLETELY - do not proceed with loan checking
-    }
-
-    if (!extensionConnected) {
-      console.warn("⚠️ Extension connection was not successful (resolved false)");
-      updateLoaderText("Extension not available - proceeding without restrictions");
-      console.log("[DEBUG] Hiding loader due to extension connection failure (resolved false)");
-      hideLoader();
-      console.log("[DEBUG] Loader should now be hidden (resolved false)");
+      setTimeout(() => hideLoader(), 1000);
       return;
     }
-
-    // Only proceed with loan checking if extension is available
 
     updateLoaderText("Step 1: Clicking Payment History tab...");
     await clickPaymentHistoryTab();
@@ -1568,7 +1390,9 @@ async function checkPaymentHistoryLoanAccess() {
     }
 
     updateLoaderText("Step 4: Verifying access for loan " + loanNumber + "...");
+    console.log("[INJECTED] Checking loan number:", loanNumber);
     const allowedLoans = await checkNumbersBatch([loanNumber]);
+    console.log("[INJECTED] Result of check:", allowedLoans);
 
     if (allowedLoans.length === 0) {
       updateLoaderText("Access denied - Hiding restricted content...");
@@ -1602,9 +1426,6 @@ async function checkPaymentHistoryLoanAccess() {
     }
     
     setTimeout(() => hideLoader(), 2000);
-  } finally {
-    // Reset the flag when execution completes
-    window.paymentHistoryFilterRunning = false;
   }
 }
 
@@ -1649,126 +1470,8 @@ function initializePaymentHistoryFilter() {
   }
 }
 
-// URL change monitoring for injected script
-let injectedCurrentUrl = window.location.href;
-let injectedIsProcessing = false;
-
-function handleInjectedUrlChange() {
-  const newUrl = window.location.href;
-  
-  if (newUrl !== injectedCurrentUrl && !injectedIsProcessing) {
-    console.log("[injected] URL changed from " + injectedCurrentUrl + " to " + newUrl);
-    injectedCurrentUrl = newUrl;
-    
-    setTimeout(() => {
-      console.log("[injected] Retriggering due to URL change...");
-      injectedIsProcessing = true;
-      initializePaymentHistoryFilter();
-      injectedIsProcessing = false;
-    }, 1000);
-  }
-}
-
-// Setup URL monitoring for injected script
-function setupInjectedUrlMonitoring() {
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-  
-  history.pushState = function() {
-    originalPushState.apply(history, arguments);
-    handleInjectedUrlChange();
-  };
-  
-  history.replaceState = function() {
-    originalReplaceState.apply(history, arguments);
-    handleInjectedUrlChange();
-  };
-  
-  window.addEventListener('popstate', handleInjectedUrlChange);
-  window.addEventListener('hashchange', handleInjectedUrlChange);
-  
-  setInterval(() => {
-    if (window.location.href !== injectedCurrentUrl) {
-      handleInjectedUrlChange();
-    }
-  }, 2000);
-}
-
-// Main injection logic for 4-level iframe structure on live site
-function injectIntoFourLevelDeepIframeLive() {
-  (async function () {
-    try {
-      console.log("[DEBUG] Starting 4-level deep iframe injection for live site...");
-      
-      // For the injected script, we start from the current context
-      // Level 1: Current context is already inside level 1
-      let currentDoc = document;
-      
-      // Check if we need to navigate up to find the right context
-      try {
-        if (window.frameElement && window.frameElement.ownerDocument) {
-          currentDoc = window.frameElement.ownerDocument;
-          console.log("[DEBUG] Found parent document via frameElement");
-        }
-      } catch (e) {
-        console.log("[DEBUG] Using current document as starting point");
-      }
-
-      // Level 2: Look for InquiryMIInformation iframe (ID: frmMIOnlineContent)
-      console.log("[DEBUG] Level 2: Looking for InquiryMIInformation iframe...");
-      const level2Iframe = await pollForIframeBySrc(currentDoc, 'InquiryMIInformation');
-      console.log("[DEBUG] Level 2: Found iframe with src:", level2Iframe.src, "ID:", level2Iframe.id);
-      
-      // Level 2.5: Wait for level 2 iframe content to load
-      console.log("[DEBUG] Level 2.5: Waiting for level 2 iframe content to load...");
-      const level2Doc = await waitForIframeContentLoaded(level2Iframe);
-      console.log("[DEBUG] Level 2.5: Level 2 iframe content loaded");
-
-      // Level 3: Look for payhist_viewAll iframe (ID: containerTab_tabPaymentHistory_frmPaymentHistory)
-      console.log("[DEBUG] Level 3: Looking for payhist_viewAll iframe...");
-      const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
-      console.log("[DEBUG] Level 3: Found iframe with src:", level3Iframe.src, "ID:", level3Iframe.id);
-      
-      // Check if this iframe is accessible and has the expected content
-      if (level3Iframe.contentDocument) {
-        console.log("[DEBUG] Level 3 iframe is accessible, checking content...");
-        initializePaymentHistoryFilter();
-      } else {
-        console.warn("[DEBUG] Level 3 iframe is not accessible (cross-origin)");
-      }
-
-    } catch (e) {
-      console.warn("[DEBUG] Live site 4-level injection failed:", e);
-      // Fallback: just run the filter in current context
-      console.log("[DEBUG] Falling back to current context filter");
-      initializePaymentHistoryFilter();
-    }
-  })();
-}
-
-// Enhanced URL monitoring for injected script
-let injectedCurrentUrl = window.location.href;
-let injectedIsProcessing = false;
-
-function handleInjectedUrlChange() {
-  const newUrl = window.location.href;
-  
-  if (newUrl !== injectedCurrentUrl && !injectedIsProcessing) {
-    console.log("[injected] URL changed from " + injectedCurrentUrl + " to " + newUrl);
-    injectedCurrentUrl = newUrl;
-    
-    setTimeout(() => {
-      console.log("[injected] Retriggering due to URL change...");
-      injectedIsProcessing = true;
-      injectIntoFourLevelDeepIframeLive();
-      injectedIsProcessing = false;
-    }, 1000);
-  }
-}
-
-// Start the injected script with URL monitoring
-setupInjectedUrlMonitoring();
-injectIntoFourLevelDeepIframeLive();
+// Start the injected script
+initializePaymentHistoryFilter();
 
 // ########## INJECTED SCRIPT END ##########
 `;
@@ -1851,7 +1554,7 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
     function check() {
       if (attempts === 0) {
         const allIframes = Array.from(doc.getElementsByTagName('iframe'));
-        console.log(`[payment_history_filter] [DEBUG] Polling for iframe with src pattern "${srcPattern}". Found iframes in doc:`,
+        console.log("[DEBUG] Polling for iframe with src pattern: " + srcPattern + ". Found iframes:",
           allIframes.map(f => ({ id: f.id, src: f.src }))
         );
       }
@@ -1861,51 +1564,46 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
 
       // Try to find iframe by src pattern first
       iframe = iframes.find(f => f.src && f.src.includes(srcPattern));
-
+      
       // If not found by src, try to find by specific ID patterns for live site
       if (!iframe) {
         if (srcPattern.includes('InquiryMIInformation')) {
           // Look for live site iframe ID: frmMIOnlineContent
           iframe = iframes.find(f => f.id === 'frmMIOnlineContent');
           if (iframe) {
-            console.log(`[payment_history_filter] [DEBUG] Found InquiryMIInformation iframe by ID: frmMIOnlineContent`);
+            console.log("[DEBUG] Found InquiryMIInformation iframe by ID: frmMIOnlineContent");
           }
         } else if (srcPattern.includes('payhist')) {
           // Look for live site iframe ID: containerTab_tabPaymentHistory_frmPaymentHistory
           iframe = iframes.find(f => f.id === 'containerTab_tabPaymentHistory_frmPaymentHistory');
           if (iframe) {
-            console.log(`[payment_history_filter] [DEBUG] Found payhist iframe by ID: containerTab_tabPaymentHistory_frmPaymentHistory`);
+            console.log("[DEBUG] Found payhist iframe by ID: containerTab_tabPaymentHistory_frmPaymentHistory");
           }
         }
       }
 
       if (iframe) {
-        // Iframe with matching src pattern or ID found, now check if accessible
         if (iframe.contentWindow && iframe.contentDocument) {
-          console.log(`[payment_history_filter] [DEBUG] Found and accessed iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
+          console.log("[DEBUG] Found and accessed iframe with pattern: " + srcPattern + " on attempt " + (attempts + 1));
           resolve(iframe);
           return;
         } else {
-          // Iframe found but not accessible, likely a cross-origin issue.
-          console.warn(`[payment_history_filter] [DEBUG] Found iframe with src pattern "${srcPattern}" but it is NOT ACCESSIBLE. This is likely a cross-origin security restriction. Iframe src: ${iframe.src}, ID: ${iframe.id}`);
-          // We can stop polling here since it will never become accessible.
-          reject(new Error(`Iframe with src pattern "${srcPattern}" is not accessible (cross-origin).`));
+          console.warn("[DEBUG] Found iframe but NOT ACCESSIBLE. Src: " + iframe.src + ", ID: " + iframe.id);
+          reject(new Error("Iframe not accessible (cross-origin): " + srcPattern));
           return;
         }
       }
 
       if (++attempts < maxAttempts) {
         if (attempts === 1) {
-          console.log(`[payment_history_filter] [DEBUG] Waiting for iframe with src pattern "${srcPattern}"...`);
+          console.log("[DEBUG] Waiting for iframe with pattern: " + srcPattern);
         }
 
-        // Show progress for long waits
         if (attempts % 10 === 0) {
           const elapsed = Math.round((attempts * currentInterval) / 1000);
-          console.log(`[payment_history_filter] [DEBUG] Still waiting for "${srcPattern}" iframe... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+          console.log("[DEBUG] Still waiting for " + srcPattern + " iframe... (" + elapsed + "s elapsed, attempt " + attempts + "/" + maxAttempts + ")");
         }
 
-        // Use exponential backoff for efficiency, but cap the interval
         if (attempts > 20) {
           currentInterval = Math.min(currentInterval * 1.2, maxInterval);
         }
@@ -1913,8 +1611,8 @@ function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) 
         setTimeout(check, currentInterval);
       } else {
         const totalTime = Math.round((attempts * interval) / 1000);
-        console.warn(`[payment_history_filter] [DEBUG] Iframe with src pattern "${srcPattern}" not found after ${maxAttempts} attempts (${totalTime}s total).`);
-        reject(new Error(`Iframe with src pattern "${srcPattern}" not found after ${totalTime}s`));
+        console.warn("[DEBUG] Iframe not found after " + maxAttempts + " attempts (" + totalTime + "s total): " + srcPattern);
+        reject(new Error("Iframe not found after " + totalTime + "s: " + srcPattern));
       }
     }
     check();
@@ -2309,6 +2007,7 @@ if (document.readyState === 'loading') {
 
 /**
  * Wait for iframe document to be fully loaded and populated
+ * Enhanced with cross-origin handling and fallback strategies
  */
 async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1000) {
   return new Promise((resolve, reject) => {
@@ -2316,46 +2015,94 @@ async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1
 
     function checkContent() {
       try {
-        const doc = iframe.contentDocument;
-        if (!doc) {
-          console.log(`[payment_history_filter] [DEBUG] Iframe contentDocument not accessible (attempt ${attempts + 1})`);
-          if (++attempts < maxAttempts) {
-            setTimeout(checkContent, interval);
-          } else {
-            reject(new Error('Iframe contentDocument not accessible'));
-          }
-          return;
+        // First check if we can access the iframe directly
+        let doc = null;
+        let isCrossOrigin = false;
+
+        try {
+          doc = iframe.contentDocument;
+          // If we get here without error, we can access the document
+        } catch (accessError) {
+          console.log(`[payment_history_filter] [DEBUG] Cross-origin restriction detected: ${accessError.message}`);
+          isCrossOrigin = true;
         }
 
-        // Check if document has meaningful content
-        const hasBody = doc.body && doc.body.children.length > 0;
-        const hasHead = doc.head && doc.head.children.length > 0;
-        const hasIframes = doc.querySelectorAll('iframe').length > 0;
-        const hasContent = doc.documentElement.textContent.trim().length > 100;
+        // If cross-origin or doc is null, we need to use alternative strategies
+        if (isCrossOrigin || !doc) {
+          console.log(`[payment_history_filter] [DEBUG] Using alternative strategy for cross-origin iframe`);
 
-        console.log(`[payment_history_filter] [DEBUG] Iframe content check (attempt ${attempts + 1}):`, {
-          hasBody,
-          hasHead,
-          hasIframes,
-          hasContent,
-          bodyChildren: doc.body ? doc.body.children.length : 0,
-          totalText: doc.documentElement.textContent.trim().length,
-          readyState: doc.readyState
-        });
+          // Check if iframe has loaded based on other indicators
+          const hasLoaded = iframe.complete === true ||
+            iframe.readyState === 'complete' ||
+            iframe.dataset.loaded === 'true';
 
-        // Consider loaded if it has body content OR nested iframes OR substantial text
-        if (hasBody || hasIframes || hasContent || doc.readyState === 'complete') {
-          console.log(`[payment_history_filter] [DEBUG] Iframe content loaded successfully after ${attempts + 1} attempts`);
-          resolve(doc);
-          return;
+          // If iframe appears loaded or we've waited long enough, proceed anyway
+          if (hasLoaded || attempts >= Math.min(20, maxAttempts / 2)) {
+            console.log(`[payment_history_filter] [DEBUG] Cross-origin iframe appears loaded (attempt ${attempts + 1})`);
+
+            // Create a placeholder document object that mimics enough functionality
+            const placeholderDoc = {
+              body: { innerHTML: "[Cross-origin content]" },
+              querySelectorAll: () => [],
+              querySelector: () => null,
+              getElementsByTagName: () => [],
+              readyState: "complete",
+              location: { href: iframe.src },
+              _isCrossOrigin: true  // Flag to identify this is a placeholder
+            };
+
+            resolve(placeholderDoc);
+            return;
+          }
+        } else if (doc) {
+          // We can access the document - check if it has meaningful content
+          const hasBody = doc.body && doc.body.children.length > 0;
+          const hasHead = doc.head && doc.head.children.length > 0;
+          const hasIframes = doc.querySelectorAll('iframe').length > 0;
+          const hasContent = doc.documentElement && doc.documentElement.textContent &&
+            doc.documentElement.textContent.trim().length > 50;
+          const isComplete = doc.readyState === 'complete';
+          const isInteractive = doc.readyState === 'interactive';
+
+          if (attempts % 10 === 0 || attempts === 0) {
+            console.log(`[payment_history_filter] [DEBUG] Iframe content check (attempt ${attempts + 1}):`, {
+              hasBody,
+              hasHead,
+              hasIframes,
+              hasContent,
+              bodyChildren: doc.body ? doc.body.children.length : 0,
+              totalText: doc.documentElement ? doc.documentElement.textContent.trim().length : 0,
+              readyState: doc.readyState
+            });
+          }
+
+          // Consider loaded if it has body content OR nested iframes OR substantial text OR readyState complete
+          if (hasBody || hasIframes || hasContent || isComplete || (isInteractive && hasContent)) {
+            console.log(`[payment_history_filter] [DEBUG] Iframe content loaded successfully after ${attempts + 1} attempts`);
+            resolve(doc);
+            return;
+          }
         }
 
         if (++attempts < maxAttempts) {
-          console.log(`[payment_history_filter] [DEBUG] Iframe content not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
-          setTimeout(checkContent, interval);
+          // Continue polling at increasing intervals
+          const dynamicInterval = Math.min(interval * Math.pow(1.1, Math.floor(attempts / 10)), 3000);
+
+          if (attempts % 10 === 0) {
+            console.log(`[payment_history_filter] [DEBUG] Iframe content not ready, waiting... (attempt ${attempts}/${maxAttempts}, interval: ${dynamicInterval}ms)`);
+          }
+
+          setTimeout(checkContent, dynamicInterval);
         } else {
           console.warn(`[payment_history_filter] [DEBUG] Iframe content failed to load after ${maxAttempts} attempts`);
-          reject(new Error(`Iframe content not loaded after ${maxAttempts * interval / 1000}s`));
+
+          // Even after max attempts, try to return whatever document we have
+          if (doc) {
+            console.log(`[payment_history_filter] [DEBUG] Returning incomplete document after max attempts`);
+            resolve(doc);
+          } else {
+            reject(new Error(`Iframe content not loaded after ${maxAttempts * interval / 1000}s`));
+          }
         }
       } catch (error) {
         console.error(`[payment_history_filter] [DEBUG] Error checking iframe content:`, error);
@@ -2370,6 +2117,562 @@ async function waitForIframeContentLoaded(iframe, maxAttempts = 60, interval = 1
     // Start checking immediately
     checkContent();
   });
+}
+
+/**
+ * Poll for iframe by src pattern with enhanced cross-origin handling
+ */
+function pollForIframeBySrc(doc, srcPattern, maxAttempts = 120, interval = 500) {
+  console.log(`[payment_history_filter] [DEBUG] Polling for iframe in Document:`, doc);
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    let currentInterval = interval;
+    const maxInterval = 2000; // Cap at 2 seconds
+
+    // Keep track of iframes we've seen to detect changes
+    const seenIframes = new Map();
+
+    // Function to log iframe details safely
+    function logIframeDetails(iframe, index) {
+      try {
+        const details = {
+          index,
+          id: iframe.id || "[no id]",
+          src: iframe.src || "[no src]",
+          name: iframe.name || "[no name]",
+          width: iframe.width,
+          height: iframe.height,
+          visible: iframe.style.display !== 'none' && iframe.style.visibility !== 'hidden',
+          accessibleContent: false
+        };
+
+        try {
+          // Try to access contentDocument (will fail for cross-origin)
+          if (iframe.contentDocument) {
+            details.accessibleContent = true;
+            details.readyState = iframe.contentDocument.readyState;
+            details.bodySize = iframe.contentDocument.body ?
+              iframe.contentDocument.body.children.length : 'no body';
+          }
+        } catch (e) {
+          details.accessibleContent = false;
+          details.crossOrigin = true;
+        }
+
+        return details;
+      } catch (e) {
+        return { index, error: e.message };
+      }
+    }
+
+    function check() {
+      if (attempts === 0 || attempts % 10 === 0) {
+        const allIframes = Array.from(doc.getElementsByTagName('iframe'));
+        console.log(`[payment_history_filter] [DEBUG] Polling for iframe with src pattern "${srcPattern}". Found ${allIframes.length} iframes in doc:`,
+          allIframes.map((f, i) => logIframeDetails(f, i))
+        );
+      }
+
+      const iframes = Array.from(doc.getElementsByTagName('iframe'));
+      let iframe = null;
+      let matchFound = false;
+      let crossOriginMatch = null;
+
+      // First pass: Try to find iframe by src pattern
+      for (let i = 0; i < iframes.length; i++) {
+        const frame = iframes[i];
+
+        // Check if this iframe matches our pattern
+        if (frame.src && frame.src.includes(srcPattern)) {
+          matchFound = true;
+
+          // Try to access contentDocument to check if it's cross-origin
+          try {
+            if (frame.contentDocument) {
+              iframe = frame;
+              console.log(`[payment_history_filter] [DEBUG] Found accessible iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
+              break;
+            } else {
+              crossOriginMatch = frame;
+              console.log(`[payment_history_filter] [DEBUG] Found iframe with matching src but null contentDocument`);
+            }
+          } catch (e) {
+            // This is a cross-origin iframe
+            crossOriginMatch = frame;
+            console.log(`[payment_history_filter] [DEBUG] Found cross-origin iframe with matching src pattern "${srcPattern}"`);
+          }
+        }
+      }
+
+      // Second pass: If no direct src match, try ID patterns
+      if (!iframe && !crossOriginMatch) {
+        if (srcPattern.includes('InquiryMIInformation')) {
+          // Look for live site iframe ID: frmMIOnlineContent
+          iframe = iframes.find(f => f.id === 'frmMIOnlineContent' ||
+            f.id.includes('MIOnline') ||
+            f.id.includes('Inquiry'));
+          if (iframe) {
+            console.log(`[payment_history_filter] [DEBUG] Found InquiryMIInformation iframe by ID: ${iframe.id}`);
+          }
+        } else if (srcPattern.includes('payhist')) {
+          // Look for live site iframe ID: containerTab_tabPaymentHistory_frmPaymentHistory
+          iframe = iframes.find(f => f.id === 'containerTab_tabPaymentHistory_frmPaymentHistory' ||
+            f.id.includes('Payment') ||
+            f.id.includes('payhist'));
+          if (iframe) {
+            console.log(`[payment_history_filter] [DEBUG] Found payhist iframe by ID: ${iframe.id}`);
+          }
+        }
+
+        // If we found by ID, check if it's cross-origin
+        if (iframe) {
+          try {
+            if (!iframe.contentDocument) {
+              crossOriginMatch = iframe;
+              iframe = null;
+              console.log(`[payment_history_filter] [DEBUG] Found iframe by ID but it's cross-origin`);
+            }
+          } catch (e) {
+            crossOriginMatch = iframe;
+            iframe = null;
+            console.log(`[payment_history_filter] [DEBUG] Found iframe by ID but it's cross-origin (exception)`);
+          }
+        }
+      }
+
+      // Third pass: Check for iframes with specific attributes or content that might match
+      if (!iframe && !crossOriginMatch) {
+        for (const frame of iframes) {
+          // Check for any attributes that might indicate this is our target
+          const nameMatch = frame.name && (
+            frame.name.includes('payment') ||
+            frame.name.includes('history') ||
+            frame.name.includes('inquiry')
+          );
+
+          const idMatch = frame.id && (
+            frame.id.includes('payment') ||
+            frame.id.includes('history') ||
+            frame.id.includes('inquiry') ||
+            frame.id.includes('content')
+          );
+
+          // If we have a potential match, check if it's accessible
+          if (nameMatch || idMatch) {
+            try {
+              if (frame.contentDocument) {
+                iframe = frame;
+                console.log(`[payment_history_filter] [DEBUG] Found potential iframe match by name/id attributes: ${frame.id || frame.name}`);
+                break;
+              } else {
+                if (!crossOriginMatch) crossOriginMatch = frame;
+              }
+            } catch (e) {
+              if (!crossOriginMatch) crossOriginMatch = frame;
+            }
+          }
+        }
+      }
+
+      // If we found an accessible iframe, resolve with it
+      if (iframe) {
+        // Check if iframe has changed since last time
+        const iframeKey = iframe.id || iframe.name || iframe.src;
+        const previousState = seenIframes.get(iframeKey);
+
+        if (previousState) {
+          // If we've seen this iframe before, check if it's changed
+          const currentSrc = iframe.src || '';
+          const previousSrc = previousState.src || '';
+
+          if (currentSrc !== previousSrc) {
+            console.log(`[payment_history_filter] [DEBUG] Iframe src changed from "${previousSrc}" to "${currentSrc}"`);
+          }
+        }
+
+        // Update seen iframes map
+        seenIframes.set(iframeKey, {
+          src: iframe.src,
+          time: Date.now(),
+          attempt: attempts
+        });
+
+        // Iframe with matching pattern found and accessible
+        console.log(`[payment_history_filter] [DEBUG] Found and accessed iframe with src pattern "${srcPattern}" on attempt ${attempts + 1}`);
+        resolve(iframe);
+        return;
+      }
+      // If we found a cross-origin match but can't access it
+      else if (crossOriginMatch && attempts >= Math.min(30, maxAttempts / 2)) {
+        console.log(`[payment_history_filter] [DEBUG] Using cross-origin iframe match after ${attempts} attempts`);
+
+        // Create a special flag on the iframe to indicate it's cross-origin
+        crossOriginMatch._isCrossOrigin = true;
+
+        resolve(crossOriginMatch);
+        return;
+      }
+      // If we found a match by src pattern but can't access it yet (might be loading)
+      else if (matchFound && !iframe) {
+        console.log(`[payment_history_filter] [DEBUG] Found matching iframe but can't access content yet (attempt ${attempts + 1})`);
+      }
+
+      if (++attempts < maxAttempts) {
+        if (attempts === 1) {
+          console.log(`[payment_history_filter] [DEBUG] Waiting for iframe with src pattern "${srcPattern}"...`);
+        }
+
+        // Show progress for long waits
+        if (attempts % 10 === 0) {
+          const elapsed = Math.round((attempts * currentInterval) / 1000);
+          console.log(`[payment_history_filter] [DEBUG] Still waiting for "${srcPattern}" iframe... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+        }
+
+        // Use exponential backoff for efficiency, but cap the interval
+        if (attempts > 20) {
+          currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+        }
+
+        setTimeout(check, currentInterval);
+      } else {
+        const totalTime = Math.round((attempts * interval) / 1000);
+        console.warn(`[payment_history_filter] [DEBUG] Iframe with src pattern "${srcPattern}" not found after ${maxAttempts} attempts (${totalTime}s total).`);
+
+        // Last resort: If we have a cross-origin match, use it even though we can't access it
+        if (crossOriginMatch) {
+          console.log(`[payment_history_filter] [DEBUG] Using cross-origin iframe as last resort`);
+          crossOriginMatch._isCrossOrigin = true;
+          resolve(crossOriginMatch);
+        } else {
+          reject(new Error(`Iframe with src pattern "${srcPattern}" not found after ${totalTime}s`));
+        }
+      }
+    }
+    check();
+  });
+}
+
+/**
+ * Inject this script into the innermost payhist_viewAll.html iframe (4-level deep)
+ * Enhanced with cross-origin handling and direct injection strategies
+ */
+function injectIntoFourLevelDeepIframe() {
+  // Poll for the first iframe (contentBlock-iframe)
+  function pollForFirstIframe(maxAttempts = 120, interval = 500) {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      let currentInterval = interval;
+      const maxInterval = 2000; // Cap at 2 seconds
+
+      function check() {
+        // First try the standard ID
+        let contentBlockIframe = document.getElementById('contentBlock-iframe');
+
+        // If not found, try alternative selectors for live site
+        if (!contentBlockIframe) {
+          const allIframes = document.querySelectorAll('iframe');
+
+          if (attempts === 0 || attempts % 10 === 0) {
+            console.log('[payment_history_filter] [DEBUG] contentBlock-iframe not found by ID, trying alternatives. Found iframes:',
+              Array.from(allIframes).map((f, i) => ({
+                index: i,
+                id: f.id || "[no id]",
+                src: f.src || "[no src]",
+                name: f.name || "[no name]"
+              })));
+          }
+
+          // Look for iframe that might contain mionlineNavigation
+          contentBlockIframe = Array.from(allIframes).find(f =>
+            (f.src && (f.src.includes('mionlineNavigation') || f.src.includes('Navigation'))) ||
+            (f.id && (f.id.includes('content') || f.id.includes('main') || f.id.includes('navigation'))) ||
+            (f.name && (f.name.includes('content') || f.name.includes('main') || f.name.includes('navigation')))
+          );
+
+          // If still not found, take the first iframe with substantial size
+          if (!contentBlockIframe) {
+            contentBlockIframe = Array.from(allIframes).find(f =>
+              (parseInt(f.width) > 500 || parseInt(f.style.width) > 500) &&
+              (parseInt(f.height) > 300 || parseInt(f.style.height) > 300)
+            );
+          }
+
+          // Last resort: just take the first iframe
+          if (!contentBlockIframe && allIframes.length > 0) {
+            if (attempts >= maxAttempts / 2) {
+              console.log('[payment_history_filter] [DEBUG] Using first iframe as last resort');
+              contentBlockIframe = allIframes[0];
+            }
+          }
+        }
+
+        // Check if we can access the iframe
+        let isAccessible = false;
+        if (contentBlockIframe) {
+          try {
+            isAccessible = !!contentBlockIframe.contentWindow && !!contentBlockIframe.contentDocument;
+          } catch (e) {
+            console.log('[payment_history_filter] [DEBUG] Found iframe but it\'s cross-origin:', e.message);
+          }
+        }
+
+        if (contentBlockIframe && isAccessible) {
+          console.log('[payment_history_filter] [DEBUG] Found contentBlock-iframe on attempt', attempts + 1);
+          resolve(contentBlockIframe);
+        } else if (contentBlockIframe && !isAccessible && attempts >= maxAttempts / 2) {
+          // If we found an iframe but can't access it, and we've waited long enough
+          console.log('[payment_history_filter] [DEBUG] Using cross-origin iframe after', attempts, 'attempts');
+          contentBlockIframe._isCrossOrigin = true;
+          resolve(contentBlockIframe);
+        } else if (++attempts < maxAttempts) {
+          if (attempts === 1) {
+            console.log('[payment_history_filter] [DEBUG] Waiting for contentBlock-iframe...');
+          }
+
+          // Show progress for long waits
+          if (attempts % 10 === 0) {
+            const elapsed = Math.round((attempts * currentInterval) / 1000);
+            console.log(`[payment_history_filter] [DEBUG] Still waiting for contentBlock-iframe... (${elapsed}s elapsed, attempt ${attempts}/${maxAttempts})`);
+          }
+
+          // Use exponential backoff for efficiency, but cap the interval
+          if (attempts > 20) {
+            currentInterval = Math.min(currentInterval * 1.2, maxInterval);
+          }
+
+          setTimeout(check, currentInterval);
+        } else {
+          const totalTime = Math.round((attempts * interval) / 1000);
+          console.warn('[payment_history_filter] [DEBUG] contentBlock-iframe not found after', maxAttempts, `attempts (${totalTime}s total).`);
+
+          // Try direct injection as fallback
+          console.log('[payment_history_filter] [DEBUG] Attempting direct injection as fallback');
+          tryDirectInjection();
+
+          reject(new Error(`contentBlock-iframe not found after ${totalTime}s`));
+        }
+      }
+      check();
+    });
+  }
+
+  // Try direct injection into any payment-related iframe we can find
+  function tryDirectInjection() {
+    console.log('[payment_history_filter] [DEBUG] Trying direct injection into any accessible iframe');
+
+    // Look for any iframe that might be related to payments
+    const allIframes = document.querySelectorAll('iframe');
+    let injected = false;
+
+    for (const iframe of allIframes) {
+      try {
+        // Check if this iframe is accessible and might be payment-related
+        if (iframe.contentDocument && iframe.contentWindow) {
+          const src = iframe.src || '';
+          const id = iframe.id || '';
+          const name = iframe.name || '';
+
+          if (src.includes('payment') || src.includes('payhist') ||
+            id.includes('payment') || id.includes('history') ||
+            name.includes('payment') || name.includes('history')) {
+
+            console.log('[payment_history_filter] [DEBUG] Found potentially relevant iframe for direct injection:',
+              { src, id, name });
+
+            // Try to inject our script
+            injectInlineScript(iframe.contentDocument);
+            injected = true;
+          }
+        }
+      } catch (e) {
+        // Cross-origin iframe, can't access
+      }
+    }
+
+    if (!injected) {
+      console.log('[payment_history_filter] [DEBUG] Could not find any accessible iframe for direct injection');
+
+      // Last resort: Try to detect if we're already in the payment history context
+      if (isTargetIframeContext()) {
+        console.log('[payment_history_filter] [DEBUG] We are already in payment history context, running filter directly');
+        checkPaymentHistoryLoanAccess();
+      }
+    }
+  }
+
+  // Main logic for 4-level injection with enhanced cross-origin handling
+  (async function () {
+    try {
+      console.log('[payment_history_filter] [DEBUG] Starting 4-level deep iframe injection with enhanced cross-origin handling...');
+
+      // Debug: Show all iframes at the start
+      const topLevelIframes = document.querySelectorAll('iframe');
+      console.log('[payment_history_filter] [DEBUG] Top-level iframes found:',
+        Array.from(topLevelIframes).map((f, i) => ({
+          index: i,
+          id: f.id || "[no id]",
+          src: f.src || "[no src]",
+          name: f.name || "[no name]"
+        })));
+
+      // Check if we're already in the payment history context
+      if (isTargetIframeContext()) {
+        console.log('[payment_history_filter] [DEBUG] Already in payment history context, running filter directly');
+        checkPaymentHistoryLoanAccess();
+        return;
+      }
+
+      // Level 1: Wait for contentBlock-iframe (mionlineNavigation.html)
+      console.log('[payment_history_filter] [DEBUG] Level 1: Waiting for contentBlock-iframe...');
+      const level1Iframe = await pollForFirstIframe();
+      console.log('[payment_history_filter] [DEBUG] Level 1: Found iframe with src:', level1Iframe.src);
+
+      // Handle cross-origin iframe
+      if (level1Iframe._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 1 iframe is cross-origin, trying alternative approach');
+        tryDirectInjection();
+        return;
+      }
+
+      // Level 1.5: Wait for iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 1.5: Waiting for iframe content to load...');
+      const level1Doc = await waitForIframeContentLoaded(level1Iframe);
+
+      // Check if we got a cross-origin placeholder
+      if (level1Doc._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 1 document is cross-origin, trying alternative approach');
+        tryDirectInjection();
+        return;
+      }
+
+      console.log('[payment_history_filter] [DEBUG] Level 1.5: Iframe content loaded, proceeding...');
+
+      // Level 2: Wait for iframe in mionlineNavigation.html (InquiryMIInformation.html)
+      console.log('[payment_history_filter] [DEBUG] Level 2: Waiting for InquiryMIInformation iframe...');
+      const level2Iframe = await pollForIframeBySrc(level1Doc, 'InquiryMIInformation');
+      console.log('[payment_history_filter] [DEBUG] Level 2: Found iframe with src:', level2Iframe.src, 'ID:', level2Iframe.id);
+
+      // Handle cross-origin iframe
+      if (level2Iframe._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 2 iframe is cross-origin, trying alternative approach');
+
+        // Try to find payment history tab in level1Doc
+        const paymentHistoryTab = findTabElement(level1Doc, 'Payment History', [
+          '#__tab_containerTab_tabPaymentHistory',
+          'a[id="__tab_containerTab_tabPaymentHistory"]',
+          '#containerTab_tabPaymentHistory_tab a',
+          'span[id="containerTab_tabPaymentHistory_tab"] a'
+        ]);
+
+        if (paymentHistoryTab) {
+          console.log('[payment_history_filter] [DEBUG] Found Payment History tab in level1Doc, clicking it');
+          paymentHistoryTab.click();
+
+          // Wait a bit and check if we're now in the payment history context
+          setTimeout(() => {
+            if (isTargetIframeContext()) {
+              console.log('[payment_history_filter] [DEBUG] Now in payment history context after clicking tab');
+              checkPaymentHistoryLoanAccess();
+            } else {
+              console.log('[payment_history_filter] [DEBUG] Still not in payment history context after clicking tab');
+              tryDirectInjection();
+            }
+          }, 2000);
+        } else {
+          tryDirectInjection();
+        }
+
+        return;
+      }
+
+      // Level 2.5: Wait for level 2 iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 2.5: Waiting for level 2 iframe content to load...');
+      const level2Doc = await waitForIframeContentLoaded(level2Iframe);
+
+      // Check if we got a cross-origin placeholder
+      if (level2Doc._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 2 document is cross-origin, trying alternative approach');
+        tryDirectInjection();
+        return;
+      }
+
+      console.log('[payment_history_filter] [DEBUG] Level 2.5: Level 2 iframe content loaded, proceeding...');
+
+      // Level 3: Wait for iframe in InquiryMIInformation.html (payhist_viewAll.html)
+      console.log('[payment_history_filter] [DEBUG] Level 3: Waiting for payhist_viewAll iframe...');
+      const level3Iframe = await pollForIframeBySrc(level2Doc, 'payhist_viewAll');
+      console.log('[payment_history_filter] [DEBUG] Level 3: Found iframe with src:', level3Iframe.src, 'ID:', level3Iframe.id);
+
+      // Handle cross-origin iframe
+      if (level3Iframe._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 3 iframe is cross-origin, trying alternative approach');
+
+        // Try to find payment history tab in level2Doc
+        const paymentHistoryTab = findTabElement(level2Doc, 'Payment History', [
+          '#__tab_containerTab_tabPaymentHistory',
+          'a[id="__tab_containerTab_tabPaymentHistory"]',
+          '#containerTab_tabPaymentHistory_tab a',
+          'span[id="containerTab_tabPaymentHistory_tab"] a'
+        ]);
+
+        if (paymentHistoryTab) {
+          console.log('[payment_history_filter] [DEBUG] Found Payment History tab in level2Doc, clicking it');
+          paymentHistoryTab.click();
+
+          // Wait a bit and check if we're now in the payment history context
+          setTimeout(() => {
+            if (isTargetIframeContext()) {
+              console.log('[payment_history_filter] [DEBUG] Now in payment history context after clicking tab');
+              checkPaymentHistoryLoanAccess();
+            } else {
+              console.log('[payment_history_filter] [DEBUG] Still not in payment history context after clicking tab');
+              tryDirectInjection();
+            }
+          }, 2000);
+        } else {
+          tryDirectInjection();
+        }
+
+        return;
+      }
+
+      // Level 3.5: Wait for level 3 iframe content to load
+      console.log('[payment_history_filter] [DEBUG] Level 3.5: Waiting for level 3 iframe content to load...');
+      const level3Doc = await waitForIframeContentLoaded(level3Iframe);
+
+      // Check if we got a cross-origin placeholder
+      if (level3Doc._isCrossOrigin) {
+        console.log('[payment_history_filter] [DEBUG] Level 3 document is cross-origin, trying alternative approach');
+        tryDirectInjection();
+        return;
+      }
+
+      // Level 4: Inject script into final iframe
+      console.log('[payment_history_filter] [DEBUG] Level 4: Preparing payhist_viewAll document...');
+      console.log('[payment_history_filter] [DEBUG] Level 4: Final document ready state:', level3Doc.readyState);
+
+      // Inject inline script into the deepest level (payhist_viewAll.html)
+      console.log('[payment_history_filter] [DEBUG] Level 4: Injecting script into payhist_viewAll...');
+      const injectionResult = injectInlineScript(level3Doc);
+
+      // Handle async injection if document was still loading
+      if (injectionResult instanceof Promise) {
+        await injectionResult;
+      }
+
+      console.log('[payment_history_filter] [DEBUG] 4-level deep iframe injection complete.');
+
+    } catch (e) {
+      console.warn('[payment_history_filter] [DEBUG] 4-level deep iframe injection failed:', e);
+
+      // Log detailed error information
+      console.log('[payment_history_filter] [DEBUG] Error details - Message:', e.message, 'Stack:', e.stack);
+
+      // Enhanced error recovery: try direct injection
+      console.log('[payment_history_filter] [DEBUG] Attempting recovery via direct injection...');
+      tryDirectInjection();
+    }
+  })();
 }
 
 // ... existing code ...
