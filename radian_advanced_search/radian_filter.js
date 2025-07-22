@@ -362,19 +362,9 @@ class TableRowFilter {
   hide() {
     if (this.parent && this.row) {
       try {
-        const table = this.row.closest("table");
-        let columnCount = 7;
-
-        if (table) {
-          const headerRow = table.querySelector("thead tr");
-          if (headerRow && headerRow.cells) {
-            columnCount = headerRow.cells.length;
-          }
-        }
-
-        this.parent.removeChild(this.row);
+        this.row.style.display = "none";
       } catch (error) {
-        console.error("[radian_filter] Error removing row:", error);
+        console.error("[radian_filter] Error hiding row:", error);
       }
     }
   }
@@ -412,6 +402,12 @@ async function processTableRows() {
   const columnCount = headerRow.cells.length;
 
   const originalRows = Array.from(tbody.querySelectorAll("tr"));
+
+  // Reset all rows to visible before filtering
+  originalRows.forEach(row => {
+    row.style.display = "";
+  });
+
   const allowedRows = [];
   let dataRowsCount = 0;
   let dataRowsRemoved = 0;
@@ -445,6 +441,7 @@ async function processTableRows() {
       if (isAllowed) {
         allowedRows.push(row);
       } else {
+        row.style.display = "none";
         dataRowsRemoved++;
       }
     } else {
@@ -452,14 +449,15 @@ async function processTableRows() {
     }
   }
 
-  // Clear tbody without using innerHTML
-  while (tbody.firstChild) {
-    tbody.removeChild(tbody.firstChild);
-  }
+  // Count only visible rows (not hidden)
+  let actualDisplayedRows = originalRows.filter(row => row.style.display !== "none").length;
 
-  let actualDisplayedRows = 0;
-
-  if (allowedRows.length === 0) {
+  // If all rows are hidden, show appropriate message
+  if (actualDisplayedRows === 0) {
+    // Remove all rows
+    while (tbody.firstChild) {
+      tbody.removeChild(tbody.firstChild);
+    }
     if (dataRowsCount === 1 && dataRowsRemoved === 1) {
       const unallowedElement = createUnallowedElement();
       unallowedElement
@@ -483,20 +481,6 @@ async function processTableRows() {
         "[radian_filter] processTableRows: All rows removed, showing no results"
       );
     }
-  } else {
-    // Count only actual data rows (exclude rows with colspan like headers/messages)
-    actualDisplayedRows = allowedRows.filter((row) => {
-      return !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
-    }).length;
-
-    allowedRows.forEach((row) => {
-      const clonedRow = row.cloneNode(true);
-      tbody.appendChild(clonedRow);
-    });
-    console.log(
-      "[radian_filter] processTableRows: Displayed rows",
-      actualDisplayedRows
-    );
   }
 
   // Update pagination counts
@@ -866,9 +850,9 @@ function refreshPaginationCounts() {
       return;
     }
 
-    // Count actual data rows (exclude rows with colspan like messages)
+    // Count actual data rows (exclude rows with colspan like messages and hidden rows)
     const dataRows = Array.from(tbody.querySelectorAll("tr")).filter((row) => {
-      return !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
+      return row.style.display !== "none" && !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
     });
 
     updatePaginationCounts(dataRows.length);
