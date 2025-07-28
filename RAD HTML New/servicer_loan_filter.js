@@ -334,40 +334,174 @@ function hasServicerLoanElement() {
 }
 
 /**
+ * Get current loan number from the page
+ */
+function getCurrentLoanNumber() {
+  const element = document.querySelector("#lblServicerLoanNumVal");
+  return element ? element.textContent.trim() : "";
+}
+
+/**
+ * Global monitoring state
+ */
+let lastLoanNumber = "";
+let currentURL = window.location.href;
+let elementObserver = null;
+let loanElementObserver = null;
+
+/**
+ * Simple URL change detection
+ */
+function monitorURLChanges() {
+  // Override pushState and replaceState to detect programmatic navigation
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function (...args) {
+    originalPushState.apply(history, args);
+    handleURLChange();
+  };
+
+  history.replaceState = function (...args) {
+    originalReplaceState.apply(history, args);
+    handleURLChange();
+  };
+
+  // Listen for popstate events
+  window.addEventListener("popstate", handleURLChange);
+
+  function handleURLChange() {
+    const newURL = window.location.href;
+    if (newURL !== currentURL) {
+      console.log("[servicer_loan_filter] URL changed, re-checking loan access...");
+      currentURL = newURL;
+      lastLoanNumber = ""; // Reset to force re-check
+      startElementMonitoring(); // Restart monitoring for new page
+    }
+  }
+}
+
+
+function startElementMonitoring() {
+  // Disconnect existing observer if any
+  if (elementObserver) {
+    elementObserver.disconnect();
+  }
+
+  // Check if element already exists
+  if (hasServicerLoanElement()) {
+    console.log("[servicer_loan_filter] ✅ Loan element already found, checking access...");
+    lastLoanNumber = getCurrentLoanNumber();
+    checkServicerLoanAccess();
+    startLoanElementMonitoring();
+    return;
+  }
+
+  console.log("[servicer_loan_filter] 🔍 Monitoring for loan element to appear...");
+
+  // Monitor entire document for the loan element to appear
+  elementObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === "childList") {
+        mutation.addedNodes.forEach((node) => {
+          // Check if the added node is the loan element
+          if (node.nodeType === 1 && node.id === "lblServicerLoanNumVal") {
+            console.log("[servicer_loan_filter] ✅ Loan element appeared, checking access...");
+            elementObserver.disconnect();
+            lastLoanNumber = getCurrentLoanNumber();
+            checkServicerLoanAccess();
+            startLoanElementMonitoring();
+            return;
+          }
+
+          // Check if the added node contains the loan element
+          if (node.nodeType === 1 && node.querySelector) {
+            const loanElement = node.querySelector("#lblServicerLoanNumVal");
+            if (loanElement) {
+              console.log("[servicer_loan_filter] ✅ Loan element found in added content, checking access...");
+              elementObserver.disconnect();
+              lastLoanNumber = getCurrentLoanNumber();
+              checkServicerLoanAccess();
+              startLoanElementMonitoring();
+              return;
+            }
+          }
+        });
+      }
+    });
+  });
+
+  // Monitor the entire document body
+  elementObserver.observe(document.body || document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+
+  // Fallback timeout
+  setTimeout(() => {
+    if (hasServicerLoanElement()) {
+      console.log("[servicer_loan_filter] ✅ Loan element found in fallback check...");
+      if (elementObserver) {
+        elementObserver.disconnect();
+      }
+      lastLoanNumber = getCurrentLoanNumber();
+      checkServicerLoanAccess();
+      startLoanElementMonitoring();
+    }
+  }, 10000); // 10 second fallback
+}
+
+/**
+ * Monitor loan element content changes (after it appears)
+ */
+function startLoanElementMonitoring() {
+  // Disconnect existing observer if any
+  if (loanElementObserver) {
+    loanElementObserver.disconnect();
+  }
+
+  const loanElement = document.querySelector("#lblServicerLoanNumVal");
+  if (!loanElement) {
+    console.log("[servicer_loan_filter] ⚠️ Loan element not found for content monitoring");
+    return;
+  }
+
+  console.log("[servicer_loan_filter] 🔍 Monitoring loan element content changes...");
+
+  loanElementObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // Only check if the servicer loan element content changed
+      if (mutation.type === "childList" ||
+        (mutation.type === "characterData" && mutation.target.parentElement?.id === "lblServicerLoanNumVal")) {
+
+        const newLoanNumber = getCurrentLoanNumber();
+        if (newLoanNumber && newLoanNumber !== lastLoanNumber) {
+          console.log(`[servicer_loan_filter] Loan number changed from "${lastLoanNumber}" to "${newLoanNumber}", re-checking access...`);
+          lastLoanNumber = newLoanNumber;
+          checkServicerLoanAccess();
+        }
+      }
+    });
+  });
+
+  loanElementObserver.observe(loanElement, {
+    childList: true,
+    characterData: true,
+    subtree: true
+  });
+}
+
+/**
  * Initialize the script and check loan access
  */
 function initializeServicerLoanFilter() {
   console.log("[servicer_loan_filter] 🚀 Initializing servicer loan filter...");
 
-  // Check immediately if the element exists
-  if (hasServicerLoanElement()) {
-    console.log("[servicer_loan_filter] ✅ Servicer loan element found, checking access...");
-    checkServicerLoanAccess();
-  } else {
-    console.log("[servicer_loan_filter] ⏳ Servicer loan element not found, waiting...");
+  // Start monitoring for loan element to appear
+  startElementMonitoring();
 
-    // Set up observer to watch for the element
-    const observer = new MutationObserver((mutations) => {
-      if (hasServicerLoanElement()) {
-        console.log("[servicer_loan_filter] ✅ Servicer loan element appeared, checking access...");
-        observer.disconnect();
-        checkServicerLoanAccess();
-      }
-    });
-
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
-
-    // Fallback timeout
-    setTimeout(() => {
-      if (hasServicerLoanElement()) {
-        observer.disconnect();
-        checkServicerLoanAccess();
-      }
-    }, 5000);
-  }
+  // Start URL change monitoring
+  monitorURLChanges();
 }
 
 // Start the script when DOM is ready
