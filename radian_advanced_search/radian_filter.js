@@ -364,6 +364,15 @@ async function processTableRows() {
 
   const columnCount = headerRow.cells.length;
 
+  // Clear any existing "no results" or restriction messages first
+  const existingMessages = tbody.querySelectorAll('tr td[colspan]');
+  existingMessages.forEach(td => {
+    const text = td.textContent.trim();
+    if (text === "No results found." || text === "You are not provisioned to see the restricted loan") {
+      td.closest('tr').remove();
+    }
+  });
+
   const originalRows = Array.from(tbody.querySelectorAll("tr"));
 
   // Reset all rows to visible before filtering
@@ -411,10 +420,11 @@ async function processTableRows() {
 
   // If all rows are hidden, show appropriate message
   if (actualDisplayedRows === 0) {
-    // Remove all rows
+    // Remove all rows first
     while (tbody.firstChild) {
       tbody.removeChild(tbody.firstChild);
     }
+    
     if (dataRowsCount === 1 && dataRowsRemoved === 1) {
       const unallowedElement = createUnallowedElement();
       unallowedElement
@@ -601,10 +611,17 @@ function setupMutationObserver() {
     lastProcessed: Date.now(),
     ignoreNextMutations: false,
     isProcessing: false,
+    lastTableHash: null,
   };
 
   const observer = new MutationObserver((mutations) => {
     if (observerState.ignoreNextMutations || observerState.isProcessing) {
+      return;
+    }
+
+    // Prevent processing if we just processed recently (within 2 seconds)
+    const timeSinceLastProcess = Date.now() - observerState.lastProcessed;
+    if (timeSinceLastProcess < 2000) {
       return;
     }
 
@@ -613,7 +630,6 @@ function setupMutationObserver() {
     }
 
     let shouldProcess = false;
-    let tableChanged = false;
     let newTableDetected = false;
 
     for (const mutation of mutations) {
@@ -630,13 +646,18 @@ function setupMutationObserver() {
               break;
             }
 
-            // Check if table rows were added
+            // Check if table rows were added to existing table
             if (
               node.nodeName === "TR" ||
               (node.querySelector && node.querySelector("tr"))
             ) {
-              tableChanged = true;
-              shouldProcess = true;
+              const table = getTargetTable();
+              if (table) {
+                const tbody = table.querySelector("tbody");
+                if (tbody && tbody.contains(node)) {
+                  shouldProcess = true;
+                }
+              }
             }
 
             // Check if tbody was added (common in dynamic tables)
@@ -644,38 +665,47 @@ function setupMutationObserver() {
               node.nodeName === "TBODY" ||
               (node.querySelector && node.querySelector("tbody"))
             ) {
-              tableChanged = true;
               shouldProcess = true;
             }
           }
         }
       }
 
-      // Check for attribute changes on table elements
+      // Only process attribute changes if they're significant
       if (
         mutation.type === "attributes" &&
         mutation.target &&
-        (mutation.target.tagName === "TABLE" ||
-          mutation.target.tagName === "TR" ||
-          mutation.target.tagName === "TD" ||
-          mutation.target.tagName === "TBODY")
+        mutation.target.tagName === "TABLE" &&
+        (mutation.attributeName === "class" || mutation.attributeName === "style")
       ) {
-        tableChanged = true;
         shouldProcess = true;
       }
     }
 
     if (shouldProcess) {
-      const delay = newTableDetected ? 1000 : 300; // Longer delay for new tables
+      const delay = newTableDetected ? 1500 : 500; // Longer delay to prevent flickering
 
       observerState.processingDebounce = setTimeout(async () => {
+        // Check if table content has actually changed
+        const table = getTargetTable();
+        if (table) {
+          const tbody = table.querySelector("tbody");
+          if (tbody) {
+            const currentHash = getTableContentHash(tbody);
+            if (currentHash === observerState.lastTableHash) {
+              return; // No actual change, skip processing
+            }
+            observerState.lastTableHash = currentHash;
+          }
+        }
+
         observerState.lastProcessed = Date.now();
         observerState.isProcessing = true;
 
         try {
           if (newTableDetected) {
             // Wait for table to be fully populated
-            const tableReady = await waitForDynamicTable(10, 300);
+            const tableReady = await waitForDynamicTable(15, 400);
             if (tableReady) {
               showPage(false);
               await processPage();
@@ -705,7 +735,7 @@ function setupMutationObserver() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["style", "class", "display"],
+    attributeFilter: ["style", "class"],
   });
 
   return observer;
@@ -723,6 +753,26 @@ async function waitForTable(maxAttempts = 10, delay = 300) {
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
   return false;
+}
+
+/**
+ * Generate a hash of table content to detect actual changes
+ */
+function getTableContentHash(tbody) {
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const content = rows.map(row => {
+    const cells = Array.from(row.querySelectorAll("td, th"));
+    return cells.map(cell => cell.textContent.trim()).join("|");
+  }).join("||");
+  
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash;
 }
 
 /**
@@ -913,6 +963,8 @@ async function handleLoanNumberInputBlur(event) {
  * Set up event listeners for table updates
  */
 function setupTableUpdateListeners() {
+  let isProcessingSearch = false;
+
   // Listen for search button clicks
   const searchButton = findSearchButton();
   if (searchButton) {
@@ -923,6 +975,11 @@ function setupTableUpdateListeners() {
         return;
       }
 
+      if (isProcessingSearch) {
+        return; // Prevent multiple simultaneous searches
+      }
+
+      isProcessingSearch = true;
       showPage(false);
 
       setTimeout(async () => {
@@ -932,6 +989,7 @@ function setupTableUpdateListeners() {
         } else {
           showPage(true);
         }
+        isProcessingSearch = false;
       }, 1500);
     });
   }
@@ -954,6 +1012,12 @@ function setupTableUpdateListeners() {
           return;
         }
 
+        if (isProcessingSearch) {
+          e.preventDefault();
+          return; // Prevent multiple simultaneous searches
+        }
+
+        isProcessingSearch = true;
         showPage(false);
 
         setTimeout(async () => {
@@ -963,6 +1027,7 @@ function setupTableUpdateListeners() {
           } else {
             showPage(true);
           }
+          isProcessingSearch = false;
         }, 1500);
       }
     });
@@ -975,6 +1040,10 @@ function setupTableUpdateListeners() {
 async function initialize() {
   try {
     await waitForListener();
+    
+    // Wait a bit longer for initial page load to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     const initialTable = getTargetTable();
 
     if (initialTable) {
@@ -1011,7 +1080,8 @@ async function initialize() {
  */
 function setupPeriodicTableCheck() {
   let lastTableCheck = 0;
-  const checkInterval = 3000; // Check every 3 seconds
+  const checkInterval = 5000; // Check every 5 seconds (increased to reduce flickering)
+  let lastTableHash = null;
 
   setInterval(async () => {
     const now = Date.now();
@@ -1022,26 +1092,36 @@ function setupPeriodicTableCheck() {
     const table = getTargetTable();
     if (table) {
       const tbody = table.querySelector("tbody");
-      const rows = tbody ? tbody.querySelectorAll("tr") : [];
+      if (!tbody) {
+        return;
+      }
 
-      // Check if this is a new table with data that we haven't processed
-      if (rows.length > 0) {
-        // Check if any row contains unprocessed loan data
-        let hasUnprocessedData = false;
-        for (const row of rows) {
-          if (row.cells && row.cells.length > 2) {
-            const cellText = row.cells[2].textContent.trim();
-            if (cellText && /\b\d{5,}\b/.test(cellText)) {
-              hasUnprocessedData = true;
-              break;
+      const currentHash = getTableContentHash(tbody);
+      
+      // Only process if table content has actually changed
+      if (currentHash !== lastTableHash) {
+        const rows = tbody.querySelectorAll("tr");
+        
+        // Check if this is a new table with data that we haven't processed
+        if (rows.length > 0) {
+          // Check if any row contains unprocessed loan data
+          let hasUnprocessedData = false;
+          for (const row of rows) {
+            if (row.cells && row.cells.length > 2) {
+              const cellText = row.cells[2].textContent.trim();
+              if (cellText && /\b\d{5,}\b/.test(cellText)) {
+                hasUnprocessedData = true;
+                break;
+              }
             }
           }
-        }
 
-        if (hasUnprocessedData) {
-          showPage(false);
-          await processPage();
-          lastTableCheck = now;
+          if (hasUnprocessedData) {
+            showPage(false);
+            await processPage();
+            lastTableCheck = now;
+            lastTableHash = currentHash;
+          }
         }
       }
     }
