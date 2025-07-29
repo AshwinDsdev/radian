@@ -125,6 +125,121 @@ const logger = {
   error: (...args) => console.error('[PaymentHistoryFilter]', ...args),
 };
 
+// ########## LOADER MANAGEMENT ##########
+
+const LoaderManager = {
+  createStyles() {
+    const style = document.createElement("style");
+    style.textContent = `
+      #paymentHistoryLoader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        transition: opacity 0.3s ease;
+        font-family: Arial, sans-serif;
+      }
+      .payment-spinner {
+        width: 80px;
+        height: 80px;
+        border: 8px solid #e0e0e0;
+        border-top-color: #2b6cb0;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        to {transform: rotate(360deg);}
+      }
+      #paymentHistoryLoader.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loader-text {
+        font-size: 18px;
+        color: #2b6cb0;
+        font-weight: 500;
+        text-align: center;
+        max-width: 400px;
+        line-height: 1.4;
+      }
+      .loader-steps {
+        margin-top: 15px;
+        font-size: 14px;
+        color: #666;
+        text-align: center;
+      }
+    `;
+    return style;
+  },
+
+  createElement() {
+    const loader = document.createElement("div");
+    loader.id = "paymentHistoryLoader";
+
+    const spinner = document.createElement("div");
+    spinner.className = "payment-spinner";
+
+    const loadingText = document.createElement("div");
+    loadingText.className = "loader-text";
+    loadingText.textContent = "Verifying loan access permissions...";
+
+    const stepsText = document.createElement("div");
+    stepsText.className = "loader-steps";
+    stepsText.id = "paymentLoaderSteps";
+    stepsText.textContent = "Initializing...";
+
+    loader.appendChild(spinner);
+    loader.appendChild(loadingText);
+    loader.appendChild(stepsText);
+
+    return loader;
+  },
+
+  show() {
+    const existingLoader = document.getElementById("paymentHistoryLoader");
+    if (existingLoader) {
+      existingLoader.remove();
+    }
+
+    const style = this.createStyles();
+    const loader = this.createElement();
+
+    if (document.head && style) {
+      document.head.appendChild(style);
+    }
+    if (document.body && loader) {
+      document.body.appendChild(loader);
+    }
+  },
+
+  updateText(stepText) {
+    const stepsElement = document.getElementById("paymentLoaderSteps");
+    if (stepsElement) {
+      stepsElement.textContent = stepText;
+    }
+  },
+
+  hide() {
+    const loader = document.getElementById("paymentHistoryLoader");
+    if (loader && loader.parentNode) {
+      loader.classList.add("hidden");
+      setTimeout(() => {
+        if (loader.parentNode) {
+          loader.parentNode.removeChild(loader);
+        }
+      }, 300);
+    }
+  }
+};
+
 // ########## CONTEXT DETECTION ##########
 
 /**
@@ -258,121 +373,6 @@ function createUnauthorizedElement() {
 
   return unauthorizedContainer;
 }
-
-// ########## LOADER MANAGEMENT ##########
-
-const LoaderManager = {
-  createStyles() {
-    const style = document.createElement("style");
-    style.textContent = `
-      #paymentHistoryLoader {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(255, 255, 255, 0.95);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 99999;
-        transition: opacity 0.3s ease;
-        font-family: Arial, sans-serif;
-      }
-      .payment-spinner {
-        width: 80px;
-        height: 80px;
-        border: 8px solid #e0e0e0;
-        border-top-color: #2b6cb0;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      @keyframes spin {
-        to {transform: rotate(360deg);}
-      }
-      #paymentHistoryLoader.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-      .loader-text {
-        font-size: 18px;
-        color: #2b6cb0;
-        font-weight: 500;
-        text-align: center;
-        max-width: 400px;
-        line-height: 1.4;
-      }
-      .loader-steps {
-        margin-top: 15px;
-        font-size: 14px;
-        color: #666;
-        text-align: center;
-      }
-    `;
-    return style;
-  },
-
-  createElement() {
-    const loader = document.createElement("div");
-    loader.id = "paymentHistoryLoader";
-
-    const spinner = document.createElement("div");
-    spinner.className = "payment-spinner";
-
-    const loadingText = document.createElement("div");
-    loadingText.className = "loader-text";
-    loadingText.textContent = "Verifying loan access permissions...";
-
-    const stepsText = document.createElement("div");
-    stepsText.className = "loader-steps";
-    stepsText.id = "paymentLoaderSteps";
-    stepsText.textContent = "Initializing...";
-
-    loader.appendChild(spinner);
-    loader.appendChild(loadingText);
-    loader.appendChild(stepsText);
-
-    return loader;
-  },
-
-  show() {
-    const existingLoader = document.getElementById("paymentHistoryLoader");
-    if (existingLoader) {
-      existingLoader.remove();
-    }
-
-    const style = this.createStyles();
-    const loader = this.createElement();
-
-    if (document.head && style) {
-      document.head.appendChild(style);
-    }
-    if (document.body && loader) {
-      document.body.appendChild(loader);
-    }
-  },
-
-  updateText(stepText) {
-    const stepsElement = document.getElementById("paymentLoaderSteps");
-    if (stepsElement) {
-      stepsElement.textContent = stepText;
-    }
-  },
-
-  hide() {
-    const loader = document.getElementById("paymentHistoryLoader");
-    if (loader && loader.parentNode) {
-      loader.classList.add("hidden");
-      setTimeout(() => {
-        if (loader.parentNode) {
-          loader.parentNode.removeChild(loader);
-        }
-      }, 300);
-    }
-  }
-};
 
 // ########## TAB NAVIGATION ##########
 
@@ -729,6 +729,16 @@ async function initializePaymentHistoryFilter() {
   window.paymentHistoryFilterExecuted = true;
   logger.info("🚀 Initializing Payment History Filter");
 
+  // Check if loader is already shown (from immediate execution)
+  const loaderAlreadyShown = document.getElementById("paymentHistoryLoader");
+  
+  // Show loader if not already shown and in relevant context
+  if (!loaderAlreadyShown && (isInquiryMIInformationContext() || isPaymentHistoryContext())) {
+    logger.info("🔒 Showing loader to prevent content exposure");
+    LoaderManager.show();
+    LoaderManager.updateText("Initializing access verification...");
+  }
+
   try {
     // First, establish connection with the extension
     logger.info("🔗 Establishing connection with extension...");
@@ -746,16 +756,43 @@ async function initializePaymentHistoryFilter() {
       setTimeout(() => handlePaymentHistoryContext(), 500);
     } else {
       logger.info("📍 Not in recognized context - script will remain dormant");
-      // Script remains loaded but dormant until context changes
+      // Hide loader if not in recognized context
+      LoaderManager.hide();
     }
 
   } catch (error) {
     logger.error("❌ Failed to establish extension connection:", error);
     logger.warn("⚠️ Script will not function without extension connection");
+    // Hide loader on error
+    LoaderManager.hide();
   }
 }
 
 // ########## AUTO-START ##########
+
+// Show loader immediately to prevent content flash
+// This must happen before any other processing
+(function showLoaderImmediately() {
+  try {
+    // Quick context check without waiting for full DOM
+    const currentUrl = window.location.href;
+    const pathname = window.location.pathname;
+    
+    // Check if we're in a relevant context based on URL
+    const isRelevantContext = currentUrl.includes('InquiryMIInformation.aspx') || 
+                             currentUrl.includes('payhist_viewAll') || 
+                             pathname.includes('InquiryMIInformation') || 
+                             pathname.includes('payhist_viewAll');
+    
+    if (isRelevantContext) {
+      logger.info("🔒 Showing loader immediately to prevent content exposure");
+      LoaderManager.show();
+      LoaderManager.updateText("Initializing access verification...");
+    }
+  } catch (error) {
+    logger.warn("⚠️ Could not show loader immediately:", error);
+  }
+})();
 
 // Start initialization when DOM is ready
 if (document.readyState === 'loading') {
