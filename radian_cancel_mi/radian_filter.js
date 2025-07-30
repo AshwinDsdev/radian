@@ -29,8 +29,12 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
       }
 
       console.log(`🔄 Sending ping attempt ${attempts + 1}/${maxRetries}...`);
+      if (!chrome.runtime?.sendMessage) {
+        reject(new Error("Chrome runtime not available"));
+        return;
+      }
 
-      chrome.runtime.sendMessage(
+      chrome.runtime?.sendMessage(
         EXTENSION_ID,
         {
           type: "ping",
@@ -72,146 +76,131 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 /**
  * Request a batch of numbers from the storage script
  */
-async function checkNumbersBatch(numbers) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
-      EXTENSION_ID,
-      {
-        type: "queryLoans",
-        loanIds: numbers,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          return reject(chrome.runtime.lastError.message);
-        } else if (!response || response.error) {
-          return reject(response?.error || "Invalid response received");
-        }
+// async function checkNumbersBatch(numbers) {
+//   return new Promise((resolve, reject) => {
+//     chrome.runtime.sendMessage(
+//       EXTENSION_ID,
+//       {
+//         type: "queryLoans",
+//         loanIds: numbers,
+//       },
+//       (response) => {
+//         if (chrome.runtime.lastError) {
+//           return reject(chrome.runtime.lastError.message);
+//         } else if (!response || response.error) {
+//           return reject(response?.error || "Invalid response received");
+//         }
 
-        if (!response.result || typeof response.result !== "object") {
-          return reject("Invalid result format received");
-        }
+//         if (!response.result || typeof response.result !== "object") {
+//           return reject("Invalid result format received");
+//         }
 
-        const available = Object.keys(response.result).filter(
-          (key) => response.result[key]
-        );
-        resolve(available);
-      }
-    );
-  });
-}
+//         const available = Object.keys(response.result).filter(
+//           (key) => response.result[key]
+//         );
+//         resolve(available);
+//       }
+//     );
+//   });
+// }
+
+
+const LoanNums = [
+  "0194737052",
+  "0151410206",
+  "0180995748",
+  "0000000612",
+  "0000000687",
+  "0000000711",
+  "0000000786",
+  "0000000927",
+  "0000000976",
+  "0194737052",
+  "0000001180",
+  "0000001230",
+  "0151410206",
+  "0000001453",
+  "0000001537",
+  "0000001594",
+  "0000001669",
+  "0000001677",
+  "0000001719",
+  "0000001792",
+  "0000001834",
+  "0000001891",
+  "0000002063",
+  "0180995748",
+  "0000002352",
+  "0000002410",
+  "0000002436",
+  "0000002477",
+  "0000002485",
+  "0000002493",
+  "0000002535",
+  "0000002550",
+  "0000002600",
+  "0000002642",
+  "0000002667",
+  "0000002691",
+];
+
+const checkNumbersBatch = async (numbers) => {
+  const available = numbers.filter((num) => LoanNums.includes(num));
+  return available;
+};
+
+
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
-function applyElementStyles(element, styles) {
-  if (!element || !styles) return;
+/**
+ * Create unallowed element to show when loan is not allowed for offshore users.
+ */
+function createUnallowedElement() {
+  const unallowed = document.createElement("span");
+  unallowed.appendChild(
+    document.createTextNode("Loan is not provisioned to the user")
+  );
+  unallowed.className = "body";
+  unallowed.style.display = "flex";
+  unallowed.style.paddingLeft = "250px";
+  unallowed.style.alignItems = "center";
+  unallowed.style.height = "100px";
+  unallowed.style.fontSize = "20px";
+  unallowed.style.fontWeight = "bold";
+  unallowed.style.color = "black";
+  unallowed.style.position = "relative";
 
-  Object.entries(styles).forEach(([property, value]) => {
-    element.style[property] = value;
-  });
-}
-
-function createUnauthorizedElement() {
-  const unauthorizedContainer = document.createElement("div");
-
-  applyElementStyles(unauthorizedContainer, {
-    position: "fixed",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    zIndex: "9999",
-    width: "80%",
-    maxWidth: "600px",
-    textAlign: "center",
-    padding: "30px",
-    backgroundColor: "#f8d7da",
-    border: "2px solid #f5c6cb",
-    borderRadius: "8px",
-    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-  });
-
-  const messageContainer = document.createElement("div");
-
-  applyElementStyles(messageContainer, {
-    color: "#721c24",
-    fontSize: "20px",
-    fontWeight: "bold",
-    position: "relative",
-  });
-
-  const iconElement = document.createElement("i");
-  iconElement.className = "fas fa-exclamation-triangle";
-  applyElementStyles(iconElement, {
-    fontSize: "24px",
-    marginBottom: "10px",
-    display: "block",
-  });
-
-  const textElement = document.createElement("div");
-  textElement.textContent =
-    "You are not provisioned to see the restricted loan";
-  applyElementStyles(textElement, {
-    marginTop: "10px",
-  });
-
-  const closeButton = document.createElement("button");
-  closeButton.textContent = "×";
-  applyElementStyles(closeButton, {
-    position: "absolute",
-    top: "-20px",
-    right: "-10px",
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    fontWeight: "bold",
-    color: "#721c24",
-    cursor: "pointer",
-    padding: "0 5px",
-    lineHeight: "1",
-  });
-  closeButton.title = "Close and go back";
-
-  closeButton.addEventListener("click", function () {
-    if (unauthorizedContainer.parentNode) {
-      unauthorizedContainer.parentNode.removeChild(unauthorizedContainer);
-    }
-    window.history.back();
-  });
-
-  messageContainer.appendChild(iconElement);
-  messageContainer.appendChild(textElement);
-  messageContainer.appendChild(closeButton);
-  unauthorizedContainer.appendChild(messageContainer);
-
-  return unauthorizedContainer;
+  return unallowed;
 }
 
 function createLoader() {
   const style = document.createElement("style");
   style.textContent = `
-    #radianLoaderOverlay {
+    #loaderOverlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 5);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 9999;
       transition: opacity 0.3s ease;
     }
-    .radian-spinner {
+    .spinner {
       width: 60px;
       height: 60px;
       border: 6px solid #ccc;
       border-top-color: #2b6cb0;
       border-radius: 50%;
-      animation: radianSpin 1s linear infinite;
+      animation: spin 1s linear infinite;
     }
-    @keyframes radianSpin {
+    @keyframes spin {
       to {transform: rotate(360deg);}
     }
-    #radianLoaderOverlay.hidden {
+    #loaderOverlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
@@ -219,58 +208,54 @@ function createLoader() {
   return style;
 }
 
+/**
+ * To create Loader Element.
+ */
 function createLoaderElement() {
   const loader = document.createElement("div");
-  loader.id = "radianLoaderOverlay";
-
-  const spinner = document.createElement("div");
-  spinner.className = "radian-spinner";
-
-  const loadingText = document.createElement("div");
-  loadingText.textContent = "Verifying loan access permissions...";
-  applyElementStyles(loadingText, {
-    marginLeft: "20px",
-    fontSize: "16px",
-    color: "#2b6cb0",
-  });
-
-  loader.appendChild(spinner);
-  loader.appendChild(loadingText);
-
+  loader.id = "loaderOverlay";
+  loader.innerHTML = `<div class="spinner"></div>`;
   return loader;
 }
 
 /**
- * Show loader during extension communication
+ * To grab the DOM elements and perform action like adding and removing.
  */
-function showLoader() {
-  const style = createLoader();
-  const loader = createLoaderElement();
-
-  const documentHead = document.head;
-  const documentBody = document.body;
-
-  if (documentHead && style) {
-    documentHead.appendChild(style);
+class FormElement {
+  constructor() {
+    this.element = document.querySelectorAll(".contentmenu");
+    this.parent = this.element[0] && this.element[0].parentElement;
+    this.unallowed = createUnallowedElement();
   }
 
-  if (documentBody && loader) {
-    documentBody.appendChild(loader);
-  }
-}
-
-/**
- * Hide loader after extension communication
- */
-function hideLoader() {
-  const loader = document.getElementById("radianLoaderOverlay");
-  if (loader && loader.parentNode) {
-    loader.classList.add("hidden");
-    setTimeout(() => {
-      if (loader.parentNode) {
-        loader.parentNode.removeChild(loader);
+  removeCancelMIElement() {
+    this.element.forEach((section) => {
+      if (
+        section.innerHTML.includes("Cancel MI") ||
+        section.innerHTML.includes("Certificate Number") ||
+        section.innerHTML.includes("Company Name") ||
+        section.innerHTML.includes("Borrower Name") ||
+        section.innerHTML.includes("Policy Status") ||
+        section.innerHTML.includes("Address") ||
+        section.innerHTML.includes("Loan Number") ||
+        section.innerHTML.includes("Cancellation Reason") ||
+        section.innerHTML.includes("Cancellation Date")
+      ) {
+        section.remove();
       }
-    }, 300);
+    });
+  }
+
+  addCancelMIElement() {
+    if (this.parent) {
+      this.parent.appendChild(this.unallowed);
+    }
+  }
+
+  getCancelMITargetElement() {
+    return Array.from(this.element).find((section) => {
+      return section.innerHTML.includes("Cancel MI");
+    });
   }
 }
 
@@ -304,22 +289,63 @@ function extractLoanNumbers(text) {
  * @returns {string|null} The loan number if found, null otherwise
  */
 function getLoanNumberFromPage() {
-  const paragraphs = document.querySelectorAll("p.sc-fXqexe");
-  for (let i = 0; i < paragraphs.length; i++) {
-    if (
-      paragraphs[i].textContent.trim() === "Loan Number" &&
-      i + 1 < paragraphs.length
-    ) {
-      const loanNumberText = paragraphs[i + 1].textContent.trim();
+  // Method 1: Look for the specific pattern in the HTML structure
+  const allDivs = document.querySelectorAll("div");
+  for (const div of allDivs) {
+    const paragraphs = div.querySelectorAll("p");
+    for (let i = 0; i < paragraphs.length; i++) {
+      const currentText = paragraphs[i].textContent.trim();
+      if (currentText === "Loan Number" && i + 1 < paragraphs.length) {
+        const loanNumberText = paragraphs[i + 1].textContent.trim();
+        if (containsLoanNumber(loanNumberText)) {
+          return loanNumberText;
+        }
+      }
+    }
+  }
+
+  // Method 2: Look for any paragraph containing "Loan Number" and get the next sibling
+  const allParagraphs = document.querySelectorAll("p");
+  for (let i = 0; i < allParagraphs.length; i++) {
+    const currentText = allParagraphs[i].textContent.trim();
+    if (currentText === "Loan Number" && i + 1 < allParagraphs.length) {
+      const loanNumberText = allParagraphs[i + 1].textContent.trim();
       if (containsLoanNumber(loanNumberText)) {
         return loanNumberText;
       }
     }
   }
-  for (const element of paragraphs) {
+
+  // Method 3: Look for any text that looks like a loan number in the content
+  const allTextElements = document.querySelectorAll("p, div, span, td");
+  for (const element of allTextElements) {
     const text = element.textContent.trim();
-    if (containsLoanNumber(text)) {
-      return text;
+    if (containsLoanNumber(text) && text.length >= 5 && text.length <= 15) {
+      // Additional validation: make sure it's not just a label
+      if (!text.toLowerCase().includes("loan") &&
+        !text.toLowerCase().includes("number") &&
+        !text.toLowerCase().includes("certificate") &&
+        !text.toLowerCase().includes("company") &&
+        !text.toLowerCase().includes("borrower") &&
+        !text.toLowerCase().includes("policy") &&
+        !text.toLowerCase().includes("address")) {
+        return text;
+      }
+    }
+  }
+
+  // Method 4: Look for the specific structure from the HTML
+  const contentMenu = document.querySelector(".contentmenu");
+  if (contentMenu) {
+    const loanNumberElements = contentMenu.querySelectorAll("p");
+    for (let i = 0; i < loanNumberElements.length; i++) {
+      const currentText = loanNumberElements[i].textContent.trim();
+      if (currentText === "Loan Number" && i + 1 < loanNumberElements.length) {
+        const loanNumberText = loanNumberElements[i + 1].textContent.trim();
+        if (containsLoanNumber(loanNumberText)) {
+          return loanNumberText;
+        }
+      }
     }
   }
 
@@ -327,126 +353,129 @@ function getLoanNumberFromPage() {
 }
 
 /**
- * Hide loan content and show unauthorized message
+ * Check loan number and handle restricted loans for offshore users
  */
-function hideLoanContentAndShowMessage() {
-  const loanContainers = document.querySelectorAll(".sc-bDoHkx");
-  if (loanContainers && loanContainers.length > 0) {
-    loanContainers.forEach((container) => {
-      container.style.display = "none";
-    });
-  }
-
-  const contentMenuElements = document.querySelectorAll(".contentmenu");
-  if (contentMenuElements.length > 0) {
-    contentMenuElements.forEach((element) => {
-      element.style.display = "none";
-    });
-  }
-
-  const unauthorizedElement = createUnauthorizedElement();
-  const documentBody = document.body;
-  if (documentBody && unauthorizedElement) {
-    documentBody.appendChild(unauthorizedElement);
-  }
-}
-
-/**
- * Main function to check loan access and handle restrictions
- */
-async function checkRadianLoanAccess() {
+async function handleFormElement() {
   try {
-    showLoader();
+    // Getting Form Element
+    const formElement = new FormElement();
 
-    await waitForListener();
-
+    // Find loan number from the page
     const loanNumber = getLoanNumberFromPage();
 
     if (!loanNumber) {
-      hideLoader();
-      return;
+      console.log("No loan number found yet, continuing to wait...");
+      return false; // Return false to indicate we should keep waiting
     }
 
+    console.log("Processing loan number:", loanNumber);
+
+    // Check if loan is restricted
     const allowedLoans = await checkNumbersBatch([loanNumber]);
-
-    if (allowedLoans.length === 0 || !allowedLoans.includes(loanNumber)) {
-      hideLoanContentAndShowMessage();
+    if (allowedLoans.length === 0) {
+      console.log("Loan is restricted, hiding content");
+      formElement.removeCancelMIElement();
+      formElement.addCancelMIElement();
     } else {
-      console.log(`Loan ${loanNumber} is authorized - showing content`);
+      console.log("Loan is allowed, showing content");
     }
 
-    // Hide loader
-    hideLoader();
+    return true; // Return true to indicate we're done processing
   } catch (error) {
-    hideLoader();
+    console.error("Error in handleFormElement:", error);
+    return false;
   }
 }
 
 /**
- * Set up mutation observer to watch for dynamic content
+ * Setup Mutation Observer to watch for dynamic changes
  */
-function setupMutationObserver() {
-  let hasFiltered = false;
-
-  const observer = new MutationObserver((mutations) => {
-    let shouldFilter = false;
-
-    if (!hasFiltered) {
-      for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              // Check if the added node or its children contain loan info
-              if (
-                node.classList?.contains("sc-bDoHkx") ||
-                node.querySelector?.(".sc-bDoHkx") ||
-                node.classList?.contains("sc-fXqexe") ||
-                node.querySelector?.(".sc-fXqexe")
-              ) {
-                shouldFilter = true;
-                break;
-              }
-            }
-          }
+function setupCaseObserver() {
+  const observer = new MutationObserver((mutationList) => {
+    for (const mutation of mutationList) {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        console.log("New content detected, checking for loan number...");
+        // Check if loan number is now available
+        const loanNumber = getLoanNumberFromPage();
+        if (loanNumber) {
+          console.log("Loan number found:", loanNumber);
+          handleFormElement();
         }
-
-        if (shouldFilter) break;
-      }
-
-      if (shouldFilter) {
-        checkRadianLoanAccess().then(() => {
-          hasFiltered = true;
-        });
       }
     }
   });
 
-  // Start observing the document body for DOM changes
-  if (document.body) {
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
+  // Observe the entire document body for changes
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
 
   return observer;
 }
 
-/**
- * Initialize the script when DOM is ready
- */
-function initializeRadianLoanFilter() {
+// Main entrypoint (this is where everything starts)
+(async function () {
+  // create loader style.
+  const style = createLoader();
+
+  // Append loader style into header.
+  document.head.appendChild(style);
+
+  // Create loader element to load while connecting to extension.
+  const loader = createLoaderElement();
+
+  // Append loader element in to body.
+  document.body.appendChild(loader);
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      setupMutationObserver();
-
-      setTimeout(checkRadianLoanAccess, 500);
-    });
+    document.addEventListener("DOMContentLoaded", onReady);
   } else {
-    setupMutationObserver();
-
-    checkRadianLoanAccess();
+    onReady();
   }
-}
 
-initializeRadianLoanFilter();
+  async function onReady() {
+    try {
+      // Check Loan extension connection
+      // await waitForListener();
+
+      // Setup mutation observer to watch for content changes
+      const observer = setupCaseObserver();
+
+      // Initial check for loan number
+      let isProcessed = await handleFormElement();
+
+      // If loan number not found, keep checking periodically
+      if (!isProcessed) {
+
+        const checkInterval = setInterval(async () => {
+          isProcessed = await handleFormElement();
+          if (isProcessed) {
+            console.log("Loan number processed successfully, stopping periodic checks");
+            clearInterval(checkInterval);
+            // Remove loader only after successful processing
+            loader.remove();
+          }
+        }, 1000); // Check every 1 second
+
+        // Set a maximum timeout to prevent infinite loading
+        setTimeout(() => {
+          if (!isProcessed) {
+            console.warn("Timeout reached, removing loader and continuing");
+            clearInterval(checkInterval);
+            loader.remove();
+          }
+        }, 30000); // 30 second timeout
+      } else {
+        // Loan number was found and processed immediately
+        console.log("Loan number processed immediately");
+        loader.remove();
+      }
+
+    } catch (error) {
+      console.error("Extension connection failed:", error);
+      // Continue without extension functionality
+      loader.remove();
+    }
+  }
+})();
