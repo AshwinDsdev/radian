@@ -94,170 +94,116 @@ async function checkNumbersBatch(numbers) {
   });
 }
 
-// ########## DYNAMIC CONTENT MONITORING ##########
+// ########## IMPROVED TABLE FILTER WITH PROPER CONTROLS ##########
 
 /**
- * Global monitoring state
+ * Global state management
  */
-let isMonitoring = false;
-let currentPageProcessed = false;
-let observerInstance = null;
-let processingInProgress = false;
-let lastProcessTime = 0;
-const PROCESS_DEBOUNCE_TIME = 2000; // 2 seconds minimum between processing attempts
+const TableFilterState = {
+  isInitialized: false,
+  isProcessing: false,
+  isTableFound: false,
+  isTableProcessed: false,
+  observer: null,
+  timeoutId: null,
+  maxWaitTime: 30000, // 30 seconds max wait time
+  checkInterval: 2000, // Check every 2 seconds
+  startTime: null
+};
 
 /**
- * Check if current page has the target table (ClaimsGridView)
+ * Enhanced logging function with timestamps
  */
-function isTargetScreen(doc = document) {
-  // Look for the claims table that indicates this is ClaimsReports.html
+function log(message, level = 'info') {
+  const timestamp = new Date().toISOString();
+  const prefix = `[table_loan_filter:${timestamp}]`;
+
+  switch (level) {
+    case 'error':
+      console.error(`${prefix} ❌ ${message}`);
+      break;
+    case 'warn':
+      console.warn(`${prefix} ⚠️ ${message}`);
+      break;
+    case 'success':
+      console.log(`${prefix} ✅ ${message}`);
+      break;
+    default:
+      console.log(`${prefix} ℹ️ ${message}`);
+  }
+}
+
+/**
+ * Check if current page is the specific Claims Reports page with the target table
+ */
+function isClaimsReportsPage(doc = document) {
+  log('Checking if current page is Claims Reports page...');
+
+  // Primary check: Look for the specific claims table
   const claimsTable = doc.querySelector("#ClaimsGridView");
-  const claimsContainer = doc.querySelector("#divClaimsGridView");
+  if (!claimsTable) {
+    log('ClaimsGridView table not found', 'warn');
+    return false;
+  }
 
-  // Additional checks to ensure this is the claims reports screen
-  const hasClaimsContent =
-    doc.querySelector(".claims-content") ||
+  // Secondary checks to ensure this is the correct page
+  const hasClaimsContent = doc.querySelector(".claims-content") ||
     doc.querySelector("[id*='Claims']") ||
-    doc.querySelector("[class*='claims']") ||
     doc.body?.textContent?.includes("Claims") ||
     doc.body?.textContent?.includes("Report");
 
-  console.log(
-    `[table_loan_filter] Page check: claims table: ${!!claimsTable}, claims container: ${!!claimsContainer}, claims content: ${!!hasClaimsContent}`
-  );
+  // Check for specific table structure
+  const hasCorrectTableStructure = claimsTable.querySelector("tr.text-black") !== null;
 
-  return !!(
-    claimsTable ||
-    claimsContainer ||
-    hasClaimsContent
-  );
+  log(`Claims table found: ${!!claimsTable}, Claims content: ${!!hasClaimsContent}, Correct structure: ${hasCorrectTableStructure}`);
+
+  return !!(claimsTable && hasClaimsContent && hasCorrectTableStructure);
 }
 
 /**
- * Process the current page if it has the target table
+ * Check if table has loaded with actual data
  */
-async function processCurrentPage(doc = document) {
-  const now = Date.now();
-
-  // Debounce processing to prevent loops
-  if (processingInProgress) {
-    console.log(
-      "[table_loan_filter] Processing already in progress, skipping..."
-    );
-    return;
+function isTableLoaded(doc = document) {
+  const claimsTable = doc.querySelector("#ClaimsGridView");
+  if (!claimsTable) {
+    return false;
   }
 
-  if (now - lastProcessTime < PROCESS_DEBOUNCE_TIME) {
-    console.log(
-      "[table_loan_filter] Too soon since last process, debouncing..."
-    );
-    return;
-  }
+  // Check if table has data rows (excluding header and pagination)
+  const dataRows = claimsTable.querySelectorAll("tr.text-black");
+  const hasData = dataRows.length > 0;
 
-  if (!isTargetScreen(doc)) {
-    console.log(
-      "[table_loan_filter] Target table not found, waiting for table to load..."
-    );
-    return;
-  }
+  // Check if table is visible
+  const isVisible = claimsTable.offsetParent !== null &&
+    claimsTable.style.display !== 'none' &&
+    claimsTable.style.visibility !== 'hidden';
 
-  console.log(
-    "[table_loan_filter] ✅ Target table detected! Processing table filtering..."
-  );
+  log(`Table loaded check - Data rows: ${dataRows.length}, Visible: ${isVisible}`);
 
-  processingInProgress = true;
-  lastProcessTime = now;
-
-  try {
-    await filterTableByAuthorizedLoanNumbers(doc);
-  } catch (error) {
-    console.error("[table_loan_filter] Error processing page:", error);
-  } finally {
-    processingInProgress = false;
-  }
+  return hasData && isVisible;
 }
 
 /**
- * Start monitoring for dynamic content changes
+ * Stop all monitoring and cleanup
  */
-function startDynamicMonitoring() {
-  if (isMonitoring) {
-    console.log("[table_loan_filter] Already monitoring, skipping...");
-    return;
+function stopMonitoring() {
+  log('Stopping all monitoring and cleanup...');
+
+  if (TableFilterState.observer) {
+    TableFilterState.observer.disconnect();
+    TableFilterState.observer = null;
   }
 
-  isMonitoring = true;
-  console.log("[table_loan_filter] 🔍 Starting dynamic content monitoring...");
-
-  // Check main document first
-  processCurrentPage(document);
-
-  // Monitor main document changes
-  if (observerInstance) {
-    observerInstance.disconnect();
+  if (TableFilterState.timeoutId) {
+    clearTimeout(TableFilterState.timeoutId);
+    TableFilterState.timeoutId = null;
   }
 
-  observerInstance = new MutationObserver((mutations) => {
-    let shouldCheck = false;
+  TableFilterState.isInitialized = false;
+  TableFilterState.isProcessing = false;
 
-    mutations.forEach((mutation) => {
-      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        const hasSignificantChange = Array.from(mutation.addedNodes).some(
-          (node) =>
-            node.nodeType === 1 && // Element node
-            (node.id || node.className || node.tagName !== "SCRIPT")
-        );
-        if (hasSignificantChange) {
-          shouldCheck = true;
-        }
-      }
-    });
-
-    if (shouldCheck && !processingInProgress) {
-      console.log(
-        "[table_loan_filter] Content changed, checking for target table..."
-      );
-      setTimeout(() => processCurrentPage(document), 1000);
-    }
-  });
-
-  observerInstance.observe(document.body || document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
-
-  // Periodic check as fallback
-  setInterval(() => {
-    if (!processingInProgress) {
-      console.log("[table_loan_filter] Periodic check for target table...");
-      processCurrentPage(document);
-    }
-  }, 5000); // Check every 5 seconds
+  log('Monitoring stopped successfully', 'success');
 }
-
-/**
- * Emergency stop function to halt all monitoring (useful for debugging)
- */
-function stopAllMonitoring() {
-  console.log(
-    "[table_loan_filter] 🛑 EMERGENCY STOP - Halting all monitoring..."
-  );
-
-  if (observerInstance) {
-    observerInstance.disconnect();
-    observerInstance = null;
-  }
-
-  isMonitoring = false;
-  processingInProgress = false;
-
-  console.log("[table_loan_filter] ✅ All monitoring stopped");
-}
-
-// Make it globally accessible for emergency use
-window.stopTableLoanFilter = stopAllMonitoring;
-
-// ########## END DYNAMIC CONTENT MONITORING ##########
 
 /**
  * Create and inject CSS styles for the loan filter loader
@@ -342,6 +288,8 @@ function createLoaderElement() {
  * Create and display the loan filter loader
  */
 function createAndDisplayLoader(targetDoc = document) {
+  log('Creating and displaying loader...');
+
   // Ensure styles are injected
   createLoaderStyles();
 
@@ -352,8 +300,9 @@ function createAndDisplayLoader(targetDoc = document) {
   const documentBody = targetDoc.body;
   if (documentBody) {
     documentBody.appendChild(loader);
+    log('Loader displayed successfully', 'success');
   } else {
-    console.warn("Document body not available for loader insertion");
+    log('Document body not available for loader insertion', 'error');
   }
 }
 
@@ -361,12 +310,15 @@ function createAndDisplayLoader(targetDoc = document) {
  * Hide and remove the loan filter loader with safe DOM manipulation
  */
 function hideAndRemoveLoader(targetDoc = document) {
+  log('Hiding and removing loader...');
+
   const loader = targetDoc.getElementById("loanFilterLoader");
   if (loader) {
     loader.classList.add("hidden");
     setTimeout(() => {
       if (loader.parentNode) {
         loader.parentNode.removeChild(loader);
+        log('Loader removed successfully', 'success');
       }
     }, 300);
   }
@@ -421,14 +373,17 @@ function createNoAuthorizedRecordsMessage() {
  * Extract loan numbers from table rows with safe DOM access
  */
 function extractLoanNumbersFromTableRows(dataRows) {
+  log(`Extracting loan numbers from ${dataRows.length} rows...`);
+
   const loanNumbers = [];
   const rowLoanMap = new Map();
 
   if (!dataRows || dataRows.length === 0) {
+    log('No data rows found', 'warn');
     return { loanNumbers, rowLoanMap };
   }
 
-  dataRows.forEach((row) => {
+  dataRows.forEach((row, index) => {
     if (!row) return;
 
     // Servicer Loan Number is in the second column (index 1)
@@ -439,10 +394,12 @@ function extractLoanNumbersFromTableRows(dataRows) {
       if (loanNumber && loanNumber !== "&nbsp;" && loanNumber !== "") {
         loanNumbers.push(loanNumber);
         rowLoanMap.set(row, loanNumber);
+        log(`Row ${index + 1}: Found loan number ${loanNumber}`);
       }
     }
   });
 
+  log(`Extracted ${loanNumbers.length} loan numbers`, 'success');
   return { loanNumbers, rowLoanMap };
 }
 
@@ -450,10 +407,13 @@ function extractLoanNumbersFromTableRows(dataRows) {
  * Apply loan authorization filtering to table rows
  */
 function applyLoanAuthorizationFilter(rowLoanMap, authorizedLoans) {
+  log(`Applying authorization filter to ${rowLoanMap.size} rows with ${authorizedLoans.length} authorized loans...`);
+
   let visibleRowCount = 0;
+  let hiddenRowCount = 0;
 
   if (!rowLoanMap || !authorizedLoans) {
-    console.warn("Invalid parameters for loan authorization filtering");
+    log('Invalid parameters for loan authorization filtering', 'error');
     return visibleRowCount;
   }
 
@@ -464,12 +424,16 @@ function applyLoanAuthorizationFilter(rowLoanMap, authorizedLoans) {
       // Loan is authorized - keep the row visible
       row.style.display = "";
       visibleRowCount++;
+      log(`Row authorized: ${loanNumber}`);
     } else {
       // Loan is restricted - hide the row
       row.style.display = "none";
+      hiddenRowCount++;
+      log(`Row hidden: ${loanNumber}`);
     }
   });
 
+  log(`Filtering complete - Visible: ${visibleRowCount}, Hidden: ${hiddenRowCount}`, 'success');
   return visibleRowCount;
 }
 
@@ -481,6 +445,8 @@ function updatePaginationDisplay(
   totalRowCount,
   targetDoc = document
 ) {
+  log(`Updating pagination display - Visible: ${visibleRowCount}, Total: ${totalRowCount}`);
+
   try {
     // Find the pagination row with the results text
     const paginationRow = targetDoc.querySelector(
@@ -501,11 +467,13 @@ function updatePaginationDisplay(
       } else {
         paginationRow.textContent = `Displaying 1-${visibleRowCount} of ${originalTotal} results`;
       }
+
+      log(`Pagination updated successfully`, 'success');
     } else {
-      console.warn("Pagination element not found for update");
+      log('Pagination element not found for update', 'warn');
     }
   } catch (error) {
-    console.error("Error updating pagination display:", error);
+    log(`Error updating pagination display: ${error}`, 'error');
   }
 }
 
@@ -513,8 +481,10 @@ function updatePaginationDisplay(
  * Handle case when no authorized records are found
  */
 function handleNoAuthorizedRecords(claimsTable) {
+  log('Handling case when no authorized records found...');
+
   if (!claimsTable) {
-    console.warn("Claims table not available for no records handling");
+    log('Claims table not available for no records handling', 'error');
     return;
   }
 
@@ -526,6 +496,8 @@ function handleNoAuthorizedRecords(claimsTable) {
     // Add "No Records Found" message
     const noRecordsMessage = createNoAuthorizedRecordsMessage();
     tableContainer.appendChild(noRecordsMessage);
+
+    log('No records message displayed', 'success');
   }
 }
 
@@ -533,6 +505,19 @@ function handleNoAuthorizedRecords(claimsTable) {
  * Main function to filter table rows based on servicer loan numbers
  */
 async function filterTableByAuthorizedLoanNumbers(targetDoc = document) {
+  if (TableFilterState.isProcessing) {
+    log('Processing already in progress, skipping...', 'warn');
+    return;
+  }
+
+  if (TableFilterState.isTableProcessed) {
+    log('Table already processed, skipping...', 'warn');
+    return;
+  }
+
+  log('Starting table filtering process...');
+  TableFilterState.isProcessing = true;
+
   try {
     // Show loader
     createAndDisplayLoader(targetDoc);
@@ -541,6 +526,7 @@ async function filterTableByAuthorizedLoanNumbers(targetDoc = document) {
     const claimsTable = targetDoc.getElementById("ClaimsGridView");
 
     if (!claimsTable) {
+      log('ClaimsGridView table not found', 'error');
       hideAndRemoveLoader(targetDoc);
       return;
     }
@@ -549,27 +535,37 @@ async function filterTableByAuthorizedLoanNumbers(targetDoc = document) {
     const dataRows = claimsTable.querySelectorAll("tr.text-black");
 
     if (!dataRows || dataRows.length === 0) {
+      log('No data rows found in table', 'warn');
       hideAndRemoveLoader(targetDoc);
       return;
     }
+
+    log(`Found ${dataRows.length} data rows to process`);
 
     // Extract all servicer loan numbers from the table
     const { loanNumbers, rowLoanMap } =
       extractLoanNumbersFromTableRows(dataRows);
 
     if (loanNumbers.length === 0) {
+      log('No loan numbers extracted from table', 'warn');
       hideAndRemoveLoader(targetDoc);
       return;
     }
+
+    console.log(loanNumbers, "Checking authorization for loan numbers");
 
     // Check which loans are authorized
     const authorizedLoans = await checkNumbersBatch(loanNumbers);
 
+    console.log(authorizedLoans, "Authorized loans");
+
     if (!authorizedLoans) {
-      console.error("Failed to retrieve authorized loans");
+      console.log("Failed to retrieve authorized loans", loanNumbers);
+      log('Failed to retrieve authorized loans', 'error');
       hideAndRemoveLoader(targetDoc);
       return;
     }
+
 
     // Apply loan authorization filtering
     const visibleRowCount = applyLoanAuthorizationFilter(
@@ -585,32 +581,112 @@ async function filterTableByAuthorizedLoanNumbers(targetDoc = document) {
       handleNoAuthorizedRecords(claimsTable);
     }
 
+    // Mark table as processed
+    TableFilterState.isTableProcessed = true;
+
+    log(`Table filtering completed successfully. Visible rows: ${visibleRowCount}`, 'success');
+
+    // Stop monitoring since we've processed the table
+    stopMonitoring();
+
     hideAndRemoveLoader(targetDoc);
   } catch (error) {
-    console.error("Error during loan filtering:", error);
+    log(`Error during loan filtering: ${error}`, 'error');
     hideAndRemoveLoader(targetDoc);
+  } finally {
+    TableFilterState.isProcessing = false;
   }
 }
 
 /**
- * Initialize the loan filter when DOM is ready with safe DOM state checking
+ * Wait for table to load with timeout
+ */
+function waitForTableLoad(targetDoc = document) {
+  return new Promise((resolve, reject) => {
+    log('Waiting for table to load...');
+
+    const startTime = Date.now();
+
+    function checkTable() {
+      const elapsed = Date.now() - startTime;
+
+      if (elapsed > TableFilterState.maxWaitTime) {
+        log(`Timeout waiting for table (${TableFilterState.maxWaitTime}ms)`, 'error');
+        reject(new Error('Table load timeout'));
+        return;
+      }
+
+      if (isTableLoaded(targetDoc)) {
+        log('Table loaded successfully', 'success');
+        resolve(true);
+        return;
+      }
+
+      // Continue checking
+      TableFilterState.timeoutId = setTimeout(checkTable, TableFilterState.checkInterval);
+    }
+
+    checkTable();
+  });
+}
+
+/**
+ * Initialize the loan filter with proper controls
  */
 async function initializeLoanAuthorizationFilter() {
-  console.log(
-    "[table_loan_filter] 🚀 Initializing table loan filter..."
-  );
+  if (TableFilterState.isInitialized) {
+    log('Filter already initialized, skipping...', 'warn');
+    return;
+  }
 
-  await waitForListener();
+  log('🚀 Initializing table loan filter...');
+  TableFilterState.startTime = Date.now();
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      startDynamicMonitoring();
-    });
-  } else {
-    // DOM is already ready
-    startDynamicMonitoring();
+  try {
+    // Wait for extension listener
+    await waitForListener();
+    log('Extension listener ready', 'success');
+
+    // Check if this is the correct page
+    if (!isClaimsReportsPage()) {
+      log('Not on Claims Reports page, stopping initialization', 'warn');
+      return;
+    }
+
+    log('On correct Claims Reports page, proceeding...', 'success');
+
+    // Wait for table to load
+    await waitForTableLoad();
+
+    // Process the table
+    await filterTableByAuthorizedLoanNumbers();
+
+    log('Table filter initialization completed successfully', 'success');
+
+  } catch (error) {
+    log(`Initialization failed: ${error}`, 'error');
+    stopMonitoring();
+  } finally {
+    TableFilterState.isInitialized = true;
   }
 }
 
-// Start the script
-initializeLoanAuthorizationFilter();
+/**
+ * Emergency stop function (globally accessible)
+ */
+function emergencyStop() {
+  log('🛑 EMERGENCY STOP - Halting all operations...', 'error');
+  stopMonitoring();
+  TableFilterState.isTableProcessed = true; // Prevent further processing
+}
+
+// Make emergency stop globally accessible
+window.stopTableLoanFilter = emergencyStop;
+
+// Start the script only if DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeLoanAuthorizationFilter);
+} else {
+  // DOM is already ready
+  initializeLoanAuthorizationFilter();
+}
