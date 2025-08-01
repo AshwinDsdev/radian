@@ -10,11 +10,101 @@
 // ########## DO NOT MODIFY THESE LINES ##########
 const EXTENSION_ID = "hellpeipojbghaaopdnddjakinlmocjl";
 
+// Enhanced Logger Configuration
+const LOGGER_CONFIG = {
+  enabled: true,
+  level: 'debug', // 'debug', 'info', 'warn', 'error'
+  prefix: '[RADIAN_FILTER]',
+  timestamp: true
+};
+
+/**
+ * Enhanced Logger Class
+ */
+class Logger {
+  static log(level, message, data = null) {
+    if (!LOGGER_CONFIG.enabled) return;
+    
+    const timestamp = LOGGER_CONFIG.timestamp ? `[${new Date().toISOString()}]` : '';
+    const prefix = LOGGER_CONFIG.prefix;
+    const logMessage = `${timestamp} ${prefix} ${level.toUpperCase()}: ${message}`;
+    
+    switch (level) {
+      case 'debug':
+        console.debug(logMessage, data || '');
+        break;
+      case 'info':
+        console.info(logMessage, data || '');
+        break;
+      case 'warn':
+        console.warn(logMessage, data || '');
+        break;
+      case 'error':
+        console.error(logMessage, data || '');
+        break;
+      default:
+        console.log(logMessage, data || '');
+    }
+  }
+
+  static debug(message, data = null) { this.log('debug', message, data); }
+  static info(message, data = null) { this.log('info', message, data); }
+  static warn(message, data = null) { this.log('warn', message, data); }
+  static error(message, data = null) { this.log('error', message, data); }
+}
+
+/**
+ * Wait for element to be present in DOM with timeout
+ */
+function waitForElement(selector, timeout = 10000, interval = 100) {
+  Logger.info(`🔍 Waiting for element: ${selector} (timeout: ${timeout}ms)`);
+  
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    
+    const checkElement = () => {
+      const element = document.querySelector(selector);
+      
+      if (element) {
+        Logger.info(`✅ Element found: ${selector} after ${Date.now() - startTime}ms`);
+        resolve(element);
+        return;
+      }
+      
+      if (Date.now() - startTime >= timeout) {
+        Logger.error(`❌ Element not found within timeout: ${selector}`);
+        reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+        return;
+      }
+      
+      setTimeout(checkElement, interval);
+    };
+    
+    checkElement();
+  });
+}
+
+/**
+ * Wait for multiple elements to be present
+ */
+function waitForElements(selectors, timeout = 10000) {
+  Logger.info(`🔍 Waiting for multiple elements: ${selectors.join(', ')}`);
+  
+  const promises = selectors.map(selector => 
+    waitForElement(selector, timeout).catch(error => {
+      Logger.warn(`⚠️ Element not found: ${selector}`, error.message);
+      return null;
+    })
+  );
+  
+  return Promise.all(promises);
+}
+
 /**
  * Establish Communication with Loan Checker Extension
  */
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
-  console.log("🔌 Starting extension listener connection...");
+  Logger.info("🔌 Starting extension listener connection...");
   return new Promise((resolve, reject) => {
     let attempts = 0;
     let delay = initialDelay;
@@ -22,13 +112,13 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 
     function sendPing() {
       if (attempts >= maxRetries) {
-        console.warn("❌ No listener detected after maximum retries.");
+        Logger.error("❌ No listener detected after maximum retries.");
         clearTimeout(timeoutId);
         reject(new Error("Listener not found"));
         return;
       }
 
-      console.log(`🔄 Sending ping attempt ${attempts + 1}/${maxRetries}...`);
+      Logger.debug(`🔄 Sending ping attempt ${attempts + 1}/${maxRetries}...`);
 
       chrome.runtime.sendMessage(
         EXTENSION_ID,
@@ -37,11 +127,11 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         },
         (response) => {
           if (response?.result === "pong") {
-            console.log("✅ Listener detected!");
+            Logger.info("✅ Listener detected!");
             clearTimeout(timeoutId);
             resolve(true);
           } else {
-            console.warn("❌ No listener detected, retrying...");
+            Logger.warn("❌ No listener detected, retrying...");
             timeoutId = setTimeout(() => {
               attempts++;
               delay *= 2; // Exponential backoff (100ms → 200ms → 400ms...)
@@ -60,7 +150,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
  * Request a batch of numbers from the storage script
  */
 async function checkNumbersBatch(numbers) {
-  console.log(`🔍 Checking batch of ${numbers.length} loan numbers:`, numbers);
+  Logger.info(`🔍 Checking batch of ${numbers.length} loan numbers:`, numbers);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
       EXTENSION_ID,
@@ -70,18 +160,18 @@ async function checkNumbersBatch(numbers) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("❌ Extension communication error:", chrome.runtime.lastError.message);
+          Logger.error("❌ Extension communication error:", chrome.runtime.lastError.message);
           return reject(chrome.runtime.lastError.message);
         } else if (response.error) {
-          console.error("❌ Extension response error:", response.error);
+          Logger.error("❌ Extension response error:", response.error);
           return reject(response.error);
         }
 
-        console.log("📊 Extension response received:", response);
+        Logger.debug("📊 Extension response received:", response);
         const available = Object.keys(response.result).filter(
           (key) => response.result[key]
         );
-        console.log("✅ Allowed loan numbers:", available);
+        Logger.info("✅ Allowed loan numbers:", available);
         resolve(available);
       }
     );
@@ -94,7 +184,9 @@ async function checkNumbersBatch(numbers) {
  * Find all tables that contain loan numbers in the third column
  */
 function findLoanTables() {
+  Logger.info("🔍 Searching for loan tables...");
   const tables = document.querySelectorAll('table');
+  Logger.debug(`📊 Found ${tables.length} total tables`);
 
   const loanTables = [];
 
@@ -102,13 +194,14 @@ function findLoanTables() {
     // Check if table has a header row with "Loan Number" in the third column
     const headerRow = table.querySelector('thead tr, tr:first-child');
     if (!headerRow) {
-      console.log(`   ⚠️  Table ${index + 1}: No header row found`);
+      Logger.debug(`   ⚠️  Table ${index + 1}: No header row found`);
       return;
     }
 
     const headerCells = headerRow.querySelectorAll('th, td');
 
     if (headerCells.length < 3) {
+      Logger.debug(`   ⚠️  Table ${index + 1}: Less than 3 columns`);
       return;
     }
 
@@ -118,12 +211,13 @@ function findLoanTables() {
     // Check if the third column header contains "Loan Number"
     if (headerText.toLowerCase().includes('loan number')) {
       loanTables.push(table);
+      Logger.debug(`   ✅ Table ${index + 1}: Loan number column found`);
     } else {
-      console.log(`   ❌ Table ${index + 1}: No loan number column found`);
+      Logger.debug(`   ❌ Table ${index + 1}: No loan number column found (header: "${headerText}")`);
     }
   });
 
-  console.log(`🎯 Found ${loanTables.length} tables with loan numbers`);
+  Logger.info(`🎯 Found ${loanTables.length} tables with loan numbers`);
   return loanTables;
 }
 
@@ -132,7 +226,7 @@ function findLoanTables() {
  */
 function extractLoanNumbers(table) {
   const rows = table.querySelectorAll('tbody tr, tr:not(:first-child)');
-  console.log(`📊 Found ${rows.length} data rows`);
+  Logger.debug(`📊 Found ${rows.length} data rows`);
 
   const loanNumbers = [];
 
@@ -142,29 +236,30 @@ function extractLoanNumbers(table) {
     if (cells.length >= 3) {
       const thirdCell = cells[2];
       const loanNumber = thirdCell.textContent.trim();
-      console.log(`   🔢 Row ${index + 1}: Third cell content = "${loanNumber}"`);
+      Logger.debug(`   🔢 Row ${index + 1}: Third cell content = "${loanNumber}"`);
 
       if (loanNumber && loanNumber !== '') {
         loanNumbers.push(loanNumber);
       } else {
-        console.log(`   ⚠️  Row ${index + 1}: Empty loan number cell`);
+        Logger.debug(`   ⚠️  Row ${index + 1}: Empty loan number cell`);
       }
     } else {
-      console.log(`   ⚠️  Row ${index + 1}: Less than 3 cells, skipping`);
+      Logger.debug(`   ⚠️  Row ${index + 1}: Less than 3 cells, skipping`);
     }
   });
 
-  console.log(`📋 Extracted ${loanNumbers.length} loan numbers:`, loanNumbers);
+  Logger.info(`📋 Extracted ${loanNumbers.length} loan numbers:`, loanNumbers);
   return loanNumbers;
 }
 
 /**
  * Create restricted loan message element
  */
-console.log("🚫 Creating restricted loan message...");
-const message = document.createElement("div");
-message.textContent = "You are not provisioned to see the Restricted Loan";
-message.style.cssText = `
+function createRestrictedMessage() {
+  Logger.info("🚫 Creating restricted loan message...");
+  const message = document.createElement("div");
+  message.textContent = "You are not provisioned to see the Restricted Loan";
+  message.style.cssText = `
     color: red;
     display: flex;
     justify-content: center;
@@ -178,13 +273,14 @@ message.style.cssText = `
     border-radius: 8px;
     margin: 20px 0;
   `;
-return message;
+  return message;
 }
 
 /**
  * Create loader to show when trying to establish connection with extension
  */
 function createLoader() {
+  Logger.info("🎨 Creating loader styles...");
   const style = document.createElement("style");
   style.textContent = `
     #loaderOverlay {
@@ -193,8 +289,9 @@ function createLoader() {
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.95);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       z-index: 9999;
@@ -207,6 +304,13 @@ function createLoader() {
       border-top-color: #2b6cb0;
       border-radius: 50%;
       animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    .loader-text {
+      color: #2b6cb0;
+      font-size: 16px;
+      font-weight: 500;
+      text-align: center;
     }
     @keyframes spin {
       to {transform: rotate(360deg);}
@@ -223,106 +327,279 @@ function createLoader() {
  * Create loader element
  */
 function createLoaderElement() {
+  Logger.info("🎯 Creating loader element...");
   const loader = document.createElement("div");
   loader.id = "loaderOverlay";
-  loader.innerHTML = `<div class="spinner"></div>`;
+  loader.innerHTML = `
+    <div class="spinner"></div>
+    <div class="loader-text">Checking loan access permissions...</div>
+  `;
   return loader;
+}
+
+/**
+ * Update loader text
+ */
+function updateLoaderText(text) {
+  const loaderText = document.querySelector('#loaderOverlay .loader-text');
+  if (loaderText) {
+    loaderText.textContent = text;
+    Logger.debug(`🔄 Loader text updated: ${text}`);
+  }
 }
 
 /**
  * Check loan numbers in tables and hide restricted ones
  */
 async function checkAndFilterLoanTables() {
-  console.log("🚀 Starting loan table filtering process...");
+  Logger.info("🚀 Starting loan table filtering process...");
+  updateLoaderText("Scanning for loan tables...");
+  
   const loanTables = findLoanTables();
 
   if (loanTables.length === 0) {
-    console.log("ℹ️  No loan tables found on this page");
+    Logger.info("ℹ️  No loan tables found on this page");
     return;
   }
 
-  console.log(`🎯 Processing ${loanTables.length} loan table(s)`);
+  Logger.info(`🎯 Processing ${loanTables.length} loan table(s)`);
 
   for (let i = 0; i < loanTables.length; i++) {
     const table = loanTables[i];
-    console.log(`📋 Processing table ${i + 1}/${loanTables.length}`);
+    Logger.info(`📋 Processing table ${i + 1}/${loanTables.length}`);
+    updateLoaderText(`Processing table ${i + 1} of ${loanTables.length}...`);
 
     const loanNumbers = extractLoanNumbers(table);
 
     if (loanNumbers.length === 0) {
+      Logger.warn(`⚠️  Table ${i + 1}: No loan numbers found, skipping`);
       continue;
     }
 
-
     try {
+      updateLoaderText(`Checking ${loanNumbers.length} loan numbers...`);
       const allowedLoans = await checkNumbersBatch(loanNumbers);
-      console.log(`📊 Table ${i + 1}: Allowed loans count: ${allowedLoans.length}/${loanNumbers.length}`);
+      Logger.info(`📊 Table ${i + 1}: Allowed loans count: ${allowedLoans.length}/${loanNumbers.length}`);
 
       // If any loan is restricted, hide the entire table
       if (allowedLoans.length < loanNumbers.length) {
-        console.log(`🚫 Table ${i + 1}: Restricted loans detected, hiding table`);
+        Logger.warn(`🚫 Table ${i + 1}: Restricted loans detected, hiding table`);
 
         // Hide the table
         table.style.display = 'none';
-        console.log(`✅ Table ${i + 1}: Hidden successfully`);
+        Logger.info(`✅ Table ${i + 1}: Hidden successfully`);
 
         // Create and insert restricted message
         const message = createRestrictedMessage();
         table.parentNode.insertBefore(message, table);
-        console.log(`✅ Table ${i + 1}: Restricted message inserted`);
+        Logger.info(`✅ Table ${i + 1}: Restricted message inserted`);
       } else {
+        Logger.info(`✅ Table ${i + 1}: All loans are accessible`);
       }
     } catch (error) {
-      console.error(`❌ Table ${i + 1}: Error checking loan numbers:`, error);
+      Logger.error(`❌ Table ${i + 1}: Error checking loan numbers:`, error);
     }
   }
 
-  console.log("🏁 Loan table filtering process completed");
+  Logger.info("🏁 Loan table filtering process completed");
 }
 
 /**
- * Setup Mutation Observer to watch for dynamic table changes
+ * Enhanced DOM Change Observer with debouncing
  */
-function setupTableObserver() {
-  console.log("👀 Setting up mutation observer for dynamic table changes...");
-  const observer = new MutationObserver((mutations) => {
-    console.log(`🔄 Mutation observer triggered with ${mutations.length} mutations`);
+class DOMChangeObserver {
+  constructor() {
+    this.observer = null;
+    this.debounceTimer = null;
+    this.debounceDelay = 500; // 500ms debounce
+    this.isProcessing = false;
+    Logger.info("👀 Initializing DOM Change Observer");
+  }
 
+  start() {
+    if (this.observer) {
+      Logger.warn("⚠️ Observer already running");
+      return;
+    }
+
+    Logger.info("🔍 Starting DOM change observer...");
+    
+    this.observer = new MutationObserver((mutations) => {
+      if (this.isProcessing) {
+        Logger.debug("⏳ Skipping mutation - already processing");
+        return;
+      }
+
+      const hasRelevantChanges = this.checkForRelevantChanges(mutations);
+      
+      if (hasRelevantChanges) {
+        Logger.info(`🔄 DOM changes detected: ${mutations.length} mutations`);
+        this.debounceCheck();
+      }
+    });
+
+    this.observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+      characterData: false
+    });
+
+    Logger.info("✅ DOM change observer started");
+  }
+
+  checkForRelevantChanges(mutations) {
     for (const mutation of mutations) {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-
         // Check if any new tables were added
         const hasNewTables = Array.from(mutation.addedNodes).some(node => {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const isTable = node.tagName === 'TABLE';
-            const hasTable = node.querySelector('table');
-            if (isTable || hasTable) {
-              return true;
-            }
+            const hasTable = node.querySelector && node.querySelector('table');
+            return isTable || hasTable;
           }
           return false;
         });
 
         if (hasNewTables) {
-          setTimeout(() => {
-            checkAndFilterLoanTables();
-          }, 100);
+          Logger.debug("📊 New table(s) detected in DOM changes");
+          return true;
         }
       }
     }
-  });
+    return false;
+  }
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  debounceCheck() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
 
+    this.debounceTimer = setTimeout(() => {
+      this.performCheck();
+    }, this.debounceDelay);
+  }
+
+  async performCheck() {
+    if (this.isProcessing) {
+      Logger.debug("⏳ Check already in progress, skipping");
+      return;
+    }
+
+    this.isProcessing = true;
+    Logger.info("🔄 Performing loan table check due to DOM changes...");
+
+    try {
+      // Show loader during check
+      const loader = document.getElementById('loaderOverlay');
+      if (loader) {
+        loader.classList.remove('hidden');
+        updateLoaderText("Re-checking loan access due to page changes...");
+      }
+
+      await checkAndFilterLoanTables();
+      Logger.info("✅ DOM change check completed");
+    } catch (error) {
+      Logger.error("❌ Error during DOM change check:", error);
+    } finally {
+      this.isProcessing = false;
+      
+      // Hide loader after check
+      const loader = document.getElementById('loaderOverlay');
+      if (loader) {
+        loader.classList.add('hidden');
+      }
+    }
+  }
+
+  stop() {
+    if (this.observer) {
+      Logger.info("🛑 Stopping DOM change observer...");
+      this.observer.disconnect();
+      this.observer = null;
+      
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = null;
+      }
+      
+      Logger.info("✅ DOM change observer stopped");
+    }
+  }
+}
+
+// Global observer instance
+const domObserver = new DOMChangeObserver();
+
+/**
+ * Initialize the loan filter system
+ */
+async function initializeLoanFilter() {
+  Logger.info("🚀 Initializing Radian Loan Filter System...");
+  
+  try {
+    // Step 1: Wait for page to be ready
+    Logger.info("📄 Waiting for page to be ready...");
+    updateLoaderText("Initializing loan filter system...");
+    
+    // Step 2: Check Extension connection
+    Logger.info("🔌 Establishing extension connection...");
+    updateLoaderText("Connecting to loan checker extension...");
+    await waitForListener();
+    Logger.info("✅ Extension connection established");
+
+    // Step 3: Wait for potential tables to load
+    Logger.info("⏳ Waiting for page content to load...");
+    updateLoaderText("Waiting for page content to load...");
+    
+    // Wait a bit for dynamic content
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Step 4: Check and filter loan tables
+    Logger.info("🔍 Starting loan table filtering...");
+    updateLoaderText("Scanning and filtering loan tables...");
+    await checkAndFilterLoanTables();
+    Logger.info("✅ Loan table filtering completed");
+
+    // Step 5: Setup observer for dynamic changes
+    Logger.info("👀 Setting up dynamic change observer...");
+    domObserver.start();
+
+    Logger.info("🎉 Radian loan filter initialized successfully!");
+    updateLoaderText("Loan filter system ready!");
+    
+    // Hide loader after successful initialization
+    setTimeout(() => {
+      const loader = document.getElementById('loaderOverlay');
+      if (loader) {
+        loader.classList.add('hidden');
+      }
+    }, 1000);
+
+  } catch (error) {
+    Logger.error("❌ Error initializing Radian loan filter:", error);
+    Logger.error("🔍 Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    updateLoaderText("Error initializing loan filter. Please refresh the page.");
+    
+    // Hide loader after error
+    setTimeout(() => {
+      const loader = document.getElementById('loaderOverlay');
+      if (loader) {
+        loader.classList.add('hidden');
+      }
+    }, 3000);
+  }
 }
 
 // Main entrypoint
 (async function () {
-
-
+  Logger.info("🎬 Radian Loan Filter Script Starting...");
+  
   // Create loader style
   const style = createLoader();
   document.head.appendChild(style);
@@ -331,37 +608,19 @@ function setupTableObserver() {
   const loader = createLoaderElement();
   document.body.appendChild(loader);
 
+  // Wait for DOM to be ready
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", onReady);
+    Logger.info("📄 DOM still loading, waiting for DOMContentLoaded...");
+    document.addEventListener("DOMContentLoaded", initializeLoanFilter);
   } else {
-    onReady();
+    Logger.info("📄 DOM already ready, starting initialization...");
+    initializeLoanFilter();
   }
 
-  async function onReady() {
-    try {
-      // Check Loan extension connection
-      await waitForListener();
-      console.log("✅ Extension connection established");
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    Logger.info("🔄 Page unloading, cleaning up...");
+    domObserver.stop();
+  });
 
-      console.log("🔍 Starting loan table filtering...");
-      // Check and filter loan tables
-      await checkAndFilterLoanTables();
-      console.log("✅ Loan table filtering completed");
-
-      // Setup observer for dynamic changes
-      setupTableObserver();
-
-      console.log("🎉 Radian loan filter initialized successfully!");
-    } catch (error) {
-      console.error("❌ Error initializing Radian loan filter:", error);
-      console.error("🔍 Error details:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    } finally {
-      // Remove loader
-      loader.remove();
-    }
-  }
 })();
