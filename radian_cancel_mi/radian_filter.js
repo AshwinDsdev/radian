@@ -5,11 +5,34 @@
  * @group : Radian
  * @owner : Radian
  * @lastModified : 15-May-2023
- * @version : 1.0.0
+ * @version : 2.0.0
  */
 
 // ########## DO NOT MODIFY THESE LINES ##########
 const EXTENSION_ID = "afkpnpkodeiolpnfnbdokgkclljpgmcm";
+
+/**
+ * Enhanced logging utility for debugging
+ */
+const Logger = {
+  prefix: '[Radian Filter]',
+  log: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.log(`${Logger.prefix} [${timestamp}] ${message}`, data || '');
+  },
+  warn: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`${Logger.prefix} [${timestamp}] ⚠️ ${message}`, data || '');
+  },
+  error: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.error(`${Logger.prefix} [${timestamp}] ❌ ${message}`, data || '');
+  },
+  success: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.log(`${Logger.prefix} [${timestamp}] ✅ ${message}`, data || '');
+  }
+};
 
 /**
  * Establish Communication with Loan Checker Extension
@@ -22,13 +45,13 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 
     function sendPing() {
       if (attempts >= maxRetries) {
-        console.warn("❌ No listener detected after maximum retries.");
+        Logger.warn("No listener detected after maximum retries.");
         clearTimeout(timeoutId);
         reject(new Error("Listener not found"));
         return;
       }
 
-      console.log(`🔄 Sending ping attempt ${attempts + 1}/${maxRetries}...`);
+      Logger.log(`Sending ping attempt ${attempts + 1}/${maxRetries}...`);
       if (!chrome.runtime?.sendMessage) {
         reject(new Error("Chrome runtime not available"));
         return;
@@ -41,10 +64,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
         },
         (response) => {
           if (chrome.runtime.lastError) {
-            console.warn(
-              "❌ Chrome runtime error:",
-              chrome.runtime.lastError.message
-            );
+            Logger.warn("Chrome runtime error:", chrome.runtime.lastError.message);
             timeoutId = setTimeout(() => {
               attempts++;
               delay *= 2; // Exponential backoff (100ms → 200ms → 400ms...)
@@ -54,11 +74,11 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
           }
 
           if (response?.result === "pong") {
-            console.log("✅ Listener detected!");
+            Logger.success("Listener detected!");
             clearTimeout(timeoutId);
             resolve(true);
           } else {
-            console.warn("❌ No listener detected, retrying...");
+            Logger.warn("No listener detected, retrying...");
             timeoutId = setTimeout(() => {
               attempts++;
               delay *= 2; // Exponential backoff (100ms → 200ms → 400ms...)
@@ -78,6 +98,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
  */
 async function checkNumbersBatch(numbers) {
   return new Promise((resolve, reject) => {
+    Logger.log(`Checking loan numbers batch:`, numbers);
     chrome.runtime.sendMessage(
       EXTENSION_ID,
       {
@@ -86,18 +107,22 @@ async function checkNumbersBatch(numbers) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
+          Logger.error("Extension communication error:", chrome.runtime.lastError.message);
           return reject(chrome.runtime.lastError.message);
         } else if (!response || response.error) {
+          Logger.error("Invalid response from extension:", response?.error || "Invalid response received");
           return reject(response?.error || "Invalid response received");
         }
 
         if (!response.result || typeof response.result !== "object") {
+          Logger.error("Invalid result format from extension");
           return reject("Invalid result format received");
         }
 
         const available = Object.keys(response.result).filter(
           (key) => response.result[key]
         );
+        Logger.log(`Extension response - Available loans:`, available);
         resolve(available);
       }
     );
@@ -109,6 +134,7 @@ async function checkNumbersBatch(numbers) {
  * Create unallowed element to show when loan is not allowed for offshore users.
  */
 function createUnallowedElement() {
+  Logger.log("Creating unallowed element");
   const unallowed = document.createElement("span");
   unallowed.appendChild(
     document.createTextNode("Loan is not provisioned to the user")
@@ -135,7 +161,7 @@ function createLoader() {
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(255, 255, 255, 5);
+      background: rgba(255, 255, 255, 0.9);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -172,36 +198,89 @@ function createLoaderElement() {
 }
 
 /**
- * To grab the DOM elements and perform action like adding and removing.
+ * Enhanced FormElement class with better dynamic class handling
  */
 class FormElement {
   constructor() {
-    this.element = document.querySelectorAll(".contentmenu");
-    this.parent = this.element[0] && this.element[0].parentElement;
+    this.refreshElements();
     this.unallowed = createUnallowedElement();
   }
 
+  /**
+   * Refresh elements to handle dynamic class names
+   */
+  refreshElements() {
+    Logger.log("Refreshing form elements");
+
+    // Try multiple possible class names for dynamic content
+    const possibleClasses = [
+      '.contentmenu',
+      '.content-menu',
+      '.content',
+      '.main-content',
+      '.form-content',
+      '.page-content',
+      '[class*="content"]',
+      '[class*="menu"]'
+    ];
+
+    let foundElements = null;
+    for (const className of possibleClasses) {
+      try {
+        const elements = document.querySelectorAll(className);
+        if (elements && elements.length > 0) {
+          Logger.log(`Found elements with selector: ${className}`, elements.length);
+          foundElements = elements;
+          this.usedSelector = className;
+          break;
+        }
+      } catch (error) {
+        Logger.warn(`Invalid selector: ${className}`, error);
+      }
+    }
+
+    this.element = foundElements || [];
+    this.parent = this.element[0] && this.element[0].parentElement;
+
+    Logger.log(`Form elements refreshed - Found ${this.element.length} elements`);
+    if (this.parent) {
+      Logger.log("Parent element found:", this.parent.tagName, this.parent.className);
+    }
+  }
+
   removeCancelMIElement() {
-    this.element.forEach((section) => {
+    Logger.log("Removing Cancel MI elements");
+    let removedCount = 0;
+
+    this.element.forEach((section, index) => {
+      const innerHTML = section.innerHTML;
       if (
-        section.innerHTML.includes("Cancel MI") ||
-        section.innerHTML.includes("Certificate Number") ||
-        section.innerHTML.includes("Company Name") ||
-        section.innerHTML.includes("Borrower Name") ||
-        section.innerHTML.includes("Policy Status") ||
-        section.innerHTML.includes("Address") ||
-        section.innerHTML.includes("Loan Number") ||
-        section.innerHTML.includes("Cancellation Reason") ||
-        section.innerHTML.includes("Cancellation Date")
+        innerHTML.includes("Cancel MI") ||
+        innerHTML.includes("Certificate Number") ||
+        innerHTML.includes("Company Name") ||
+        innerHTML.includes("Borrower Name") ||
+        innerHTML.includes("Policy Status") ||
+        innerHTML.includes("Address") ||
+        innerHTML.includes("Loan Number") ||
+        innerHTML.includes("Cancellation Reason") ||
+        innerHTML.includes("Cancellation Date")
       ) {
+        Logger.log(`Removing element ${index} with content:`, innerHTML.substring(0, 100) + '...');
         section.remove();
+        removedCount++;
       }
     });
+
+    Logger.log(`Removed ${removedCount} Cancel MI elements`);
   }
 
   addCancelMIElement() {
+    Logger.log("Adding unallowed element");
     if (this.parent) {
       this.parent.appendChild(this.unallowed);
+      Logger.success("Unallowed element added successfully");
+    } else {
+      Logger.warn("No parent element found to add unallowed element");
     }
   }
 
@@ -238,39 +317,64 @@ function extractLoanNumbers(text) {
 }
 
 /**
- * Get loan number from the page
+ * Enhanced loan number extraction optimized for the specific HTML structure
  * @returns {string|null} The loan number if found, null otherwise
  */
 function getLoanNumberFromPage() {
-  // Method 1: Look for the specific pattern in the HTML structure
-  const allDivs = document.querySelectorAll("div");
-  for (const div of allDivs) {
-    const paragraphs = div.querySelectorAll("p");
-    for (let i = 0; i < paragraphs.length; i++) {
-      const currentText = paragraphs[i].textContent.trim();
-      if (currentText === "Loan Number" && i + 1 < paragraphs.length) {
-        const loanNumberText = paragraphs[i + 1].textContent.trim();
+  Logger.log("Starting loan number extraction from page");
+
+  // Method 1: Look for the specific pattern matching the provided HTML structure
+  // This targets the exact structure: <div class="sc-..."><p>Loan Number</p></div><div class="sc-..."><p>4778748600</p></div>
+  Logger.log("Method 1: Searching for specific HTML structure pattern");
+
+  // Look for paragraphs with "Loan Number" text
+  const loanNumberLabels = Array.from(document.querySelectorAll('p')).filter(p =>
+    p.textContent.trim() === 'Loan Number'
+  );
+
+  Logger.log(`Found ${loanNumberLabels.length} 'Loan Number' labels`);
+
+  for (const label of loanNumberLabels) {
+    // Get the parent div of the "Loan Number" label
+    const labelParent = label.closest('div');
+    if (!labelParent) continue;
+
+    // Look for the next sibling div that contains the actual loan number
+    const nextDiv = labelParent.nextElementSibling;
+    if (nextDiv && nextDiv.tagName === 'DIV') {
+      const loanNumberP = nextDiv.querySelector('p');
+      if (loanNumberP) {
+        const loanNumberText = loanNumberP.textContent.trim();
         if (containsLoanNumber(loanNumberText)) {
+          Logger.success(`Found loan number via Method 1 (specific structure): ${loanNumberText}`);
           return loanNumberText;
         }
       }
     }
   }
 
-  // Method 2: Look for any paragraph containing "Loan Number" and get the next sibling
+  // Method 2: Look for any paragraph containing "Loan Number" and get the next sibling paragraph
+  Logger.log("Method 2: Searching for 'Loan Number' in all paragraphs");
   const allParagraphs = document.querySelectorAll("p");
+  Logger.log(`Found ${allParagraphs.length} paragraphs to search`);
+
   for (let i = 0; i < allParagraphs.length; i++) {
     const currentText = allParagraphs[i].textContent.trim();
     if (currentText === "Loan Number" && i + 1 < allParagraphs.length) {
       const loanNumberText = allParagraphs[i + 1].textContent.trim();
       if (containsLoanNumber(loanNumberText)) {
+        Logger.success(`Found loan number via Method 2: ${loanNumberText}`);
         return loanNumberText;
       }
     }
   }
 
   // Method 3: Look for any text that looks like a loan number in the content
+  // This is a fallback method for cases where the structure might be different
+  Logger.log("Method 3: Searching for potential loan numbers in all text elements");
   const allTextElements = document.querySelectorAll("p, div, span, td");
+  Logger.log(`Found ${allTextElements.length} text elements to search`);
+
   for (const element of allTextElements) {
     const text = element.textContent.trim();
     if (containsLoanNumber(text) && text.length >= 5 && text.length <= 15) {
@@ -282,93 +386,184 @@ function getLoanNumberFromPage() {
         !text.toLowerCase().includes("borrower") &&
         !text.toLowerCase().includes("policy") &&
         !text.toLowerCase().includes("address")) {
+        Logger.success(`Found potential loan number via Method 3: ${text}`);
         return text;
       }
     }
   }
 
-  // Method 4: Look for the specific structure from the HTML
-  const contentMenu = document.querySelector(".contentmenu");
-  if (contentMenu) {
-    const loanNumberElements = contentMenu.querySelectorAll("p");
-    for (let i = 0; i < loanNumberElements.length; i++) {
-      const currentText = loanNumberElements[i].textContent.trim();
-      if (currentText === "Loan Number" && i + 1 < loanNumberElements.length) {
-        const loanNumberText = loanNumberElements[i + 1].textContent.trim();
-        if (containsLoanNumber(loanNumberText)) {
-          return loanNumberText;
+  // Method 4: Look for the specific structure from the HTML with dynamic class handling
+  Logger.log("Method 4: Searching in content menu with dynamic class handling");
+  const possibleContentSelectors = [
+    '.contentmenu',
+    '.content-menu',
+    '.content',
+    '.main-content',
+    '.form-content',
+    '.page-content',
+    '[class*="content"]'
+  ];
+
+  for (const selector of possibleContentSelectors) {
+    try {
+      const contentMenu = document.querySelector(selector);
+      if (contentMenu) {
+        Logger.log(`Found content menu with selector: ${selector}`);
+        const loanNumberElements = contentMenu.querySelectorAll("p");
+        for (let i = 0; i < loanNumberElements.length; i++) {
+          const currentText = loanNumberElements[i].textContent.trim();
+          if (currentText === "Loan Number" && i + 1 < loanNumberElements.length) {
+            const loanNumberText = loanNumberElements[i + 1].textContent.trim();
+            if (containsLoanNumber(loanNumberText)) {
+              Logger.success(`Found loan number via Method 4: ${loanNumberText}`);
+              return loanNumberText;
+            }
+          }
         }
       }
+    } catch (error) {
+      Logger.warn(`Error with selector ${selector}:`, error);
     }
   }
 
+  Logger.warn("No loan number found using any method");
   return null;
 }
 
 /**
- * Check loan number and handle restricted loans for offshore users
+ * Enhanced form element handler with better error handling and logging
  */
 async function handleFormElement() {
   try {
-    // Getting Form Element
+    Logger.log("Starting form element handling");
+
+    // Refresh form elements to handle dynamic changes
     const formElement = new FormElement();
 
     // Find loan number from the page
     const loanNumber = getLoanNumberFromPage();
 
     if (!loanNumber) {
-      console.log("No loan number found yet, continuing to wait...");
+      Logger.log("No loan number found yet, will continue monitoring for changes");
       return false; // Return false to indicate we should keep waiting
     }
 
-    console.log("Processing loan number:", loanNumber);
+    Logger.success(`Processing loan number: ${loanNumber}`);
 
     // Check if loan is restricted
     const allowedLoans = await checkNumbersBatch([loanNumber]);
     if (allowedLoans.length === 0) {
-      console.log("Loan is restricted, hiding content");
+      Logger.log("Loan is restricted, hiding content");
       formElement.removeCancelMIElement();
       formElement.addCancelMIElement();
     } else {
-      console.log("Loan is allowed, showing content");
+      Logger.success("Loan is allowed, showing content");
     }
 
     return true; // Return true to indicate we're done processing
   } catch (error) {
-    console.error("Error in handleFormElement:", error);
+    Logger.error("Error in handleFormElement:", error);
     return false;
   }
 }
 
 /**
- * Setup Mutation Observer to watch for dynamic changes
+ * Enhanced Mutation Observer with debouncing and better change detection
  */
-function setupCaseObserver() {
+function setupCaseObserver(globalTimeoutRef) {
+  Logger.log("Setting up mutation observer");
+
+  let processingTimeout = null;
+  let lastProcessedContent = '';
+  let processingCount = 0;
+  let startTime = Date.now();
+  const maxProcessingTime = 45000; // 45 seconds
+
   const observer = new MutationObserver((mutationList) => {
-    for (const mutation of mutationList) {
-      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        console.log("New content detected, checking for loan number...");
-        // Check if loan number is now available
-        const loanNumber = getLoanNumberFromPage();
-        if (loanNumber) {
-          console.log("Loan number found:", loanNumber);
-          handleFormElement();
+    // Check if we've exceeded the maximum processing time
+    if (Date.now() - startTime > maxProcessingTime) {
+      Logger.warn("Mutation observer timeout reached, disconnecting observer");
+      observer.disconnect();
+      return;
+    }
+
+    // Debounce the processing to avoid excessive calls
+    if (processingTimeout) {
+      clearTimeout(processingTimeout);
+    }
+
+    processingTimeout = setTimeout(() => {
+      let hasRelevantChanges = false;
+
+      for (const mutation of mutationList) {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          // Check if any added nodes contain relevant content
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const content = node.textContent || '';
+              // More specific checks for loan number related content
+              if (content.includes('Loan Number') ||
+                content.includes('Cancel MI') ||
+                /\b\d{5,}\b/.test(content) || // Loan number pattern
+                content.includes('Certificate Number') ||
+                content.includes('Company Name') ||
+                content.includes('Borrower Name')) {
+                hasRelevantChanges = true;
+                Logger.log("Relevant content detected in mutation:", content.substring(0, 50) + '...');
+                break;
+              }
+            }
+          }
         }
       }
-    }
+
+      if (hasRelevantChanges) {
+        const currentContent = document.body.textContent;
+        if (currentContent !== lastProcessedContent) {
+          processingCount++;
+          Logger.log(`Relevant DOM changes detected (attempt ${processingCount}), checking for loan number...`);
+          lastProcessedContent = currentContent;
+
+          // Check if loan number is now available
+          const loanNumber = getLoanNumberFromPage();
+          if (loanNumber) {
+            Logger.success(`Loan number found after DOM change: ${loanNumber}`);
+            handleFormElement();
+            // Disconnect observer after successful processing
+            observer.disconnect();
+            Logger.log("Mutation observer disconnected after successful loan number processing");
+            // Clear the global timeout since we found the loan number
+            if (globalTimeoutRef) {
+              clearTimeout(globalTimeoutRef);
+              Logger.log("Global timeout cleared after successful loan number processing");
+            }
+          } else {
+            Logger.log("No loan number found yet, continuing to monitor...");
+          }
+        }
+      }
+    }, 500); // Increased debounce to 500ms for better performance
   });
 
   // Observe the entire document body for changes
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    characterData: true,
+    attributes: false // Don't watch attribute changes to reduce noise
   });
 
+  Logger.success("Mutation observer setup complete");
   return observer;
 }
 
 // Main entrypoint (this is where everything starts)
 (async function () {
+  Logger.log("Radian Filter Script starting...");
+
+  // Global timeout mechanism - stop all processing after 45 seconds
+  let globalTimeout;
+
   // create loader style.
   const style = createLoader();
 
@@ -382,53 +577,77 @@ function setupCaseObserver() {
   document.body.appendChild(loader);
 
   if (document.readyState === "loading") {
+    Logger.log("Document still loading, waiting for DOMContentLoaded");
     document.addEventListener("DOMContentLoaded", onReady);
   } else {
+    Logger.log("Document already loaded, proceeding immediately");
     onReady();
   }
 
   async function onReady() {
     try {
+      Logger.log("Document ready, starting initialization");
+
+      // Set up global timeout
+      globalTimeout = setTimeout(() => {
+        Logger.warn("Global script timeout reached after 45 seconds. This iframe may not contain the loan data.");
+        // Clean up any remaining observers or processes
+        const existingObserver = document.querySelector('#loaderOverlay');
+        if (existingObserver) {
+          existingObserver.remove();
+        }
+      }, 45000);
+
       // Check Loan extension connection
       await waitForListener();
 
       // Setup mutation observer to watch for content changes
-      const observer = setupCaseObserver();
+      const observer = setupCaseObserver(globalTimeout);
 
       // Initial check for loan number
       let isProcessed = await handleFormElement();
 
-      // If loan number not found, keep checking periodically
-      if (!isProcessed) {
-
-        const checkInterval = setInterval(async () => {
-          isProcessed = await handleFormElement();
-          if (isProcessed) {
-            console.log("Loan number processed successfully, stopping periodic checks");
-            clearInterval(checkInterval);
-            // Remove loader only after successful processing
-            loader.remove();
-          }
-        }, 1000); // Check every 1 second
-
-        // Set a maximum timeout to prevent infinite loading
-        setTimeout(() => {
-          if (!isProcessed) {
-            console.warn("Timeout reached, removing loader and continuing");
-            clearInterval(checkInterval);
-            loader.remove();
-          }
-        }, 30000); // 30 second timeout
-      } else {
+      if (isProcessed) {
         // Loan number was found and processed immediately
-        console.log("Loan number processed immediately");
+        Logger.success("Loan number processed immediately");
+        clearTimeout(globalTimeout); // Clear the global timeout
         loader.remove();
+      } else {
+        Logger.log("Loan number not found initially, will monitor for changes via mutation observer");
+        // Remove loader since we're now monitoring for changes
+        loader.remove();
+
+        // Set a timeout to stop processing if no loan number is found after 45 seconds
+        setTimeout(() => {
+          const loanNumber = getLoanNumberFromPage();
+          if (!loanNumber) {
+            Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
+            // Disconnect the observer to stop monitoring
+            if (observer) {
+              observer.disconnect();
+              Logger.log("Mutation observer disconnected due to timeout");
+            }
+            clearTimeout(globalTimeout); // Clear the global timeout
+          }
+        }, 45000); // 45 seconds timeout
       }
 
     } catch (error) {
-      console.error("Extension connection failed:", error);
+      Logger.error("Extension connection failed:", error);
       // Continue without extension functionality
       loader.remove();
+
+      // Still setup mutation observer for future changes
+      setupCaseObserver(globalTimeout);
+
+      // Set timeout even if extension fails
+      setTimeout(() => {
+        const loanNumber = getLoanNumberFromPage();
+        if (!loanNumber) {
+          Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
+          clearTimeout(globalTimeout); // Clear the global timeout
+        }
+      }, 45000);
     }
   }
 })();
