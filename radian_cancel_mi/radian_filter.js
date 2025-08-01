@@ -12,7 +12,7 @@
 const EXTENSION_ID = "afkpnpkodeiolpnfnbdokgkclljpgmcm";
 
 /**
- * Enhanced logging utility for debugging
+ * Minimal logging utility for essential debugging only
  */
 const Logger = {
   prefix: '[Radian Filter]',
@@ -99,6 +99,7 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 async function checkNumbersBatch(numbers) {
   return new Promise((resolve, reject) => {
     Logger.log(`Checking loan numbers batch:`, numbers);
+
     chrome.runtime.sendMessage(
       EXTENSION_ID,
       {
@@ -243,8 +244,8 @@ class FormElement {
     this.parent = this.element[0] && this.element[0].parentElement;
 
     Logger.log(`Form elements refreshed - Found ${this.element.length} elements`);
-    if (this.parent) {
-      Logger.log("Parent element found:", this.parent.tagName, this.parent.className);
+    if (!this.parent) {
+      Logger.warn("No parent element found - this may cause issues");
     }
   }
 
@@ -265,7 +266,6 @@ class FormElement {
         innerHTML.includes("Cancellation Reason") ||
         innerHTML.includes("Cancellation Date")
       ) {
-        Logger.log(`Removing element ${index} with content:`, innerHTML.substring(0, 100) + '...');
         section.remove();
         removedCount++;
       }
@@ -317,6 +317,34 @@ function extractLoanNumbers(text) {
 }
 
 /**
+ * Debug function to analyze page state (only when needed)
+ */
+function debugPageState() {
+  Logger.log("=== PAGE STATE ANALYSIS ===");
+
+  // Document state
+  Logger.log("Document state:", {
+    readyState: document.readyState,
+    title: document.title,
+    url: window.location.href,
+    bodyChildren: document.body.children.length
+  });
+
+  // Styled components analysis
+  const styledComponents = document.querySelectorAll('div[class*="sc-"]');
+  Logger.log(`Styled components found: ${styledComponents.length}`);
+
+  // Paragraph analysis
+  const paragraphs = document.querySelectorAll('p');
+  Logger.log(`Total paragraphs: ${paragraphs.length}`);
+
+  const paragraphTexts = Array.from(paragraphs).map(p => p.textContent.trim()).filter(t => t.length > 0);
+  Logger.log("Paragraph texts (first 10):", paragraphTexts.slice(0, 10));
+
+  Logger.log("=== END PAGE STATE ANALYSIS ===");
+}
+
+/**
  * Enhanced loan number extraction optimized for the specific HTML structure
  * @returns {string|null} The loan number if found, null otherwise
  */
@@ -328,7 +356,8 @@ function getLoanNumberFromPage() {
   Logger.log("Method 1: Searching for specific HTML structure pattern");
 
   // Look for paragraphs with "Loan Number" text
-  const loanNumberLabels = Array.from(document.querySelectorAll('p')).filter(p =>
+  const allParagraphs = document.querySelectorAll('p');
+  const loanNumberLabels = Array.from(allParagraphs).filter(p =>
     p.textContent.trim() === 'Loan Number'
   );
 
@@ -355,8 +384,6 @@ function getLoanNumberFromPage() {
 
   // Method 2: Look for any paragraph containing "Loan Number" and get the next sibling paragraph
   Logger.log("Method 2: Searching for 'Loan Number' in all paragraphs");
-  const allParagraphs = document.querySelectorAll("p");
-  Logger.log(`Found ${allParagraphs.length} paragraphs to search`);
 
   for (let i = 0; i < allParagraphs.length; i++) {
     const currentText = allParagraphs[i].textContent.trim();
@@ -373,7 +400,6 @@ function getLoanNumberFromPage() {
   // This is a fallback method for cases where the structure might be different
   Logger.log("Method 3: Searching for potential loan numbers in all text elements");
   const allTextElements = document.querySelectorAll("p, div, span, td");
-  Logger.log(`Found ${allTextElements.length} text elements to search`);
 
   for (const element of allTextElements) {
     const text = element.textContent.trim();
@@ -408,7 +434,6 @@ function getLoanNumberFromPage() {
     try {
       const contentMenu = document.querySelector(selector);
       if (contentMenu) {
-        Logger.log(`Found content menu with selector: ${selector}`);
         const loanNumberElements = contentMenu.querySelectorAll("p");
         for (let i = 0; i < loanNumberElements.length; i++) {
           const currentText = loanNumberElements[i].textContent.trim();
@@ -423,6 +448,96 @@ function getLoanNumberFromPage() {
       }
     } catch (error) {
       Logger.warn(`Error with selector ${selector}:`, error);
+    }
+  }
+
+  // Method 5: Enhanced search for the specific Radian structure with class patterns
+  Logger.log("Method 5: Searching for Radian-specific structure with class patterns");
+  const radianDivs = document.querySelectorAll('div[class*="sc-"]');
+
+  for (let i = 0; i < radianDivs.length; i++) {
+    const currentDiv = radianDivs[i];
+    const paragraph = currentDiv.querySelector('p');
+    if (paragraph && paragraph.textContent.trim() === 'Loan Number') {
+      // Look for the next div with the same class pattern
+      if (i + 1 < radianDivs.length) {
+        const nextDiv = radianDivs[i + 1];
+        const nextParagraph = nextDiv.querySelector('p');
+        if (nextParagraph) {
+          const loanNumberText = nextParagraph.textContent.trim();
+          if (containsLoanNumber(loanNumberText)) {
+            Logger.success(`Found loan number via Method 5 (Radian structure): ${loanNumberText}`);
+            return loanNumberText;
+          }
+        }
+      }
+    }
+  }
+
+  // Method 6: Search for any numeric content that could be a loan number
+  Logger.log("Method 6: Searching for any numeric content that could be a loan number");
+  const allElements = document.querySelectorAll('*');
+  for (const element of allElements) {
+    if (element.children.length === 0) { // Only leaf nodes
+      const text = element.textContent.trim();
+      if (text && /^\d{5,}$/.test(text) && text.length <= 15) {
+        // Check if this looks like a loan number by examining context
+        const parent = element.parentElement;
+        if (parent) {
+          const parentText = parent.textContent;
+          if (parentText.includes('Loan') || parentText.includes('Number')) {
+            Logger.success(`Found loan number via Method 6 (context search): ${text}`);
+            return text;
+          }
+        }
+      }
+    }
+  }
+
+  // Method 7: Search for any loan number pattern in styled-components structure
+  Logger.log("Method 7: Searching for loan numbers in styled-components structure");
+  const styledComponents = document.querySelectorAll('div[class*="sc-"]');
+
+  for (const component of styledComponents) {
+    const paragraph = component.querySelector('p');
+    if (paragraph) {
+      const text = paragraph.textContent.trim();
+      // Look for numeric patterns that could be loan numbers (5-15 digits)
+      if (/^\d{5,15}$/.test(text)) {
+        // Additional validation: make sure it's not just a label or other content
+        if (!text.toLowerCase().includes("loan") &&
+          !text.toLowerCase().includes("number") &&
+          !text.toLowerCase().includes("certificate") &&
+          !text.toLowerCase().includes("company") &&
+          !text.toLowerCase().includes("borrower") &&
+          !text.toLowerCase().includes("policy") &&
+          !text.toLowerCase().includes("address")) {
+          Logger.success(`Found loan number via Method 7 (styled-components): ${text}`);
+          return text;
+        }
+      }
+    }
+  }
+
+  // Method 8: Search for any alphanumeric pattern that could be a loan number
+  Logger.log("Method 8: Searching for alphanumeric loan number patterns");
+  const alphanumericElements = document.querySelectorAll('p, div, span, td');
+
+  for (const element of alphanumericElements) {
+    const text = element.textContent.trim();
+    // Look for alphanumeric patterns (5-20 characters) that could be loan numbers
+    if (/^[A-Z0-9]{5,20}$/i.test(text)) {
+      // Additional validation: make sure it's not just a label or other content
+      if (!text.toLowerCase().includes("loan") &&
+        !text.toLowerCase().includes("number") &&
+        !text.toLowerCase().includes("certificate") &&
+        !text.toLowerCase().includes("company") &&
+        !text.toLowerCase().includes("borrower") &&
+        !text.toLowerCase().includes("policy") &&
+        !text.toLowerCase().includes("address")) {
+        Logger.success(`Found alphanumeric loan number via Method 8: ${text}`);
+        return text;
+      }
     }
   }
 
@@ -452,10 +567,12 @@ async function handleFormElement() {
 
     // Check if loan is restricted
     const allowedLoans = await checkNumbersBatch([loanNumber]);
+
     if (allowedLoans.length === 0) {
       Logger.log("Loan is restricted, hiding content");
       formElement.removeCancelMIElement();
       formElement.addCancelMIElement();
+      Logger.success("Content hidden successfully");
     } else {
       Logger.success("Loan is allowed, showing content");
     }
@@ -509,7 +626,6 @@ function setupCaseObserver(globalTimeoutRef) {
                 content.includes('Company Name') ||
                 content.includes('Borrower Name')) {
                 hasRelevantChanges = true;
-                Logger.log("Relevant content detected in mutation:", content.substring(0, 50) + '...');
                 break;
               }
             }
@@ -542,7 +658,7 @@ function setupCaseObserver(globalTimeoutRef) {
           }
         }
       }
-    }, 500); // Increased debounce to 500ms for better performance
+    }, 300); // Reduced debounce to 300ms for faster response
   });
 
   // Observe the entire document body for changes
@@ -617,11 +733,14 @@ function setupCaseObserver(globalTimeoutRef) {
         // Remove loader since we're now monitoring for changes
         loader.remove();
 
+        // No additional periodic checks - only rely on mutation observer for DOM changes
+
         // Set a timeout to stop processing if no loan number is found after 45 seconds
         setTimeout(() => {
           const loanNumber = getLoanNumberFromPage();
           if (!loanNumber) {
             Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
+
             // Disconnect the observer to stop monitoring
             if (observer) {
               observer.disconnect();
@@ -638,16 +757,29 @@ function setupCaseObserver(globalTimeoutRef) {
       loader.remove();
 
       // Still setup mutation observer for future changes
-      setupCaseObserver(globalTimeout);
+      const observer = setupCaseObserver(globalTimeout);
 
-      // Set timeout even if extension fails
-      setTimeout(() => {
-        const loanNumber = getLoanNumberFromPage();
-        if (!loanNumber) {
-          Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
-          clearTimeout(globalTimeout); // Clear the global timeout
+      // Initial check for loan number even without extension
+      let isProcessed = await handleFormElement();
+      if (isProcessed) {
+        Logger.success("Loan number processed without extension");
+        clearTimeout(globalTimeout);
+        if (observer) {
+          observer.disconnect();
         }
-      }, 45000);
+      } else {
+        // Set timeout even if extension fails
+        setTimeout(() => {
+          const loanNumber = getLoanNumberFromPage();
+          if (!loanNumber) {
+            Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
+            clearTimeout(globalTimeout); // Clear the global timeout
+            if (observer) {
+              observer.disconnect();
+            }
+          }
+        }, 45000);
+      }
     }
   }
 })();
