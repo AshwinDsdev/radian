@@ -258,7 +258,7 @@ function extractLoanNumbers(table) {
 function createRestrictedMessage() {
   Logger.info("🚫 Creating restricted loan message...");
   const message = document.createElement("div");
-  message.textContent = "You are not provisioned to see the Restricted Loan";
+  message.textContent = "You are not provisioned to see the restricted loan details";
   message.style.cssText = `
     color: red;
     display: flex;
@@ -381,21 +381,51 @@ async function checkAndFilterLoanTables() {
       const allowedLoans = await checkNumbersBatch(loanNumbers);
       Logger.info(`📊 Table ${i + 1}: Allowed loans count: ${allowedLoans.length}/${loanNumbers.length}`);
 
-      // If any loan is restricted, hide the entire table
-      if (allowedLoans.length < loanNumbers.length) {
-        Logger.warn(`🚫 Table ${i + 1}: Restricted loans detected, hiding table`);
+      // Get all data rows in the table
+      const rows = table.querySelectorAll('tbody tr, tr:not(:first-child)');
+      const dataRows = Array.from(rows).filter(row => row.querySelectorAll('td').length >= 3);
+      
+      Logger.debug(`📊 Table ${i + 1}: Found ${dataRows.length} data rows`);
 
+      // If only one row and it's restricted, show message instead of hiding
+      if (dataRows.length === 1 && allowedLoans.length === 0) {
+        Logger.info(`🚫 Table ${i + 1}: Single row with restricted loan - showing message`);
+        
         // Hide the table
         table.style.display = 'none';
-        Logger.info(`✅ Table ${i + 1}: Hidden successfully`);
-
+        
         // Create and insert restricted message
         const message = createRestrictedMessage();
         table.parentNode.insertBefore(message, table);
-        Logger.info(`✅ Table ${i + 1}: Restricted message inserted`);
+        Logger.info(`✅ Table ${i + 1}: Restricted message inserted for single row`);
+        continue;
+      }
+
+      // Check each row individually and hide restricted ones
+      let restrictedRowsFound = false;
+      dataRows.forEach((row, rowIndex) => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 3) {
+          const thirdCell = cells[2];
+          const loanNumber = thirdCell.textContent.trim();
+          
+          // Check if this loan number is in the allowed list
+          if (loanNumber && !allowedLoans.includes(loanNumber)) {
+            Logger.debug(`🚫 Table ${i + 1}, Row ${rowIndex + 1}: Hiding restricted loan "${loanNumber}"`);
+            row.style.display = 'none';
+            restrictedRowsFound = true;
+          } else {
+            Logger.debug(`✅ Table ${i + 1}, Row ${rowIndex + 1}: Loan "${loanNumber}" is accessible`);
+          }
+        }
+      });
+
+      if (restrictedRowsFound) {
+        Logger.info(`✅ Table ${i + 1}: Row-level filtering completed - restricted rows hidden`);
       } else {
         Logger.info(`✅ Table ${i + 1}: All loans are accessible`);
       }
+
     } catch (error) {
       Logger.error(`❌ Table ${i + 1}: Error checking loan numbers:`, error);
     }
