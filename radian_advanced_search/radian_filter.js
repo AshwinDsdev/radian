@@ -908,142 +908,11 @@ function refreshPaginationCounts() {
   }
 }
 
-/**
- * Validate loan number format
- * @param {string} value - The input value to validate
- * @returns {boolean} - True if the value matches loan number format
- */
-function isValidLoanNumberFormat(value) {
-  if (!value) return false;
 
-  // Remove any whitespace
-  value = value.trim();
 
-  // Check length is 13 or less
-  if (value.length > 13) return false;
 
-  // Count digits in the value
-  const digitCount = (value.match(/\d/g) || []).length;
 
-  // Must have at least 9 digits
-  return digitCount >= 9;
-}
 
-/**
- * Find the search button using multiple strategies
- * @returns {HTMLButtonElement|null}
- */
-function findSearchButton() {
-  // Strategy 1: Find button with "Search" text
-  const buttons = Array.from(document.querySelectorAll('button'));
-  const searchButton = buttons.find(btn =>
-    btn.textContent.trim().toLowerCase() === 'search' &&
-    btn.closest('[class*="MuiButton-containedPrimary"]')
-  );
-
-  if (searchButton) return searchButton;
-
-  // Strategy 2: Find by MUI classes and type
-  const muiButtons = document.querySelectorAll('button[class*="MuiButton-containedPrimary"]');
-  for (const btn of muiButtons) {
-    if (btn.textContent.trim().toLowerCase() === 'search') {
-      return btn;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Handle input blur event for loan number validation
- * @param {Event} event - The blur event
- */
-async function handleLoanNumberInputBlur(event) {
-  const input = event.target;
-  const value = input.value.trim();
-
-  // Skip if empty or not matching format
-  if (!value || !isValidLoanNumberFormat(value)) {
-    return;
-  }
-
-  // Find the search button
-  const searchButton = findSearchButton();
-
-  // Check if loan number is allowed
-  const isAllowed = await isLoanNumberAllowed(value);
-
-  if (!isAllowed) {
-    // Create or get message element
-    let messageElement = document.getElementById('loan-restriction-message');
-    if (!messageElement) {
-      messageElement = document.createElement('div');
-      messageElement.id = 'loan-restriction-message';
-      messageElement.style.textAlign = 'center';
-      messageElement.style.padding = '15px';
-      messageElement.style.fontWeight = 'bold';
-      messageElement.style.color = '#721c24';
-      messageElement.style.backgroundColor = '#f8d7da';
-      messageElement.style.border = '1px solid #f5c6cb';
-      messageElement.style.marginTop = '10px';
-      input.parentElement.appendChild(messageElement);
-    }
-
-    messageElement.textContent = 'You are not provisioned to see the restricted loan';
-
-    // Disable search button if found
-    if (searchButton) {
-      searchButton.disabled = true;
-      searchButton.style.opacity = '0.5';
-      searchButton.style.cursor = 'not-allowed';
-      searchButton.setAttribute('data-restricted', 'true');
-    }
-
-    // Mark input as restricted
-    input.setAttribute('data-restricted', 'true');
-
-    // Remove any existing keypress listeners
-    const oldListener = input._keypressListener;
-    if (oldListener) {
-      input.removeEventListener('keypress', oldListener);
-    }
-
-    // Add new keypress listener
-    const keypressListener = function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    input._keypressListener = keypressListener;
-    input.addEventListener('keypress', keypressListener);
-
-  } else {
-    // Remove message if exists
-    const messageElement = document.getElementById('loan-restriction-message');
-    if (messageElement) {
-      messageElement.remove();
-    }
-
-    // Enable search button if found
-    if (searchButton) {
-      searchButton.disabled = false;
-      searchButton.style.opacity = '';
-      searchButton.style.cursor = '';
-      searchButton.removeAttribute('data-restricted');
-    }
-
-    // Remove restriction from input
-    input.removeAttribute('data-restricted');
-
-    // Remove keypress listener
-    const oldListener = input._keypressListener;
-    if (oldListener) {
-      input.removeEventListener('keypress', oldListener);
-      delete input._keypressListener;
-    }
-  }
-}
 
 /**
  * Set up event listeners for table updates
@@ -1053,56 +922,11 @@ function setupTableUpdateListeners() {
 
   let isProcessingSearch = false;
 
-  // Listen for search button clicks
-  const searchButton = findSearchButton();
-  if (searchButton) {
-    searchButton.addEventListener("click", (e) => {
-      if (searchButton.hasAttribute('data-restricted') || searchButton.disabled) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isProcessingSearch) {
-        return; // Prevent multiple simultaneous searches
-      }
-
-      console.log(
-        "[radian_filter] Search button clicked, preparing for table update"
-      );
-      isProcessingSearch = true;
-      showPage(false);
-
-      setTimeout(async () => {
-        const tableReady = await waitForDynamicTable(20, 500);
-        if (tableReady) {
-          await processPage();
-        } else {
-          showPage(true);
-        }
-        isProcessingSearch = false;
-      }, 1500);
-    });
-  }
-
-  // Add blur event listeners to all text inputs
-  const inputs = document.querySelectorAll('input[type="text"]');
-  inputs.forEach(input => {
-    input.addEventListener('blur', handleLoanNumberInputBlur);
-  });
-
   // Listen for Enter key in search inputs
   const searchInputs = document.querySelectorAll('input[type="text"]');
   searchInputs.forEach((input) => {
     input.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
-        if (input.hasAttribute('data-restricted') ||
-          (searchButton && (searchButton.disabled || searchButton.hasAttribute('data-restricted')))) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-
         if (isProcessingSearch) {
           e.preventDefault();
           return; // Prevent multiple simultaneous searches

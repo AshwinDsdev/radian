@@ -374,66 +374,6 @@ function createUnauthorizedElement() {
   return unauthorizedContainer;
 }
 
-// ########## TAB NAVIGATION ##########
-
-/**
- * Click Payment History tab in InquiryMIInformation.aspx
- */
-async function clickPaymentHistoryTab() {
-  return new Promise((resolve, reject) => {
-    try {
-      const paymentHistoryTab = document.querySelector('#__tab_containerTab_tabPaymentHistory');
-
-      if (!paymentHistoryTab) {
-        reject(new Error("Payment History tab not found"));
-        return;
-      }
-
-      logger.info("🔍 Clicking Payment History tab...");
-      paymentHistoryTab.click();
-
-      // Small delay to allow the click to process
-      setTimeout(() => {
-        logger.info("✅ Payment History tab clicked");
-        resolve(true);
-      }, 500);
-
-    } catch (error) {
-      logger.error("❌ Error clicking Payment History tab:", error);
-      reject(error);
-    }
-  });
-}
-
-/**
- * Click MI Application tab (return to initial tab)
- */
-async function clickMIApplicationTab() {
-  return new Promise((resolve, reject) => {
-    try {
-      const miAppTab = document.querySelector('#__tab_containerTab_tabMIApp');
-
-      if (!miAppTab) {
-        reject(new Error("MI Application tab not found"));
-        return;
-      }
-
-      logger.info("🔍 Clicking MI Application tab...");
-      miAppTab.click();
-
-      // Small delay to allow the click to process
-      setTimeout(() => {
-        logger.info("✅ MI Application tab clicked");
-        resolve(true);
-      }, 500);
-
-    } catch (error) {
-      logger.error("❌ Error clicking MI Application tab:", error);
-      reject(error);
-    }
-  });
-}
-
 // ########## IFRAME MONITORING ##########
 
 /**
@@ -632,40 +572,74 @@ async function handlePaymentHistoryContext() {
 }
 
 /**
- * Handle InquiryMIInformation context - programmatically click Payment History tab and check loan
+ * Extract loan number directly from InquiryMIInformation page
+ */
+function extractLoanNumberDirectly() {
+  try {
+    // Primary selector for loan number
+    const loanElement = document.querySelector('#lblLenderLoanValue');
+    
+    if (loanElement && loanElement.textContent) {
+      const loanNumber = loanElement.textContent.trim();
+      if (loanNumber) {
+        logger.info(`📋 Found loan number directly: ${loanNumber}`);
+        return loanNumber;
+      }
+    }
+
+    // Fallback selectors in case the primary one doesn't work
+    const fallbackSelectors = [
+      '[id*="lblLenderLoan"]',
+      '[id*="LoanValue"]',
+      '.lableValue_column span',
+      '[class*="loan"]'
+    ];
+
+    for (const selector of fallbackSelectors) {
+      const element = document.querySelector(selector);
+      if (element && element.textContent) {
+        const loanNumber = element.textContent.trim();
+        if (loanNumber && /^\d+$/.test(loanNumber)) { // Ensure it's numeric
+          logger.info(`📋 Found loan number with fallback selector: ${loanNumber} (${selector})`);
+          return loanNumber;
+        }
+      }
+    }
+
+    logger.warn("⚠️ No loan number found with direct extraction");
+    return null;
+  } catch (error) {
+    logger.error("❌ Error extracting loan number directly:", error);
+    return null;
+  }
+}
+
+/**
+ * Handle InquiryMIInformation context - extract loan number directly and check access
  */
 async function handleInquiryMIInformationContext() {
   try {
-    logger.info("🔄 Handling InquiryMIInformation context - starting automated loan check");
+    logger.info("🔄 Handling InquiryMIInformation context - direct loan number extraction");
     LoaderManager.show();
-    LoaderManager.updateText("Starting automated loan access verification...");
+    LoaderManager.updateText("Extracting loan number directly...");
 
     // Small delay to ensure page is ready
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Step 1: Click Payment History tab
-    LoaderManager.updateText("Step 1: Clicking Payment History tab...");
-    await clickPaymentHistoryTab();
-
-    // Step 2: Wait for payment history iframe to load
-    LoaderManager.updateText("Step 2: Waiting for payment history data to load...");
-    const paymentIframe = await waitForPaymentHistoryIframe();
-
-    // Step 3: Extract loan number from iframe
-    LoaderManager.updateText("Step 3: Extracting loan number...");
-    const loanNumber = extractLoanNumberFromIframe(paymentIframe);
+    // Extract loan number directly from the page
+    LoaderManager.updateText("Extracting loan number from page...");
+    const loanNumber = extractLoanNumberDirectly();
 
     if (!loanNumber) {
       LoaderManager.updateText("Error: Loan number not found");
       setTimeout(() => {
         LoaderManager.hide();
-        clickMIApplicationTab(); // Return to MI Application tab
       }, 2000);
       return;
     }
 
-    // Step 4: Check loan access
-    LoaderManager.updateText(`Step 4: Verifying access for loan ${loanNumber}...`);
+    // Check loan access
+    LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
     const allowedLoans = await checkNumbersBatch([loanNumber]);
 
     if (!allowedLoans || allowedLoans.length === 0) {
@@ -678,33 +652,14 @@ async function handleInquiryMIInformationContext() {
         hideInquiryMIInformationFrame();
       }, 1000);
     } else {
-      LoaderManager.updateText("Access granted - Returning to MI Application tab...");
-      logger.debug(`✅ Loan ${loanNumber} is authorized - returning to MI Application tab`);
-
-      // Return to MI Application tab
-      try {
-        await clickMIApplicationTab();
-        LoaderManager.updateText("Returned to MI Application tab");
-      } catch (error) {
-        logger.warn("⚠️ Could not return to MI Application tab:", error);
-        LoaderManager.updateText("Warning: Could not return to MI Application tab");
-      }
-
+      LoaderManager.updateText("Access granted");
+      logger.debug(`✅ Loan ${loanNumber} is authorized`);
       setTimeout(() => LoaderManager.hide(), 1000);
     }
 
   } catch (error) {
     logger.error("❌ Error in InquiryMIInformation context handling:", error);
     LoaderManager.updateText("Error occurred during access verification");
-
-    // Try to return to MI Application tab even on error
-    try {
-      await clickMIApplicationTab();
-      LoaderManager.updateText("Returned to MI Application tab after error");
-    } catch (fallbackError) {
-      LoaderManager.updateText("Error: Could not return to MI Application tab");
-    }
-
     setTimeout(() => LoaderManager.hide(), 2000);
   }
 }
