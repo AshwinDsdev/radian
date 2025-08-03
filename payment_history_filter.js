@@ -279,42 +279,6 @@ function isInquiryMIInformationContext() {
   }
 }
 
-/**
- * Detect if we're in Payment History iframe context (payhist_viewAll.html)
- */
-function isPaymentHistoryContext() {
-  try {
-    const currentUrl = window.location.href;
-    const pathname = window.location.pathname;
-
-    // Check URL patterns
-    if (currentUrl.includes('payhist_viewAll') || pathname.includes('payhist_viewAll')) {
-      logger.info("✅ In Payment History iframe (URL pattern)");
-      return true;
-    }
-
-    // Check for payment history specific elements
-    const paymentHistoryIndicators = [
-      '#_LblLenderNumInfo',
-      '#payhist_viewAll_table',
-      'table[id*="payhist"]',
-      '.payment-history'
-    ];
-
-    for (const selector of paymentHistoryIndicators) {
-      if (document.querySelector(selector)) {
-        logger.info(`✅ In Payment History iframe (element: ${selector})`);
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    logger.warn("⚠️ Error detecting Payment History context:", error);
-    return false;
-  }
-}
-
 // ########## UTILITY FUNCTIONS ##########
 
 /**
@@ -429,43 +393,6 @@ async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
   });
 }
 
-/**
- * Extract loan number from payment history iframe
- */
-function extractLoanNumberFromIframe(paymentIframe) {
-  try {
-    const iframeDoc = paymentIframe.contentDocument;
-    if (!iframeDoc) {
-      logger.warn("⚠️ Cannot access iframe document");
-      return null;
-    }
-
-    const loanSelectors = [
-      '#_LblLenderNumInfo',
-      '.loan-number',
-      '[id*="LoanNum"]',
-      '[class*="loan-num"]'
-    ];
-
-    for (const selector of loanSelectors) {
-      const element = iframeDoc.querySelector(selector);
-      if (element && element.textContent) {
-        const loanNumber = element.textContent.trim();
-        if (loanNumber) {
-          logger.info(`📋 Found loan number: ${loanNumber} (using ${selector})`);
-          return loanNumber;
-        }
-      }
-    }
-
-    logger.warn("⚠️ No loan number found in payment history iframe");
-    return null;
-  } catch (error) {
-    logger.error("❌ Error extracting loan number from iframe:", error);
-    return null;
-  }
-}
-
 // ########## ACCESS CONTROL ##########
 
 /**
@@ -578,7 +505,7 @@ function extractLoanNumberDirectly() {
   try {
     // Primary selector for loan number
     const loanElement = document.querySelector('#lblLenderLoanValue');
-    
+
     if (loanElement && loanElement.textContent) {
       const loanNumber = loanElement.textContent.trim();
       if (loanNumber) {
@@ -686,9 +613,9 @@ async function initializePaymentHistoryFilter() {
 
   // Check if loader is already shown (from immediate execution)
   const loaderAlreadyShown = document.getElementById("paymentHistoryLoader");
-  
+
   // Show loader if not already shown and in relevant context
-  if (!loaderAlreadyShown && (isInquiryMIInformationContext() || isPaymentHistoryContext())) {
+  if (!loaderAlreadyShown && (isInquiryMIInformationContext())) {
     logger.info("🔒 Showing loader to prevent content exposure");
     LoaderManager.show();
     LoaderManager.updateText("Initializing access verification...");
@@ -705,11 +632,8 @@ async function initializePaymentHistoryFilter() {
       logger.info("📍 Detected InquiryMIInformation.aspx context - will start automated loan check");
       // Start automated process after DOM is ready
       setTimeout(() => handleInquiryMIInformationContext(), 1000);
-    } else if (isPaymentHistoryContext()) {
-      logger.info("📍 Detected Payment History context - will check loan access");
-      // Check loan access in payment history iframe
-      setTimeout(() => handlePaymentHistoryContext(), 500);
-    } else {
+    }
+    else {
       logger.info("📍 Not in recognized context - script will remain dormant");
       // Hide loader if not in recognized context
       LoaderManager.hide();
@@ -732,13 +656,13 @@ async function initializePaymentHistoryFilter() {
     // Quick context check without waiting for full DOM
     const currentUrl = window.location.href;
     const pathname = window.location.pathname;
-    
+
     // Check if we're in a relevant context based on URL
-    const isRelevantContext = currentUrl.includes('InquiryMIInformation.aspx') || 
-                             currentUrl.includes('payhist_viewAll') || 
-                             pathname.includes('InquiryMIInformation') || 
-                             pathname.includes('payhist_viewAll');
-    
+    const isRelevantContext = currentUrl.includes('InquiryMIInformation.aspx') ||
+      currentUrl.includes('payhist_viewAll') ||
+      pathname.includes('InquiryMIInformation') ||
+      pathname.includes('payhist_viewAll');
+
     if (isRelevantContext) {
       logger.info("🔒 Showing loader immediately to prevent content exposure");
       LoaderManager.show();
