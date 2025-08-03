@@ -222,7 +222,16 @@ class FormElement {
       '.form-content',
       '.page-content',
       '[class*="content"]',
-      '[class*="menu"]'
+      '[class*="menu"]',
+      // Add more specific selectors for the Radian Cancel MI page
+      'div[class*="sc-"]',
+      'div[class*="styled"]',
+      'div[class*="container"]',
+      'section',
+      'main',
+      'article',
+      // Fallback to any div that might contain our content
+      'div:not([style*="display:none"]):not([style*="display: none"])'
     ];
 
     let foundElements = null;
@@ -241,12 +250,30 @@ class FormElement {
     }
 
     this.element = foundElements || [];
-    this.parent = this.element[0] && this.element[0].parentElement;
+
+    // Try to find the most appropriate parent element
+    if (this.element.length > 0) {
+      // First try to find a direct parent
+      this.parent = this.element[0] && this.element[0].parentElement;
+
+      // If no direct parent or it's the body, try to find a better container
+      if (!this.parent || this.parent === document.body) {
+        // Look for common container elements
+        const containers = document.querySelectorAll('main, .container, [class*="container"], [class*="content-wrapper"], [class*="main"]');
+        if (containers.length > 0) {
+          this.parent = containers[0];
+        } else {
+          // Fallback to body if no better container found
+          this.parent = document.body;
+        }
+      }
+    } else {
+      // Fallback to body if no elements found
+      this.parent = document.body;
+    }
 
     Logger.log(`Form elements refreshed - Found ${this.element.length} elements`);
-    if (!this.parent) {
-      Logger.warn("No parent element found - this may cause issues");
-    }
+    Logger.log(`Using parent element:`, this.parent.tagName);
   }
 
   removeCancelMIElement() {
@@ -595,6 +622,7 @@ function setupCaseObserver(globalTimeoutRef) {
   let processingCount = 0;
   let startTime = Date.now();
   const maxProcessingTime = 45000; // 45 seconds
+  let lastProcessedLoanNumber = null;
 
   const observer = new MutationObserver((mutationList) => {
     // Check if we've exceeded the maximum processing time
@@ -610,55 +638,92 @@ function setupCaseObserver(globalTimeoutRef) {
     }
 
     processingTimeout = setTimeout(() => {
-      let hasRelevantChanges = false;
+      // Always check for changes on significant DOM mutations
+      let hasSignificantChanges = false;
+      let contentChanged = false;
 
+      // Check for significant DOM changes
       for (const mutation of mutationList) {
+        // Check for added nodes (new content)
         if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          // Check if any added nodes contain relevant content
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check if this is a significant element (div, section, etc.)
+              if (node.tagName === 'DIV' || node.tagName === 'SECTION' ||
+                node.tagName === 'MAIN' || node.tagName === 'ARTICLE') {
+                hasSignificantChanges = true;
+                break;
+              }
+
+              // Check for relevant content
               const content = node.textContent || '';
-              // More specific checks for loan number related content
               if (content.includes('Loan Number') ||
                 content.includes('Cancel MI') ||
                 /\b\d{5,}\b/.test(content) || // Loan number pattern
                 content.includes('Certificate Number') ||
                 content.includes('Company Name') ||
                 content.includes('Borrower Name')) {
-                hasRelevantChanges = true;
+                hasSignificantChanges = true;
                 break;
               }
             }
           }
         }
-      }
 
-      if (hasRelevantChanges) {
-        const currentContent = document.body.textContent;
-        if (currentContent !== lastProcessedContent) {
-          processingCount++;
-          Logger.log(`Relevant DOM changes detected (attempt ${processingCount}), checking for loan number...`);
-          lastProcessedContent = currentContent;
-
-          // Check if loan number is now available
-          const loanNumber = getLoanNumberFromPage();
-          if (loanNumber) {
-            Logger.success(`Loan number found after DOM change: ${loanNumber}`);
-            handleFormElement();
-            // Disconnect observer after successful processing
-            observer.disconnect();
-            Logger.log("Mutation observer disconnected after successful loan number processing");
-            // Clear the global timeout since we found the loan number
-            if (globalTimeoutRef) {
-              clearTimeout(globalTimeoutRef);
-              Logger.log("Global timeout cleared after successful loan number processing");
+        // Also check for removed nodes (content being replaced)
+        if (mutation.type === "childList" && mutation.removedNodes.length > 0) {
+          for (const node of mutation.removedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE &&
+              (node.tagName === 'DIV' || node.tagName === 'SECTION')) {
+              hasSignificantChanges = true;
+              break;
             }
-          } else {
-            Logger.log("No loan number found yet, continuing to monitor...");
           }
         }
+
+        if (hasSignificantChanges) break;
       }
-    }, 300); // Reduced debounce to 300ms for faster response
+
+      // Check if overall content has changed significantly
+      const currentContent = document.body.textContent;
+      if (currentContent !== lastProcessedContent) {
+        contentChanged = true;
+        lastProcessedContent = currentContent;
+      }
+
+      // Process if we have significant changes or content changes
+      if (hasSignificantChanges || contentChanged) {
+        processingCount++;
+        Logger.log(`DOM changes detected (attempt ${processingCount}), checking for loan number...`);
+
+        // Always refresh form elements on significant changes
+        const formElement = new FormElement();
+
+        // Check if loan number is now available
+        const loanNumber = getLoanNumberFromPage();
+
+        if (loanNumber) {
+          // Only process if this is a new loan number or we haven't processed it yet
+          if (loanNumber !== lastProcessedLoanNumber) {
+            Logger.success(`Loan number found after DOM change: ${loanNumber}`);
+            lastProcessedLoanNumber = loanNumber;
+
+            // Process the form with the new loan number
+            handleFormElement().then(processed => {
+              if (processed) {
+                Logger.success("Successfully processed loan after DOM changes");
+              } else {
+                Logger.warn("Failed to process loan after DOM changes");
+              }
+            });
+          } else {
+            Logger.log(`Same loan number detected (${loanNumber}), skipping duplicate processing`);
+          }
+        } else {
+          Logger.log("No loan number found yet, continuing to monitor...");
+        }
+      }
+    }, 250); // Slightly reduced debounce for faster response
   });
 
   // Observe the entire document body for changes
@@ -666,10 +731,10 @@ function setupCaseObserver(globalTimeoutRef) {
     childList: true,
     subtree: true,
     characterData: true,
-    attributes: false // Don't watch attribute changes to reduce noise
+    attributes: true // Also watch attribute changes as they might affect visibility
   });
 
-  Logger.success("Mutation observer setup complete");
+  Logger.success("Enhanced mutation observer setup complete");
   return observer;
 }
 
@@ -704,21 +769,26 @@ function setupCaseObserver(globalTimeoutRef) {
     try {
       Logger.log("Document ready, starting initialization");
 
-      // Set up global timeout
+      // Set up global timeout - but only for initial loading
       globalTimeout = setTimeout(() => {
-        Logger.warn("Global script timeout reached after 45 seconds. This iframe may not contain the loan data.");
-        // Clean up any remaining observers or processes
-        const existingObserver = document.querySelector('#loaderOverlay');
-        if (existingObserver) {
-          existingObserver.remove();
+        Logger.warn("Initial loading timeout reached after 45 seconds");
+        // Only remove the loader, but keep the observer running
+        const loaderElement = document.querySelector('#loaderOverlay');
+        if (loaderElement) {
+          loaderElement.remove();
         }
       }, 45000);
 
       // Check Loan extension connection
       await waitForListener();
 
-      // Setup mutation observer to watch for content changes
+      // Setup enhanced mutation observer to watch for content changes
+      // This observer will continue running throughout the page lifecycle
       const observer = setupCaseObserver(globalTimeout);
+
+      // Store observer reference in window object to prevent garbage collection
+      // and ensure it continues running even after initial processing
+      window._radianObserver = observer;
 
       // Initial check for loan number
       let isProcessed = await handleFormElement();
@@ -728,27 +798,38 @@ function setupCaseObserver(globalTimeoutRef) {
         Logger.success("Loan number processed immediately");
         clearTimeout(globalTimeout); // Clear the global timeout
         loader.remove();
+
+        // IMPORTANT: Don't disconnect the observer - keep it running for future DOM changes
+        // This is the key fix to ensure the script continues working after initial load
       } else {
         Logger.log("Loan number not found initially, will monitor for changes via mutation observer");
         // Remove loader since we're now monitoring for changes
         loader.remove();
 
-        // No additional periodic checks - only rely on mutation observer for DOM changes
-
-        // Set a timeout to stop processing if no loan number is found after 45 seconds
-        setTimeout(() => {
+        // Add periodic check as a backup to the mutation observer
+        // This ensures we catch changes that might not trigger the mutation observer
+        const periodicCheckInterval = setInterval(() => {
           const loanNumber = getLoanNumberFromPage();
-          if (!loanNumber) {
-            Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
-
-            // Disconnect the observer to stop monitoring
-            if (observer) {
-              observer.disconnect();
-              Logger.log("Mutation observer disconnected due to timeout");
-            }
-            clearTimeout(globalTimeout); // Clear the global timeout
+          if (loanNumber) {
+            Logger.log(`Loan number found during periodic check: ${loanNumber}`);
+            handleFormElement().then(processed => {
+              if (processed) {
+                Logger.success("Successfully processed loan during periodic check");
+              }
+            });
           }
-        }, 45000); // 45 seconds timeout
+        }, 5000); // Check every 5 seconds
+
+        // Store interval reference to prevent garbage collection
+        window._radianCheckInterval = periodicCheckInterval;
+
+        // Set a long timeout to eventually clear the interval (but keep the observer)
+        setTimeout(() => {
+          if (window._radianCheckInterval) {
+            clearInterval(window._radianCheckInterval);
+            Logger.log("Cleared periodic check interval after extended timeout");
+          }
+        }, 120000); // 2 minutes
       }
 
     } catch (error) {
@@ -759,26 +840,33 @@ function setupCaseObserver(globalTimeoutRef) {
       // Still setup mutation observer for future changes
       const observer = setupCaseObserver(globalTimeout);
 
+      // Store observer reference in window object
+      window._radianObserver = observer;
+
       // Initial check for loan number even without extension
       let isProcessed = await handleFormElement();
       if (isProcessed) {
         Logger.success("Loan number processed without extension");
         clearTimeout(globalTimeout);
-        if (observer) {
-          observer.disconnect();
-        }
+        // IMPORTANT: Don't disconnect the observer - keep it running
       } else {
-        // Set timeout even if extension fails
-        setTimeout(() => {
+        // Add periodic check as a backup
+        const periodicCheckInterval = setInterval(() => {
           const loanNumber = getLoanNumberFromPage();
-          if (!loanNumber) {
-            Logger.warn("Script timed out after 45 seconds without finding a loan number. This iframe may not contain the loan data.");
-            clearTimeout(globalTimeout); // Clear the global timeout
-            if (observer) {
-              observer.disconnect();
-            }
+          if (loanNumber) {
+            handleFormElement();
           }
-        }, 45000);
+        }, 5000);
+
+        // Store interval reference
+        window._radianCheckInterval = periodicCheckInterval;
+
+        // Set a long timeout to eventually clear the interval
+        setTimeout(() => {
+          if (window._radianCheckInterval) {
+            clearInterval(window._radianCheckInterval);
+          }
+        }, 120000); // 2 minutes
       }
     }
   }
