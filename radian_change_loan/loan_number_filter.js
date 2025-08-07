@@ -650,50 +650,60 @@ function createErrorElement() {
  * Create loader to show when trying to establish connection with extension
  */
 function createLoader() {
-  const style = document.createElement("style");
-  style.textContent = `
-    #loaderOverlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(255, 255, 255, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      transition: opacity 0.3s ease;
-    }
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 6px solid #ccc;
-      border-top-color: #2b6cb0;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      to {transform: rotate(360deg);}
-    }
-    #loaderOverlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-  `;
-  return style;
+  try {
+    const style = document.createElement("style");
+    style.textContent = `
+      #loaderOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 6px solid #ccc;
+        border-top-color: #2b6cb0;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {transform: rotate(360deg);}
+      }
+      #loaderOverlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    `;
+    return style;
+  } catch (error) {
+    logger.error("❌ Error creating loader styles:", error);
+    return null;
+  }
 }
 
 /**
  * To create Loader Element.
  */
 function createLoaderElement() {
-  const loader = document.createElement("div");
-  loader.id = "loaderOverlay";
-  const spinner = document.createElement("div");
-  spinner.className = "spinner";
-  loader.appendChild(spinner);
-  return loader;
+  try {
+    const loader = document.createElement("div");
+    loader.id = "loaderOverlay";
+    const spinner = document.createElement("div");
+    spinner.className = "spinner";
+    loader.appendChild(spinner);
+    return loader;
+  } catch (error) {
+    logger.error("❌ Error creating loader element:", error);
+    return null;
+  }
 }
 
 /**
@@ -927,28 +937,50 @@ function setupTableObserver() {
   setupEnhancedTableObserver();
 }
 
+// Global execution flag to prevent multiple runs
+window.loanNumberFilterExecuted = window.loanNumberFilterExecuted || false;
+
 // Main entrypoint (this is where everything starts)
 (async function () {
-  logger.info("🚀 Radian Loan Filter Script Starting...");
-
-  // Create loader style
-  const style = createLoader();
-
-  document.head.appendChild(style);
-
-  const loader = createLoaderElement();
-
-  document.body.appendChild(loader);
-
-  if (document.readyState === "loading") {
-    logger.info("📋 DOM still loading, waiting for DOMContentLoaded...");
-    document.addEventListener("DOMContentLoaded", onReady);
-  } else {
-    logger.info("📋 DOM already loaded, starting immediately...");
-    onReady();
+  // Prevent multiple executions
+  if (window.loanNumberFilterExecuted) {
+    logger.warn("⚠️ Loan number filter already executed, skipping");
+    return;
   }
 
-  async function onReady() {
+  window.loanNumberFilterExecuted = true;
+  logger.info("🚀 Radian Loan Filter Script Starting...");
+
+  // Wait for DOM to be ready before creating loader
+  function initializeScript() {
+    try {
+      // Create loader style only if head exists
+      if (document.head) {
+        const style = createLoader();
+        if (style) {
+          document.head.appendChild(style);
+        }
+      }
+
+      // Create loader element only if body exists
+      let loader = null;
+      if (document.body) {
+        loader = createLoaderElement();
+        if (loader) {
+          document.body.appendChild(loader);
+        }
+      }
+
+      // Start the main initialization
+      onReady(loader);
+    } catch (error) {
+      logger.error("❌ Error during script initialization:", error);
+      // Try to start without loader if there's an error
+      onReady(null);
+    }
+  }
+
+  async function onReady(loader) {
     logger.info("✅ DOM Ready - Initializing filter...");
     try {
       // Check Loan extension connection
@@ -966,10 +998,45 @@ function setupTableObserver() {
     } catch (error) {
       logger.error("❌ Failed to initialize filter:", error);
     } finally {
-      // Remove loader
-      logger.info("🔄 Removing loader...");
-      loader.classList.add("hidden");
-      setTimeout(() => loader.remove(), 300);
+      // Remove loader if it exists
+      if (loader) {
+        logger.info("🔄 Removing loader...");
+        try {
+          loader.classList.add("hidden");
+          setTimeout(() => {
+            if (loader && loader.parentNode) {
+              loader.remove();
+            }
+          }, 300);
+        } catch (loaderError) {
+          logger.warn("⚠️ Error removing loader:", loaderError);
+        }
+      }
     }
   }
+
+  // Check if DOM is ready
+  function waitForDOMReady() {
+    // Check if document and body exist
+    if (document && document.body) {
+      logger.info("📋 DOM ready, starting initialization...");
+      initializeScript();
+    } else if (document.readyState === "loading") {
+      logger.info("📋 DOM still loading, waiting for DOMContentLoaded...");
+      document.addEventListener("DOMContentLoaded", initializeScript);
+    } else {
+      logger.info("📋 DOM state unclear, waiting with timeout...");
+      // Fallback: wait a bit and try again
+      setTimeout(() => {
+        if (document && document.body) {
+          initializeScript();
+        } else {
+          logger.warn("⚠️ DOM not ready after timeout, starting without loader...");
+          onReady(null);
+        }
+      }, 500);
+    }
+  }
+
+  waitForDOMReady();
 })();
