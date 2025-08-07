@@ -847,16 +847,6 @@ function setupFormValidation() {
             hasRestrictedLoan = true;
           }
         }
-
-        // Prevent form submission if any loan is restricted
-        if (hasRestrictedLoan) {
-          console.log(" Form submission blocked due to restricted loans");
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          alert(
-            "Please remove or correct the restricted loan numbers before submitting."
-          );
-        }
       },
       true
     );
