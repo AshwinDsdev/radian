@@ -84,19 +84,280 @@ async function checkNumbersBatch(numbers) {
 
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
+/**
+ * Logger utility for consistent debug output
+ */
+const logger = {
+  debug: (...args) => console.debug('[LoanNumberFilter]', ...args),
+  info: (...args) => console.info('[LoanNumberFilter]', ...args),
+  warn: (...args) => console.warn('[LoanNumberFilter]', ...args),
+  error: (...args) => console.error('[LoanNumberFilter]', ...args),
+};
+
 // Configuration for table detection
 const TABLE_CONFIG = {
   tableId: "_GrdLoanNumberChange",
   tableClass: "resultsTable",
   detectionTimeout: 45000, // 45 seconds timeout
   checkInterval: 1000, // Check every 1 second
-  maxAttempts: 45 // Maximum attempts (45 seconds / 1 second)
+  maxAttempts: 45, // Maximum attempts (45 seconds / 1 second)
+  domChangeDebounce: 300, // Debounce DOM change events
+  loanExtractionResetDelay: 500 // Delay before resetting loan extraction after DOM changes
 };
 
 let tableDetectionTimer = null;
 let isTableDetected = false;
 let currentUrl = window.location.href;
 let tablePresenceCheckTimer = null;
+let domChangeTimer = null;
+let mutationObserver = null;
+let lastTableContent = null;
+let loanExtractionResetTimer = null;
+
+// ########## DOM MONITORING & LOAN EXTRACTION RESET ##########
+
+/**
+ * Generate a hash of table content for change detection
+ */
+function getTableContentHash(table) {
+  if (!table) return null;
+  
+  try {
+    // Get all loan number inputs and their values
+    const loanInputs = table.querySelectorAll('input[id*="_TxtLoanNumber"]');
+    const content = Array.from(loanInputs).map(input => ({
+      id: input.id,
+      value: input.value,
+      disabled: input.disabled,
+      hasError: !!input.parentNode.querySelector('.error-msg')
+    }));
+    
+    // Also include table structure (row count, etc.)
+    const rows = table.querySelectorAll('tr');
+    const structure = {
+      rowCount: rows.length,
+      loanInputCount: loanInputs.length
+    };
+    
+    return JSON.stringify({ content, structure });
+  } catch (error) {
+    console.warn('Error generating table content hash:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if table content has changed significantly
+ */
+function hasTableContentChanged(table) {
+  const currentHash = getTableContentHash(table);
+  
+  if (lastTableContent === null) {
+    lastTableContent = currentHash;
+    return false; // First time, no change
+  }
+  
+  const hasChanged = lastTableContent !== currentHash;
+  if (hasChanged) {
+    console.log('📊 Table content change detected - resetting loan extraction');
+    lastTableContent = currentHash;
+  }
+  
+  return hasChanged;
+}
+
+/**
+ * Reset loan extraction and re-validate all loan numbers
+ */
+async function resetLoanExtraction() {
+  console.log('🔄 Resetting loan extraction and re-validating...');
+  
+  try {
+    // Clear any existing error messages
+    const errorMessages = document.querySelectorAll('.error-msg');
+    errorMessages.forEach(msg => msg.remove());
+    
+    // Reset all loan number inputs styling
+    const table = document.getElementById(TABLE_CONFIG.tableId);
+    if (table) {
+      const loanInputs = table.querySelectorAll('input[id*="_TxtLoanNumber"]');
+      loanInputs.forEach(input => {
+        input.style.border = '';
+        input.disabled = false;
+        input.style.backgroundColor = '';
+        input.style.cursor = '';
+      });
+    }
+    
+    // Re-setup validation for new inputs
+    setupLoanNumberValidation();
+    setupFormValidation();
+    setupCancelValidation();
+    
+    // Re-check all existing loan numbers
+    await checkExistingLoanNumbers();
+    
+    console.log('✅ Loan extraction reset completed');
+  } catch (error) {
+    console.error('❌ Error during loan extraction reset:', error);
+  }
+}
+
+/**
+ * Debounced function to handle DOM changes
+ */
+function handleDomChange() {
+  if (domChangeTimer) {
+    clearTimeout(domChangeTimer);
+  }
+  
+  domChangeTimer = setTimeout(() => {
+    const table = document.getElementById(TABLE_CONFIG.tableId);
+    if (table && hasTableContentChanged(table)) {
+      // Reset loan extraction after a short delay to ensure DOM is stable
+      if (loanExtractionResetTimer) {
+        clearTimeout(loanExtractionResetTimer);
+      }
+      
+      loanExtractionResetTimer = setTimeout(() => {
+        resetLoanExtraction();
+      }, TABLE_CONFIG.loanExtractionResetDelay);
+    }
+  }, TABLE_CONFIG.domChangeDebounce);
+}
+
+/**
+ * Enhanced mutation observer for comprehensive DOM monitoring
+ */
+function setupEnhancedTableObserver() {
+  const targetTable = document.getElementById(TABLE_CONFIG.tableId);
+  if (!targetTable) {
+    console.warn('⚠️ Loan number table not found for enhanced observer setup');
+    return;
+  }
+
+  console.log('🔍 Setting up enhanced mutation observer for table:', targetTable.id);
+
+  // Disconnect existing observer if any
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+  }
+
+  mutationObserver = new MutationObserver((mutationList) => {
+    let hasRelevantChanges = false;
+
+    for (const mutation of mutationList) {
+      // Check for added/removed nodes
+      if (mutation.type === 'childList') {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if added node contains loan inputs or is a loan input
+            const hasLoanInputs = node.querySelector && 
+              (node.querySelector('input[id*="_TxtLoanNumber"]') || 
+               node.matches && node.matches('input[id*="_TxtLoanNumber"]'));
+            
+            if (hasLoanInputs) {
+              hasRelevantChanges = true;
+              console.log('➕ New loan input detected in DOM change');
+              break;
+            }
+          }
+        }
+        
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if removed node contains loan inputs
+            const hadLoanInputs = node.querySelector && 
+              node.querySelector('input[id*="_TxtLoanNumber"]');
+            
+            if (hadLoanInputs) {
+              hasRelevantChanges = true;
+              console.log('➖ Loan input removed from DOM');
+              break;
+            }
+          }
+        }
+      }
+      
+      // Check for attribute changes on loan inputs
+      if (mutation.type === 'attributes' && 
+          mutation.target.matches && 
+          mutation.target.matches('input[id*="_TxtLoanNumber"]')) {
+        hasRelevantChanges = true;
+        console.log('🔄 Loan input attribute changed:', mutation.attributeName);
+      }
+    }
+
+    if (hasRelevantChanges) {
+      console.log('📊 Relevant DOM changes detected - triggering loan extraction reset');
+      handleDomChange();
+    }
+  });
+
+  // Observe the entire table with comprehensive options
+  mutationObserver.observe(targetTable, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['value', 'disabled', 'style', 'class'],
+    characterData: false
+  });
+
+  console.log('✅ Enhanced mutation observer setup complete for table:', targetTable.id);
+}
+
+/**
+ * Monitor for table structure changes (new rows, removed rows, etc.)
+ */
+function setupTableStructureMonitoring() {
+  const targetTable = document.getElementById(TABLE_CONFIG.tableId);
+  if (!targetTable) return;
+
+  console.log('📊 Setting up table structure monitoring');
+
+  // Monitor for changes in table structure
+  const structureObserver = new MutationObserver((mutationList) => {
+    let structureChanged = false;
+
+    for (const mutation of mutationList) {
+      if (mutation.type === 'childList') {
+        // Check if rows were added or removed
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE && 
+              (node.tagName === 'TR' || node.querySelector && node.querySelector('tr'))) {
+            structureChanged = true;
+            console.log('➕ Table row structure changed (added)');
+            break;
+          }
+        }
+        
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE && 
+              (node.tagName === 'TR' || node.querySelector && node.querySelector('tr'))) {
+            structureChanged = true;
+            console.log('➖ Table row structure changed (removed)');
+            break;
+          }
+        }
+      }
+    }
+
+    if (structureChanged) {
+      console.log('📊 Table structure change detected - resetting loan extraction');
+      handleDomChange();
+    }
+  });
+
+  structureObserver.observe(targetTable, {
+    childList: true,
+    subtree: true,
+    attributes: false,
+    characterData: false
+  });
+
+  return structureObserver;
+}
+
 /**
  * Check if URL has changed
  */
@@ -119,16 +380,16 @@ function detectTableWithTimeout() {
     return;
   }
 
-  console.log(" Starting table detection with timeout...");
+  logger.info("🔄 Starting table detection with timeout...");
   let attempts = 0;
 
   const detectTable = () => {
     attempts++;
-    console.log(` Table detection attempt ${attempts}/${TABLE_CONFIG.maxAttempts}`);
+    logger.debug(`📋 Table detection attempt ${attempts}/${TABLE_CONFIG.maxAttempts}`);
 
     const table = document.getElementById(TABLE_CONFIG.tableId);
     if (table && table.classList.contains(TABLE_CONFIG.tableClass)) {
-      console.log("✅ Table detected successfully!");
+      logger.info("✅ Table detected successfully!");
       isTableDetected = true;
       clearTimeout(tableDetectionTimer);
 
@@ -138,7 +399,7 @@ function detectTableWithTimeout() {
     }
 
     if (attempts >= TABLE_CONFIG.maxAttempts) {
-      console.warn(" Table detection timeout reached. Stopping detection.");
+      logger.warn("⚠️ Table detection timeout reached. Stopping detection.");
       clearTimeout(tableDetectionTimer);
       return;
     }
@@ -172,12 +433,45 @@ function checkTablePresence() {
 }
 
 /**
- * Setup periodic table presence check
+ * Setup periodic table presence check and loan number discovery
  */
 function setupTablePresenceCheck() {
-  console.log(" Setting up periodic table presence check (every 10s)");
-  // Check every 10 seconds if table is still present
-  tablePresenceCheckTimer = setInterval(checkTablePresence, 10000);
+  console.log("🔄 Setting up periodic table presence check and loan discovery (every 10s)");
+  
+  // Check every 10 seconds if table is still present and discover new loan numbers
+  tablePresenceCheckTimer = setInterval(() => {
+    checkTablePresence();
+    discoverNewLoanNumbers();
+  }, 10000);
+}
+
+/**
+ * Discover new loan numbers that might have been added dynamically
+ */
+function discoverNewLoanNumbers() {
+  const table = document.getElementById(TABLE_CONFIG.tableId);
+  if (!table) return;
+
+  const currentLoanInputs = table.querySelectorAll('input[id*="_TxtLoanNumber"]');
+  const currentCount = currentLoanInputs.length;
+  
+  // Check if we have new loan inputs that aren't being monitored
+  let hasNewInputs = false;
+  
+  currentLoanInputs.forEach(input => {
+    // Check if this input has our validation event listeners
+    const hasValidationListeners = input._hasValidationListeners;
+    
+    if (!hasValidationListeners) {
+      hasNewInputs = true;
+      console.log('🔍 Discovered new loan input:', input.id);
+    }
+  });
+  
+  if (hasNewInputs) {
+    console.log('🔄 New loan inputs discovered - resetting validation');
+    handleDomChange();
+  }
 }
 
 /**
@@ -186,10 +480,29 @@ function setupTablePresenceCheck() {
 function resetTableDetection() {
   console.log("Resetting table detection state");
   isTableDetected = false;
+  
   if (tableDetectionTimer) {
     clearTimeout(tableDetectionTimer);
     tableDetectionTimer = null;
   }
+  
+  // Reset DOM monitoring state
+  if (domChangeTimer) {
+    clearTimeout(domChangeTimer);
+    domChangeTimer = null;
+  }
+  
+  if (loanExtractionResetTimer) {
+    clearTimeout(loanExtractionResetTimer);
+    loanExtractionResetTimer = null;
+  }
+  
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+  
+  lastTableContent = null;
 }
 
 /**
@@ -198,11 +511,17 @@ function resetTableDetection() {
 function initializeFilterForTable(table) {
   console.log(" Initializing filter for table:", table.id);
 
+  // Initialize table content hash for change detection
+  lastTableContent = getTableContentHash(table);
+
   // Setup all validation functions
   setupLoanNumberValidation();
   setupFormValidation();
   setupCancelValidation();
-  setupTableObserver();
+  
+  // Setup enhanced DOM monitoring
+  setupEnhancedTableObserver();
+  setupTableStructureMonitoring();
   setupTablePresenceCheck(); // Setup periodic presence check
 
   // Check existing loan numbers
@@ -233,6 +552,27 @@ function cleanup() {
     clearInterval(tablePresenceCheckTimer);
     tablePresenceCheckTimer = null;
   }
+
+  // Clear DOM change timer
+  if (domChangeTimer) {
+    clearTimeout(domChangeTimer);
+    domChangeTimer = null;
+  }
+
+  // Disconnect mutation observers
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+
+  // Clear loan extraction reset timer
+  if (loanExtractionResetTimer) {
+    clearTimeout(loanExtractionResetTimer);
+    loanExtractionResetTimer = null;
+  }
+
+  // Reset table content hash
+  lastTableContent = null;
 
   console.log("✅ Cleanup completed");
 }
@@ -425,7 +765,7 @@ function setupLoanNumberValidation() {
   // Get the table that contains loan numbers
   const table = document.getElementById("_GrdLoanNumberChange");
   if (!table) {
-    console.warn(" Loan number table not found");
+    console.warn("⚠️ Loan number table not found");
     return;
   }
 
@@ -433,20 +773,35 @@ function setupLoanNumberValidation() {
     'input[id*="_TxtLoanNumber"]'
   );
 
-  console.log(`Setting up validation for ${loanNumberInputs.length} loan number inputs`);
+  console.log(`🔧 Setting up validation for ${loanNumberInputs.length} loan number inputs`);
 
   loanNumberInputs.forEach((input) => {
-    input.addEventListener("blur", async function () {
+    // Remove existing event listeners to prevent duplicates
+    const newInput = input.cloneNode(true);
+    input.parentNode.replaceChild(newInput, input);
+    
+    // Add event listeners to the new input
+    newInput.addEventListener("blur", async function () {
       await validateLoanNumberInput(this);
     });
 
     let timeout;
-    input.addEventListener("input", function () {
+    newInput.addEventListener("input", function () {
       clearTimeout(timeout);
       timeout = setTimeout(async () => {
         await validateLoanNumberInput(this);
       }, 500); // Wait 500ms after user stops typing
     });
+    
+    // Also validate on focus to handle programmatic changes
+    newInput.addEventListener("focus", async function () {
+      if (this.value.trim()) {
+        await validateLoanNumberInput(this);
+      }
+    });
+    
+    // Mark this input as having validation listeners
+    newInput._hasValidationListeners = true;
   });
 }
 
@@ -565,58 +920,16 @@ function setupCancelValidation() {
 
 /**
  * Setup Mutation Observer to watch for dynamic changes in the table
+ * @deprecated - Use setupEnhancedTableObserver instead
  */
 function setupTableObserver() {
-  const targetTable = document.getElementById("_GrdLoanNumberChange");
-  if (!targetTable) {
-    console.warn("Loan number table not found for observer setup");
-    return;
-  }
-
-  console.log(" Setting up mutation observer for table:", targetTable.id);
-
-  const observer = new MutationObserver((mutationList) => {
-    let hasRelevantChanges = false;
-
-    for (const mutation of mutationList) {
-      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        // Check if any added nodes contain loan number inputs
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const hasLoanInputs = node.querySelector && node.querySelector('input[id*="_TxtLoanNumber"]');
-            if (hasLoanInputs) {
-              hasRelevantChanges = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (hasRelevantChanges) {
-      console.log(" Table content changes detected - re-initializing validation for new inputs");
-      setTimeout(async () => {
-        setupLoanNumberValidation();
-        setupFormValidation();
-        setupCancelValidation();
-        await checkExistingLoanNumbers();
-      }, 100);
-    }
-  });
-
-  observer.observe(targetTable, {
-    childList: true,
-    subtree: true,
-    attributes: false,
-    characterData: false
-  });
-
-  console.log("✅ Mutation observer setup complete for table:", targetTable.id);
+  console.log("⚠️ setupTableObserver is deprecated - using enhanced observer instead");
+  setupEnhancedTableObserver();
 }
 
 // Main entrypoint (this is where everything starts)
 (async function () {
-  console.log("Radian Loan Filter Script Starting...");
+  logger.info("🚀 Radian Loan Filter Script Starting...");
 
   // Create loader style
   const style = createLoader();
@@ -628,33 +941,33 @@ function setupTableObserver() {
   document.body.appendChild(loader);
 
   if (document.readyState === "loading") {
-    console.log(" DOM still loading, waiting for DOMContentLoaded...");
+    logger.info("📋 DOM still loading, waiting for DOMContentLoaded...");
     document.addEventListener("DOMContentLoaded", onReady);
   } else {
-    console.log(" DOM already loaded, starting immediately...");
+    logger.info("📋 DOM already loaded, starting immediately...");
     onReady();
   }
 
   async function onReady() {
-    console.log("✅ DOM Ready - Initializing filter...");
+    logger.info("✅ DOM Ready - Initializing filter...");
     try {
       // Check Loan extension connection
       await waitForListener();
 
       // Setup URL change detection first
-      console.log("Setting up URL change detection...");
+      logger.info("🔗 Setting up URL change detection...");
       setupUrlChangeDetection();
       setupCleanup(); // Setup cleanup on page unload
 
       // Start table detection with timeout
-      console.log("Starting table detection...");
+      logger.info("🔍 Starting table detection...");
       detectTableWithTimeout();
 
     } catch (error) {
-      console.error("❌ Failed to initialize filter:", error);
+      logger.error("❌ Failed to initialize filter:", error);
     } finally {
       // Remove loader
-      console.log(" Removing loader...");
+      logger.info("🔄 Removing loader...");
       loader.classList.add("hidden");
       setTimeout(() => loader.remove(), 300);
     }
