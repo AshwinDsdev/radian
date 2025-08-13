@@ -256,6 +256,21 @@ function isInquiryMIInformationContext() {
       return true;
     }
 
+    // Check for new HTML structure indicators
+    const newStructureIndicators = [
+      'Lender/Servicer Loan Number',
+      'Borrower Name',
+      'Payment Plan',
+      'MI Policy Status'
+    ];
+
+    for (const indicator of newStructureIndicators) {
+      if (document.body && document.body.textContent && document.body.textContent.includes(indicator)) {
+        logger.info(`✅ In InquiryMIInformation.aspx iframe (new structure indicator: ${indicator})`);
+        return true;
+      }
+    }
+
     // Check for specific tab elements that exist in InquiryMIInformation.aspx
     const inquiryIndicators = [
       '#__tab_containerTab_tabPaymentHistory',
@@ -326,7 +341,7 @@ function createUnauthorizedElement() {
   });
 
   const textElement = document.createElement("div");
-  textElement.textContent = "You are not authorized to view restricted loans";
+  textElement.textContent = "You are not authorized to view this loan information";
   applyElementStyles(textElement, {
     marginTop: "10px",
   });
@@ -396,19 +411,27 @@ async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
 // ########## ACCESS CONTROL ##########
 
 /**
- * Hide InquiryMIInformation iframe and show unauthorized message
+ * Hide contentmenu div and show unauthorized message
  */
 function hideInquiryMIInformationFrame() {
-  logger.info("🔒 Hiding InquiryMIInformation frame - unauthorized access");
+  logger.info("🔒 Hiding contentmenu div - unauthorized access");
 
-  // Hide all content in current frame
-  const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-  if (allElements && allElements.length > 0) {
-    allElements.forEach((element) => {
-      if (element && element.id !== "paymentHistoryLoader") {
-        element.style.display = "none";
-      }
-    });
+  // Hide only the contentmenu div which contains the loan information
+  const contentMenuDiv = document.querySelector('.contentmenu');
+  if (contentMenuDiv) {
+    contentMenuDiv.style.display = "none";
+    logger.info("✅ contentmenu div hidden successfully");
+  } else {
+    logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
+    // Fallback: Hide all content if contentmenu div is not found
+    const allElements = document.querySelectorAll("body > *:not(script):not(style)");
+    if (allElements && allElements.length > 0) {
+      allElements.forEach((element) => {
+        if (element && element.id !== "paymentHistoryLoader") {
+          element.style.display = "none";
+        }
+      });
+    }
   }
 
   // Show unauthorized message
@@ -418,7 +441,7 @@ function hideInquiryMIInformationFrame() {
     documentBody.appendChild(unauthorizedElement);
   }
 
-  logger.info("✅ Unauthorized message displayed in InquiryMIInformation frame");
+  logger.info("✅ Unauthorized message displayed");
 }
 
 // ########## MAIN LOGIC ##########
@@ -435,26 +458,9 @@ async function handlePaymentHistoryContext() {
     // Wait a bit for the page to stabilize
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Extract loan number
+    // Extract loan number using the new structure
     LoaderManager.updateText("Extracting loan number...");
-    const loanSelectors = [
-      '#_LblLenderNumInfo',
-      '.loan-number',
-      '[id*="LoanNum"]',
-      '[class*="loan-num"]'
-    ];
-
-    let loanNumber = null;
-    for (const selector of loanSelectors) {
-      const element = document.querySelector(selector);
-      if (element && element.textContent) {
-        loanNumber = element.textContent.trim();
-        if (loanNumber) {
-          logger.info(`📋 Found loan number: ${loanNumber} (using ${selector})`);
-          break;
-        }
-      }
-    }
+    const loanNumber = extractLoanNumberDirectly();
 
     if (!loanNumber) {
       LoaderManager.updateText("Error: Loan number not found");
@@ -473,12 +479,22 @@ async function handlePaymentHistoryContext() {
       // Hide content and show unauthorized message  
       setTimeout(() => {
         LoaderManager.hide();
-        const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-        allElements.forEach((element) => {
-          if (element && element.id !== "paymentHistoryLoader") {
-            element.style.display = "none";
-          }
-        });
+        
+        // Hide only the contentmenu div which contains the loan information
+        const contentMenuDiv = document.querySelector('.contentmenu');
+        if (contentMenuDiv) {
+          contentMenuDiv.style.display = "none";
+          logger.info("✅ contentmenu div hidden successfully in payment history context");
+        } else {
+          logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
+          // Fallback: Hide all content if contentmenu div is not found
+          const allElements = document.querySelectorAll("body > *:not(script):not(style)");
+          allElements.forEach((element) => {
+            if (element && element.id !== "paymentHistoryLoader") {
+              element.style.display = "none";
+            }
+          });
+        }
 
         const unauthorizedElement = createUnauthorizedElement();
         if (document.body) {
@@ -503,37 +519,70 @@ async function handlePaymentHistoryContext() {
  */
 function extractLoanNumberDirectly() {
   try {
-    // Primary selector for loan number
-    const loanElement = document.querySelector('#lblLenderLoanValue');
+    const loanLabels = document.querySelectorAll('p');
+    let loanNumber = null;
 
-    if (loanElement && loanElement.textContent) {
-      const loanNumber = loanElement.textContent.trim();
-      if (loanNumber) {
-        logger.info(`📋 Found loan number directly: ${loanNumber}`);
-        return loanNumber;
-      }
-    }
-
-    // Fallback selectors in case the primary one doesn't work
-    const fallbackSelectors = [
-      '[id*="lblLenderLoan"]',
-      '[id*="LoanValue"]',
-      '.lableValue_column span',
-      '[class*="loan"]'
-    ];
-
-    for (const selector of fallbackSelectors) {
-      const element = document.querySelector(selector);
-      if (element && element.textContent) {
-        const loanNumber = element.textContent.trim();
-        if (loanNumber && /^\d+$/.test(loanNumber)) { // Ensure it's numeric
-          logger.info(`📋 Found loan number with fallback selector: ${loanNumber} (${selector})`);
-          return loanNumber;
+    for (let i = 0; i < loanLabels.length; i++) {
+      const labelElement = loanLabels[i];
+      if (labelElement.textContent && labelElement.textContent.trim() === 'Lender/Servicer Loan Number') {
+        // Found the label, now look for the next value element
+        const parentDiv = labelElement.closest('.sc-daUvki.kLPqhr');
+        if (parentDiv && parentDiv.nextElementSibling) {
+          const valueDiv = parentDiv.nextElementSibling;
+          const valueElement = valueDiv.querySelector('p');
+          if (valueElement && valueElement.textContent) {
+            loanNumber = valueElement.textContent.trim();
+            if (loanNumber && /^\d+$/.test(loanNumber)) { // Ensure it's numeric
+              logger.info(`📋 Found loan number with new structure: ${loanNumber}`);
+              return loanNumber;
+            }
+          }
         }
       }
     }
 
-    logger.warn("⚠️ No loan number found with direct extraction");
+    // Fallback: Look for any element containing "Lender/Servicer Loan Number" text
+    const loanLabelElements = Array.from(document.querySelectorAll('*')).filter(element => 
+      element.textContent && element.textContent.includes('Lender/Servicer Loan Number')
+    );
+
+    for (const labelElement of loanLabelElements) {
+      // Find the parent container and look for the next sibling with the value
+      const container = labelElement.closest('.sc-daUvki.kLPqhr') || labelElement.closest('div');
+      if (container && container.nextElementSibling) {
+        const valueContainer = container.nextElementSibling;
+        const valueElement = valueContainer.querySelector('p') || valueContainer;
+        if (valueElement && valueElement.textContent) {
+          const text = valueElement.textContent.trim();
+          if (text && /^\d+$/.test(text)) { // Ensure it's numeric
+            loanNumber = text;
+            logger.info(`📋 Found loan number with fallback method: ${loanNumber}`);
+            return loanNumber;
+          }
+        }
+      }
+    }
+
+    // Additional fallback: Search for numeric patterns near loan-related text
+    const allTextElements = document.querySelectorAll('p, span, div');
+    for (const element of allTextElements) {
+      if (element.textContent && element.textContent.includes('Loan Number')) {
+        // Look in the same container or nearby for numeric values
+        const container = element.closest('div');
+        if (container) {
+          const numericElements = container.querySelectorAll('p, span');
+          for (const numElement of numericElements) {
+            if (numElement.textContent && /^\d{8,15}$/.test(numElement.textContent.trim())) {
+              loanNumber = numElement.textContent.trim();
+              logger.info(`📋 Found loan number with pattern search: ${loanNumber}`);
+              return loanNumber;
+            }
+          }
+        }
+      }
+    }
+
+    logger.warn("⚠️ No loan number found with new structure extraction methods");
     return null;
   } catch (error) {
     logger.error("❌ Error extracting loan number directly:", error);
@@ -657,11 +706,11 @@ async function initializePaymentHistoryFilter() {
     const currentUrl = window.location.href;
     const pathname = window.location.pathname;
 
-    // Check if we're in a relevant context based on URL
     const isRelevantContext = currentUrl.includes('InquiryMIInformation.aspx') ||
       currentUrl.includes('payhist_viewAll') ||
       pathname.includes('InquiryMIInformation') ||
-      pathname.includes('payhist_viewAll');
+      pathname.includes('payhist_viewAll') ||
+      (document.body && document.body.textContent && document.body.textContent.includes('Lender/Servicer Loan Number'));
 
     if (isRelevantContext) {
       logger.info("🔒 Showing loader immediately to prevent content exposure");
