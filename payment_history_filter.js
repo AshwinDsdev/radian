@@ -247,44 +247,11 @@ const LoaderManager = {
  */
 function isInquiryMIInformationContext() {
   try {
-    const currentUrl = window.location.href;
-    const pathname = window.location.pathname;
-
-    // Check URL patterns
-    if (currentUrl.includes('InquiryMIInformation.aspx') || pathname.includes('InquiryMIInformation')) {
-      logger.info("✅ In InquiryMIInformation.aspx iframe (URL pattern)");
+    // Only check for content indicators, no URL checks
+    if (document.body && document.body.textContent && 
+        document.body.textContent.includes('Lender/Servicer Loan Number')) {
+      logger.info("✅ In InquiryMIInformation context (content detected)");
       return true;
-    }
-
-    // Check for new HTML structure indicators
-    const newStructureIndicators = [
-      'Lender/Servicer Loan Number',
-      'Borrower Name',
-      'Payment Plan',
-      'MI Policy Status'
-    ];
-
-    for (const indicator of newStructureIndicators) {
-      if (document.body && document.body.textContent && document.body.textContent.includes(indicator)) {
-        logger.info(`✅ In InquiryMIInformation.aspx iframe (new structure indicator: ${indicator})`);
-        return true;
-      }
-    }
-
-    // Check for specific tab elements that exist in InquiryMIInformation.aspx
-    const inquiryIndicators = [
-      '#__tab_containerTab_tabPaymentHistory',
-      '#__tab_containerTab_tabMIApp',
-      '#containerTab_tabPaymentHistory',
-      '#containerTab_tabMIApp',
-      '.ajax__tab_tab'
-    ];
-
-    for (const selector of inquiryIndicators) {
-      if (document.querySelector(selector)) {
-        logger.info(`✅ In InquiryMIInformation.aspx iframe (element: ${selector})`);
-        return true;
-      }
     }
 
     return false;
@@ -292,6 +259,49 @@ function isInquiryMIInformationContext() {
     logger.warn("⚠️ Error detecting InquiryMIInformation context:", error);
     return false;
   }
+}
+
+// ########## MUTATION OBSERVER ##########
+
+/**
+ * Set up mutation observer to handle dynamic content loading
+ */
+function setupMutationObserver() {
+  if (window.paymentHistoryMutationObserver) {
+    return; // Already set up
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        // Check if new content contains loan information
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node;
+            if (element.textContent && element.textContent.includes('Lender/Servicer Loan Number')) {
+              logger.info("🔄 Dynamic content detected with loan information");
+              // Re-run context detection and handling
+              setTimeout(() => {
+                if (isInquiryMIInformationContext() && !window.paymentHistoryFilterExecuted) {
+                  logger.info("🔄 Re-initializing due to dynamic content");
+                  initializePaymentHistoryFilter();
+                }
+              }, 500);
+              break;
+            }
+          }
+        }
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  window.paymentHistoryMutationObserver = observer;
+  logger.info("Mutation observer set up for dynamic content");
 }
 
 // ########## UTILITY FUNCTIONS ##########
@@ -515,25 +525,24 @@ async function handlePaymentHistoryContext() {
 }
 
 /**
- * Extract loan number directly from InquiryMIInformation page
+ * Extract loan number directly from InquiryMIInformation page - simplified for new structure
  */
 function extractLoanNumberDirectly() {
   try {
-    const loanLabels = document.querySelectorAll('p');
-    let loanNumber = null;
-
-    for (let i = 0; i < loanLabels.length; i++) {
-      const labelElement = loanLabels[i];
-      if (labelElement.textContent && labelElement.textContent.trim() === 'Lender/Servicer Loan Number') {
-        // Found the label, now look for the next value element
-        const parentDiv = labelElement.closest('.sc-daUvki.kLPqhr');
+    // Find all elements containing "Lender/Servicer Loan Number"
+    const allElements = document.querySelectorAll('*');
+    
+    for (const element of allElements) {
+      if (element.textContent && element.textContent.trim() === 'Lender/Servicer Loan Number') {
+        // Found the label, look for the next sibling div that contains the loan number
+        const parentDiv = element.closest('div');
         if (parentDiv && parentDiv.nextElementSibling) {
-          const valueDiv = parentDiv.nextElementSibling;
-          const valueElement = valueDiv.querySelector('p');
-          if (valueElement && valueElement.textContent) {
-            loanNumber = valueElement.textContent.trim();
-            if (loanNumber && /^\d+$/.test(loanNumber)) { // Ensure it's numeric
-              logger.info(`📋 Found loan number with new structure: ${loanNumber}`);
+          const nextDiv = parentDiv.nextElementSibling;
+          const pElement = nextDiv.querySelector('p');
+          if (pElement && pElement.textContent) {
+            const loanNumber = pElement.textContent.trim();
+            if (loanNumber && /^\d+$/.test(loanNumber)) {
+              logger.info(`📋 Found loan number: ${loanNumber}`);
               return loanNumber;
             }
           }
@@ -541,51 +550,10 @@ function extractLoanNumberDirectly() {
       }
     }
 
-    // Fallback: Look for any element containing "Lender/Servicer Loan Number" text
-    const loanLabelElements = Array.from(document.querySelectorAll('*')).filter(element => 
-      element.textContent && element.textContent.includes('Lender/Servicer Loan Number')
-    );
-
-    for (const labelElement of loanLabelElements) {
-      // Find the parent container and look for the next sibling with the value
-      const container = labelElement.closest('.sc-daUvki.kLPqhr') || labelElement.closest('div');
-      if (container && container.nextElementSibling) {
-        const valueContainer = container.nextElementSibling;
-        const valueElement = valueContainer.querySelector('p') || valueContainer;
-        if (valueElement && valueElement.textContent) {
-          const text = valueElement.textContent.trim();
-          if (text && /^\d+$/.test(text)) { // Ensure it's numeric
-            loanNumber = text;
-            logger.info(`📋 Found loan number with fallback method: ${loanNumber}`);
-            return loanNumber;
-          }
-        }
-      }
-    }
-
-    // Additional fallback: Search for numeric patterns near loan-related text
-    const allTextElements = document.querySelectorAll('p, span, div');
-    for (const element of allTextElements) {
-      if (element.textContent && element.textContent.includes('Loan Number')) {
-        // Look in the same container or nearby for numeric values
-        const container = element.closest('div');
-        if (container) {
-          const numericElements = container.querySelectorAll('p, span');
-          for (const numElement of numericElements) {
-            if (numElement.textContent && /^\d{8,15}$/.test(numElement.textContent.trim())) {
-              loanNumber = numElement.textContent.trim();
-              logger.info(`📋 Found loan number with pattern search: ${loanNumber}`);
-              return loanNumber;
-            }
-          }
-        }
-      }
-    }
-
-    logger.warn("⚠️ No loan number found with new structure extraction methods");
+    logger.warn("⚠️ No loan number found");
     return null;
   } catch (error) {
-    logger.error("❌ Error extracting loan number directly:", error);
+    logger.error("❌ Error extracting loan number:", error);
     return null;
   }
 }
@@ -671,6 +639,9 @@ async function initializePaymentHistoryFilter() {
   }
 
   try {
+    // Set up mutation observer for dynamic content
+    setupMutationObserver();
+
     // First, establish connection with the extension
     logger.info("🔗 Establishing connection with extension...");
     await waitForListener();
@@ -678,7 +649,7 @@ async function initializePaymentHistoryFilter() {
 
     // Now determine context and handle accordingly
     if (isInquiryMIInformationContext()) {
-      logger.info("📍 Detected InquiryMIInformation.aspx context - will start automated loan check");
+      logger.info("📍 Detected InquiryMIInformation context - will start automated loan check");
       // Start automated process after DOM is ready
       setTimeout(() => handleInquiryMIInformationContext(), 1000);
     }
@@ -706,11 +677,8 @@ async function initializePaymentHistoryFilter() {
     const currentUrl = window.location.href;
     const pathname = window.location.pathname;
 
-    const isRelevantContext = currentUrl.includes('InquiryMIInformation.aspx') ||
-      currentUrl.includes('payhist_viewAll') ||
-      pathname.includes('InquiryMIInformation') ||
-      pathname.includes('payhist_viewAll') ||
-      (document.body && document.body.textContent && document.body.textContent.includes('Lender/Servicer Loan Number'));
+    const isRelevantContext = document.body && document.body.textContent && 
+      document.body.textContent.includes('Lender/Servicer Loan Number');
 
     if (isRelevantContext) {
       logger.info("🔒 Showing loader immediately to prevent content exposure");
