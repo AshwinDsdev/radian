@@ -282,9 +282,10 @@ function setupMutationObserver() {
               logger.info("🔄 Dynamic content detected with loan information");
               // Re-run context detection and handling
               setTimeout(() => {
-                if (isInquiryMIInformationContext() && !window.paymentHistoryFilterExecuted) {
+                if (isInquiryMIInformationContext() && !window.paymentHistoryLoanChecked) {
                   logger.info("🔄 Re-initializing due to dynamic content");
-                  initializePaymentHistoryFilter();
+                  window.paymentHistoryLoanChecked = true;
+                  handleInquiryMIInformationContext();
                 }
               }, 500);
               break;
@@ -529,11 +530,16 @@ async function handlePaymentHistoryContext() {
  */
 function extractLoanNumberDirectly() {
   try {
-    // Find all elements containing "Lender/Servicer Loan Number"
+    logger.info("🔍 Starting loan number extraction...");
+    
+    // Method 1: Find elements containing "Lender/Servicer Loan Number"
     const allElements = document.querySelectorAll('*');
+    logger.debug(`Found ${allElements.length} elements to search`);
     
     for (const element of allElements) {
       if (element.textContent && element.textContent.trim() === 'Lender/Servicer Loan Number') {
+        logger.info("📍 Found 'Lender/Servicer Loan Number' label");
+        
         // Found the label, look for the next sibling div that contains the loan number
         const parentDiv = element.closest('div');
         if (parentDiv && parentDiv.nextElementSibling) {
@@ -541,8 +547,9 @@ function extractLoanNumberDirectly() {
           const pElement = nextDiv.querySelector('p');
           if (pElement && pElement.textContent) {
             const loanNumber = pElement.textContent.trim();
+            logger.debug(`Found potential loan number: '${loanNumber}'`);
             if (loanNumber && /^\d+$/.test(loanNumber)) {
-              logger.info(`📋 Found loan number: ${loanNumber}`);
+              logger.info(`✅ Extracted loan number: ${loanNumber}`);
               return loanNumber;
             }
           }
@@ -550,7 +557,20 @@ function extractLoanNumberDirectly() {
       }
     }
 
-    logger.warn("⚠️ No loan number found");
+    // Method 2: Broader search for numeric patterns near loan-related text
+    logger.debug("🔍 Trying broader extraction method...");
+    const textContent = document.body.textContent || "";
+    if (textContent.includes('Lender/Servicer Loan Number')) {
+      // Look for numeric patterns after the label
+      const patterns = textContent.match(/Lender\/Servicer Loan Number[\s\S]{0,200}?\b(\d{6,})\b/);
+      if (patterns && patterns[1]) {
+        const loanNumber = patterns[1];
+        logger.info(`✅ Extracted loan number via pattern: ${loanNumber}`);
+        return loanNumber;
+      }
+    }
+
+    logger.warn("⚠️ No loan number found with any method");
     return null;
   } catch (error) {
     logger.error("❌ Error extracting loan number:", error);
@@ -563,7 +583,7 @@ function extractLoanNumberDirectly() {
  */
 async function handleInquiryMIInformationContext() {
   try {
-    logger.info("🔄 Handling InquiryMIInformation context - direct loan number extraction");
+    logger.info("🔄 Starting loan access verification");
     LoaderManager.show();
     LoaderManager.updateText("Extracting loan number directly...");
 
@@ -575,6 +595,7 @@ async function handleInquiryMIInformationContext() {
     const loanNumber = extractLoanNumberDirectly();
 
     if (!loanNumber) {
+      logger.warn("❌ No loan found - stopping verification");
       LoaderManager.updateText("Error: Loan number not found");
       setTimeout(() => {
         LoaderManager.hide();
@@ -583,12 +604,13 @@ async function handleInquiryMIInformationContext() {
     }
 
     // Check loan access
+    logger.info(`🔍 Checking loan access for: ${loanNumber}`);
     LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
     const allowedLoans = await checkNumbersBatch([loanNumber]);
 
     if (!allowedLoans || allowedLoans.length === 0) {
       LoaderManager.updateText("Access denied - Hiding restricted content...");
-      logger.debug(`🚫 Loan ${loanNumber} is restricted - hiding InquiryMIInformation frame`);
+      logger.info(`🚫 Loan ${loanNumber} is RESTRICTED - hiding content`);
 
       // Hide the entire InquiryMIInformation frame
       setTimeout(() => {
@@ -597,7 +619,7 @@ async function handleInquiryMIInformationContext() {
       }, 1000);
     } else {
       LoaderManager.updateText("Access granted");
-      logger.debug(`✅ Loan ${loanNumber} is authorized`);
+      logger.info(`✅ Loan ${loanNumber} is AUTHORIZED - showing content`);
       setTimeout(() => LoaderManager.hide(), 1000);
     }
 
@@ -611,9 +633,10 @@ async function handleInquiryMIInformationContext() {
 // ########## INITIALIZATION ##########
 
 /**
- * Global execution flag to prevent multiple runs
+ * Global execution flags to prevent multiple runs
  */
 window.paymentHistoryFilterExecuted = window.paymentHistoryFilterExecuted || false;
+window.paymentHistoryLoanChecked = window.paymentHistoryLoanChecked || false;
 
 /**
  * Main initialization function
