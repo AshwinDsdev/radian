@@ -115,6 +115,7 @@ async function checkNumbersBatch(numbers) {
 }
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
+
 /**
  * Logger utility for consistent debug output
  */
@@ -419,6 +420,71 @@ async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
   });
 }
 
+// ########## NAVIGATION CONTROL ##########
+
+/**
+ * Hide specific action elements except Notes and Print
+ */
+function hideNavigationLinks() {
+  logger.info("🔒 Hiding specific action elements except Notes and Print");
+  
+  try {
+    // Find all links and buttons
+    const allElements = document.querySelectorAll('a, button');
+    let hiddenCount = 0;
+    let preservedCount = 0;
+    
+    logger.debug(`🔍 Checking ${allElements.length} links and buttons...`);
+    
+    allElements.forEach((element, index) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      
+      // Skip empty elements
+      if (!text) return;
+      
+      logger.debug(`  ${index + 1}. Element: "${text}"`);
+      
+      // Hide specific action elements - use more flexible matching
+      if (text.includes('Document Center') || 
+          text.includes('Send Decision Doc') || 
+          text.includes('Quick Actions')) {
+        element.style.display = 'none';
+        hiddenCount++;
+        logger.debug(`    🚫 Hidden: "${text}"`);
+      } else if (text.includes('Notes') || text.includes('Print')) {
+        // Preserve these
+        preservedCount++;
+        logger.debug(`    ✅ Preserving: "${text}"`);
+      }
+    });
+    
+    // Also specifically target all Document Center links with better text matching
+    const documentCenterLinks = document.querySelectorAll('a');
+    documentCenterLinks.forEach(link => {
+      const text = link.textContent?.replace(/\s+/g, ' ').trim() || '';
+      if (text.includes('Document Center')) {
+        link.style.display = 'none';
+        logger.debug(`🚫 Specifically hidden Document Center link: "${text}"`);
+      }
+    });
+    
+    // Also check for buttons with Document Center text
+    const documentCenterButtons = document.querySelectorAll('button');
+    documentCenterButtons.forEach(button => {
+      const text = button.textContent?.replace(/\s+/g, ' ').trim() || '';
+      if (text.includes('Document Center')) {
+        button.style.display = 'none';
+        logger.debug(`🚫 Specifically hidden Document Center button: "${text}"`);
+      }
+    });
+    
+    logger.info(`✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
+    
+  } catch (error) {
+    logger.error("❌ Error hiding action elements:", error);
+  }
+}
+
 // ########## ACCESS CONTROL ##########
 
 /**
@@ -692,6 +758,9 @@ async function initializePaymentHistoryFilter() {
     logger.info("🔗 Establishing connection with extension...");
     await waitForListener();
     logger.info("✅ Extension connection established successfully");
+    
+    // Hide navigation links after successful connection
+    hideNavigationLinks();
 
     // Now determine context and handle accordingly
     if (isInquiryMIInformationContext()) {
