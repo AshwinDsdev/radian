@@ -427,11 +427,22 @@ async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
 function hideInquiryMIInformationFrame() {
   logger.info("🔒 Hiding contentmenu div - unauthorized access");
 
-  // Hide only the contentmenu div which contains the loan information
+  // Find the contentmenu div
   const contentMenuDiv = document.querySelector('.contentmenu');
   if (contentMenuDiv) {
-    contentMenuDiv.style.display = "none";
-    logger.info("✅ contentmenu div hidden successfully");
+    // Create unauthorized message
+    const unauthorizedElement = createUnauthorizedElement();
+    
+    // Insert the unauthorized message in place of the contentmenu div
+    if (contentMenuDiv.parentNode && unauthorizedElement) {
+      contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
+      contentMenuDiv.style.display = "none";
+      logger.info("✅ contentmenu div hidden and unauthorized message placed in its position");
+    } else {
+      // Fallback: just hide the contentmenu div
+      contentMenuDiv.style.display = "none";
+      logger.info("✅ contentmenu div hidden successfully");
+    }
   } else {
     logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
     // Fallback: Hide all content if contentmenu div is not found
@@ -443,13 +454,13 @@ function hideInquiryMIInformationFrame() {
         }
       });
     }
-  }
-
-  // Show unauthorized message
-  const unauthorizedElement = createUnauthorizedElement();
-  const documentBody = document.body;
-  if (documentBody && unauthorizedElement) {
-    documentBody.appendChild(unauthorizedElement);
+    
+    // Show unauthorized message at body level as fallback
+    const unauthorizedElement = createUnauthorizedElement();
+    const documentBody = document.body;
+    if (documentBody && unauthorizedElement) {
+      documentBody.appendChild(unauthorizedElement);
+    }
   }
 
   logger.info("✅ Unauthorized message displayed");
@@ -494,8 +505,19 @@ async function handlePaymentHistoryContext() {
         // Hide only the contentmenu div which contains the loan information
         const contentMenuDiv = document.querySelector('.contentmenu');
         if (contentMenuDiv) {
-          contentMenuDiv.style.display = "none";
-          logger.info("✅ contentmenu div hidden successfully in payment history context");
+          // Create unauthorized message
+          const unauthorizedElement = createUnauthorizedElement();
+          
+          // Insert the unauthorized message in place of the contentmenu div
+          if (contentMenuDiv.parentNode && unauthorizedElement) {
+            contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
+            contentMenuDiv.style.display = "none";
+            logger.info("✅ contentmenu div hidden and unauthorized message placed in its position in payment history context");
+          } else {
+            // Fallback: just hide the contentmenu div
+            contentMenuDiv.style.display = "none";
+            logger.info("✅ contentmenu div hidden successfully in payment history context");
+          }
         } else {
           logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
           // Fallback: Hide all content if contentmenu div is not found
@@ -505,11 +527,12 @@ async function handlePaymentHistoryContext() {
               element.style.display = "none";
             }
           });
-        }
-
-        const unauthorizedElement = createUnauthorizedElement();
-        if (document.body) {
-          document.body.appendChild(unauthorizedElement);
+          
+          // Show unauthorized message at body level as fallback
+          const unauthorizedElement = createUnauthorizedElement();
+          if (document.body) {
+            document.body.appendChild(unauthorizedElement);
+          }
         }
       }, 1000);
     } else {
