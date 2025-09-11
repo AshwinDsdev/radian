@@ -236,6 +236,15 @@ const LoaderManager = {
         if (loader.parentNode) {
           loader.parentNode.removeChild(loader);
         }
+
+        // Remove the temporary style that hides content
+        const tempStyle = document.getElementById("temporary-content-hide");
+        if (tempStyle && tempStyle.parentNode) {
+          tempStyle.parentNode.removeChild(tempStyle);
+        }
+
+        // Make content visible again
+        document.documentElement.style.visibility = "";
       }, 300);
     }
   }
@@ -249,8 +258,8 @@ const LoaderManager = {
 function isInquiryMIInformationContext() {
   try {
     // Only check for content indicators, no URL checks
-    if (document.body && document.body.textContent && 
-        document.body.textContent.includes('Lender/Servicer Loan Number')) {
+    if (document.body && document.body.textContent &&
+      document.body.textContent.includes('Lender/Servicer Loan Number')) {
       logger.info("✅ In InquiryMIInformation context (content detected)");
       return true;
     }
@@ -272,38 +281,124 @@ function setupMutationObserver() {
     return; // Already set up
   }
 
+  // Create a debounced version of hideNavigationLinks to avoid excessive calls
+  let navLinksDebounceTimer = null;
+  const debouncedHideNavigationLinks = () => {
+    clearTimeout(navLinksDebounceTimer);
+    navLinksDebounceTimer = setTimeout(() => {
+      hideNavigationLinks();
+    }, 300);
+  };
+
+  // Track URL changes to detect navigation
+  let lastUrl = window.location.href;
+
   const observer = new MutationObserver((mutations) => {
+    let shouldCheckLinks = false;
+    let shouldCheckLoanInfo = false;
+
+    // Check if URL changed (navigation happened)
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      logger.info("🔄 URL changed - will re-apply navigation controls");
+      shouldCheckLinks = true;
+      shouldCheckLoanInfo = true;
+    }
+
+    // Check mutations for relevant changes
     mutations.forEach((mutation) => {
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          shouldCheckLinks = true;
+        }
+      }
+
+      // For added nodes, check for both navigation and loan info
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        // Check if new content contains loan information
         for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const element = node;
+
+            // Check for navigation elements
+            if (element.querySelector &&
+              (element.querySelector('a') ||
+                element.querySelector('button') ||
+                element.querySelector('[role="menuitem"]') ||
+                element.querySelector('.menu-item'))) {
+              shouldCheckLinks = true;
+            }
+
+            // Check for loan information
             if (element.textContent && element.textContent.includes('Lender/Servicer Loan Number')) {
               logger.info("🔄 Dynamic content detected with loan information");
-              // Re-run context detection and handling
-              setTimeout(() => {
-                if (isInquiryMIInformationContext() && !window.paymentHistoryLoanChecked) {
-                  logger.info("🔄 Re-initializing due to dynamic content");
-                  window.paymentHistoryLoanChecked = true;
-                  handleInquiryMIInformationContext();
-                }
-              }, 500);
-              break;
+              shouldCheckLoanInfo = true;
             }
           }
         }
       }
     });
+
+    // Handle navigation links if needed
+    if (shouldCheckLinks) {
+      logger.debug("🔄 Navigation-related changes detected - re-applying link controls");
+      debouncedHideNavigationLinks();
+    }
+
+    // Handle loan information if needed
+    if (shouldCheckLoanInfo) {
+      setTimeout(() => {
+        if (isInquiryMIInformationContext() && !window.paymentHistoryLoanChecked) {
+          logger.info("🔄 Re-initializing due to dynamic content with loan information");
+          window.paymentHistoryLoanChecked = true;
+          handleInquiryMIInformationContext();
+        }
+      }, 500);
+    }
   });
 
   observer.observe(document.body, {
     childList: true,
-    subtree: true
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'display', 'visibility']
   });
 
+  // Also set up a periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+  
+  // Add event listeners for page load events to catch all possible DOM changes
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+  
+  // Listen for iframe load events
+  function setupIframeListeners() {
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        iframe.addEventListener('load', hideNavigationLinks);
+      } catch (e) {
+        // Ignore cross-origin errors
+      }
+    });
+  }
+  
+  // Initial iframe setup and periodic check for new iframes
+  setupIframeListeners();
+  setInterval(setupIframeListeners, 5000);
+  
+  // Store references to clean up if needed
   window.paymentHistoryMutationObserver = observer;
-  logger.info("Mutation observer set up for dynamic content");
+  window.paymentHistoryPeriodicCheck = periodicCheckInterval;
+
+  logger.info("✅ Enhanced mutation observer set up for dynamic content and navigation");
 }
 
 // ########## UTILITY FUNCTIONS ##########
@@ -322,18 +417,35 @@ function applyElementStyles(element, styles) {
  * Create unauthorized access message element
  */
 function createUnauthorizedElement() {
+  // Create a full-page container that will be centered in the viewport
+  const fullPageContainer = document.createElement("div");
+  applyElementStyles(fullPageContainer, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    zIndex: "9999"
+  });
+
+  // Create the actual message container
   const unauthorizedContainer = document.createElement("div");
   applyElementStyles(unauthorizedContainer, {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    width: "80%",
+    maxWidth: "600px",
     height: "200px",
     backgroundColor: "#f8f9fa",
     border: "2px solid #dc3545",
     borderRadius: "8px",
-    margin: "20px",
-    position: "relative",
-    zIndex: "9999"
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+    zIndex: "10000"
   });
 
   const messageContainer = document.createElement("div");
@@ -361,8 +473,9 @@ function createUnauthorizedElement() {
   messageContainer.appendChild(iconElement);
   messageContainer.appendChild(textElement);
   unauthorizedContainer.appendChild(messageContainer);
+  fullPageContainer.appendChild(unauthorizedContainer);
 
-  return unauthorizedContainer;
+  return fullPageContainer;
 }
 
 // ########## IFRAME MONITORING ##########
@@ -423,63 +536,107 @@ async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
 // ########## NAVIGATION CONTROL ##########
 
 /**
+ * Define the links that should be hidden
+ */
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+/**
+ * Define the links that should always be preserved
+ */
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+/**
  * Hide specific action elements except Notes and Print
+ * This function is designed to be called repeatedly to handle dynamic content
  */
 function hideNavigationLinks() {
   logger.info("🔒 Hiding specific action elements except Notes and Print");
-  
+
   try {
     // Find all links and buttons
-    const allElements = document.querySelectorAll('a, button');
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
     let hiddenCount = 0;
     let preservedCount = 0;
-    
-    logger.debug(`🔍 Checking ${allElements.length} links and buttons...`);
-    
+
+    logger.debug(`🔍 Checking ${allElements.length} potential navigation elements...`);
+
     allElements.forEach((element, index) => {
       const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
-      
+
       // Skip empty elements
       if (!text) return;
-      
-      logger.debug(`  ${index + 1}. Element: "${text}"`);
-      
-      // Hide specific action elements - use more flexible matching
-      if (text.includes('Document Center') || 
-          text.includes('Send Decision Doc') || 
-          text.includes('Quick Actions')) {
+
+      // Check if this element should be hidden
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      // Check if this element should be preserved
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        // Hide the element
         element.style.display = 'none';
+        // Also add a data attribute to mark it as hidden by our script
+        element.setAttribute('data-hidden-by-filter', 'true');
         hiddenCount++;
         logger.debug(`    🚫 Hidden: "${text}"`);
-      } else if (text.includes('Notes') || text.includes('Print')) {
-        // Preserve these
+      } else if (shouldPreserve) {
+        // Mark as preserved
+        element.setAttribute('data-preserved-by-filter', 'true');
         preservedCount++;
         logger.debug(`    ✅ Preserving: "${text}"`);
       }
     });
-    
-    // Also specifically target all Document Center links with better text matching
-    const documentCenterLinks = document.querySelectorAll('a');
-    documentCenterLinks.forEach(link => {
-      const text = link.textContent?.replace(/\s+/g, ' ').trim() || '';
-      if (text.includes('Document Center')) {
-        link.style.display = 'none';
-        logger.debug(`🚫 Specifically hidden Document Center link: "${text}"`);
-      }
-    });
-    
-    // Also check for buttons with Document Center text
-    const documentCenterButtons = document.querySelectorAll('button');
-    documentCenterButtons.forEach(button => {
-      const text = button.textContent?.replace(/\s+/g, ' ').trim() || '';
-      if (text.includes('Document Center')) {
-        button.style.display = 'none';
-        logger.debug(`🚫 Specifically hidden Document Center button: "${text}"`);
-      }
-    });
-    
+
+    // Also specifically target all iframe documents that might contain navigation elements
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          // Only access same-origin iframes
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+            iframeElements.forEach(element => {
+              const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (!text) return;
+
+              const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+                text.toLowerCase().includes(hiddenText.toLowerCase())
+              );
+
+              if (shouldHide) {
+                element.style.display = 'none';
+                element.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                logger.debug(`    🚫 Hidden in iframe: "${text}"`);
+              }
+            });
+          }
+        } catch (e) {
+          // Silently ignore cross-origin iframe errors
+        }
+      });
+    } catch (iframeError) {
+      logger.debug("⚠️ Error accessing iframes:", iframeError);
+    }
+
     logger.info(`✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
-    
+
   } catch (error) {
     logger.error("❌ Error hiding action elements:", error);
   }
@@ -498,7 +655,7 @@ function hideInquiryMIInformationFrame() {
   if (contentMenuDiv) {
     // Create unauthorized message
     const unauthorizedElement = createUnauthorizedElement();
-    
+
     // Insert the unauthorized message in place of the contentmenu div
     if (contentMenuDiv.parentNode && unauthorizedElement) {
       contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
@@ -520,7 +677,7 @@ function hideInquiryMIInformationFrame() {
         }
       });
     }
-    
+
     // Show unauthorized message at body level as fallback
     const unauthorizedElement = createUnauthorizedElement();
     const documentBody = document.body;
@@ -567,13 +724,13 @@ async function handlePaymentHistoryContext() {
       // Hide content and show unauthorized message  
       setTimeout(() => {
         LoaderManager.hide();
-        
+
         // Hide only the contentmenu div which contains the loan information
         const contentMenuDiv = document.querySelector('.contentmenu');
         if (contentMenuDiv) {
           // Create unauthorized message
           const unauthorizedElement = createUnauthorizedElement();
-          
+
           // Insert the unauthorized message in place of the contentmenu div
           if (contentMenuDiv.parentNode && unauthorizedElement) {
             contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
@@ -593,7 +750,7 @@ async function handlePaymentHistoryContext() {
               element.style.display = "none";
             }
           });
-          
+
           // Show unauthorized message at body level as fallback
           const unauthorizedElement = createUnauthorizedElement();
           if (document.body) {
@@ -620,15 +777,15 @@ async function handlePaymentHistoryContext() {
 function extractLoanNumberDirectly() {
   try {
     logger.info("🔍 Starting loan number extraction...");
-    
+
     // Method 1: Find elements containing "Lender/Servicer Loan Number"
     const allElements = document.querySelectorAll('*');
     logger.debug(`Found ${allElements.length} elements to search`);
-    
+
     for (const element of allElements) {
       if (element.textContent && element.textContent.trim() === 'Lender/Servicer Loan Number') {
         logger.info("📍 Found 'Lender/Servicer Loan Number' label");
-        
+
         // Found the label, look for the next sibling div that contains the loan number
         const parentDiv = element.closest('div');
         if (parentDiv && parentDiv.nextElementSibling) {
@@ -758,7 +915,7 @@ async function initializePaymentHistoryFilter() {
     logger.info("🔗 Establishing connection with extension...");
     await waitForListener();
     logger.info("✅ Extension connection established successfully");
-    
+
     // Hide navigation links after successful connection
     hideNavigationLinks();
 
@@ -785,21 +942,30 @@ async function initializePaymentHistoryFilter() {
 // ########## AUTO-START ##########
 
 // Show loader immediately to prevent content flash
-// This must happen before any other processing
+// This must happen before any other processing and before DOM is fully loaded
 (function showLoaderImmediately() {
   try {
-    // Quick context check without waiting for full DOM
-    const currentUrl = window.location.href;
-    const pathname = window.location.pathname;
+    // Show loader immediately regardless of context to prevent any content flash
+    // We'll hide it later if we're not in the right context
+    logger.info("🔒 Showing loader immediately to prevent content exposure");
+    LoaderManager.show();
+    LoaderManager.updateText("Initializing access verification...");
 
-    const isRelevantContext = document.body && document.body.textContent && 
-      document.body.textContent.includes('Lender/Servicer Loan Number');
+    // Hide all content temporarily until we can verify access
+    document.documentElement.style.visibility = "hidden";
 
-    if (isRelevantContext) {
-      logger.info("🔒 Showing loader immediately to prevent content exposure");
-      LoaderManager.show();
-      LoaderManager.updateText("Initializing access verification...");
-    }
+    // Create and insert a style element to hide content immediately
+    const style = document.createElement("style");
+    style.id = "temporary-content-hide";
+    style.textContent = `
+      body > *:not(#paymentHistoryLoader) {
+        visibility: hidden !important;
+      }
+      #paymentHistoryLoader {
+        visibility: visible !important;
+      }
+    `;
+    document.head.appendChild(style);
   } catch (error) {
     logger.warn("⚠️ Could not show loader immediately:", error);
   }
@@ -808,10 +974,10 @@ async function initializePaymentHistoryFilter() {
 // Start initialization when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(initializePaymentHistoryFilter, 300);
+    setTimeout(initializePaymentHistoryFilter, 100);
   });
 } else {
-  setTimeout(initializePaymentHistoryFilter, 300);
+  setTimeout(initializePaymentHistoryFilter, 100);
 }
 
 logger.info("📜 Payment History Filter script loaded");
