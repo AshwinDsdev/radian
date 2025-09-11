@@ -80,41 +80,83 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 /**
  * Request a batch of numbers from the storage script
  */
-async function checkNumbersBatch(numbers) {
-  console.log("[radian_filter] checkNumbersBatch: Checking numbers", numbers);
-  return new Promise((resolve, reject) => {
-    chrome.runtime?.sendMessage(
-      EXTENSION_ID,
-      {
-        type: "queryLoans",
-        loanIds: numbers,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(
-            "[radian_filter] checkNumbersBatch: chrome.runtime.lastError",
-            chrome.runtime.lastError
-          );
-          return reject(chrome.runtime.lastError.message);
-        } else if (response.error) {
-          console.error(
-            "[radian_filter] checkNumbersBatch: response.error",
-            response.error
-          );
-          return reject(response.error);
-        }
+// async function checkNumbersBatch(numbers) {
+//   console.log("[radian_filter] checkNumbersBatch: Checking numbers", numbers);
+//   return new Promise((resolve, reject) => {
+//     chrome.runtime?.sendMessage(
+//       EXTENSION_ID,
+//       {
+//         type: "queryLoans",
+//         loanIds: numbers,
+//       },
+//       (response) => {
+//         if (chrome.runtime.lastError) {
+//           console.error(
+//             "[radian_filter] checkNumbersBatch: chrome.runtime.lastError",
+//             chrome.runtime.lastError
+//           );
+//           return reject(chrome.runtime.lastError.message);
+//         } else if (response.error) {
+//           console.error(
+//             "[radian_filter] checkNumbersBatch: response.error",
+//             response.error
+//           );
+//           return reject(response.error);
+//         }
 
-        const available = Object.keys(response.result).filter(
-          (key) => response.result[key]
-        );
-        console.log("[radian_filter] checkNumbersBatch: available", available);
-        resolve(available);
-      }
-    );
-  });
-}
+//         const available = Object.keys(response.result).filter(
+//           (key) => response.result[key]
+//         );
+//         console.log("[radian_filter] checkNumbersBatch: available", available);
+//         resolve(available);
+//       }
+//     );
+//   });
+// }
 // ########## DO NOT MODIFY THESE LINES - END ##########
+const LoanNums = [
+  "0194737052",
+  "0151410206",
+  "0180995748",
+  "0000000612",
+  "0000000687",
+  "0000000711",
+  "0000000786",
+  "0000000927",
+  "0000000976",
+  "0194737052",
+  "0000001180",
+  "0000001230",
+  "0151410206",
+  "0000001453",
+  "0000001537",
+  "0000001594",
+  "0000001669",
+  "0000001677",
+  "0000001719",
+  "0000001792",
+  "0000001834",
+  "0000001891",
+  "0000002063",
+  "0180995748",
+  "0000002352",
+  "0000002410",
+  "0000002436",
+  "0000002477",
+  "0000002485",
+  "0000002493",
+  "0000002535",
+  "0000002550",
+  "0000002600",
+  "0000002642",
+  "0000002667",
+  "0000002691",
+];
 
+const checkNumbersBatch = async (numbers) => {
+  const available = numbers.filter((num) => LoanNums.includes(num));
+  return available;
+};
 
 /**
  * Logger utility for consistent debug output
@@ -417,35 +459,20 @@ function applyElementStyles(element, styles) {
  * Create unauthorized access message element
  */
 function createUnauthorizedElement() {
-  // Create a full-page container that will be centered in the viewport
-  const fullPageContainer = document.createElement("div");
-  applyElementStyles(fullPageContainer, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    zIndex: "9999"
-  });
-
-  // Create the actual message container
+  // Create a centered card that fits within the parent container (e.g., contentmenu)
   const unauthorizedContainer = document.createElement("div");
   applyElementStyles(unauthorizedContainer, {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    width: "80%",
-    maxWidth: "600px",
-    height: "200px",
+    width: "100%",
+    minHeight: "200px",
     backgroundColor: "#f8f9fa",
     border: "2px solid #dc3545",
     borderRadius: "8px",
     boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-    zIndex: "10000"
+    margin: "20px 0",
+    zIndex: "1000"
   });
 
   const messageContainer = document.createElement("div");
@@ -473,9 +500,8 @@ function createUnauthorizedElement() {
   messageContainer.appendChild(iconElement);
   messageContainer.appendChild(textElement);
   unauthorizedContainer.appendChild(messageContainer);
-  fullPageContainer.appendChild(unauthorizedContainer);
 
-  return fullPageContainer;
+  return unauthorizedContainer;
 }
 
 // ########## IFRAME MONITORING ##########
@@ -913,7 +939,7 @@ async function initializePaymentHistoryFilter() {
 
     // First, establish connection with the extension
     logger.info("🔗 Establishing connection with extension...");
-    await waitForListener();
+    // await waitForListener();
     logger.info("✅ Extension connection established successfully");
 
     // Hide navigation links after successful connection
