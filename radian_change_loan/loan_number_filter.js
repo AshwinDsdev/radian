@@ -95,7 +95,7 @@ const CONFIG = {
   tableClass: "resultsTable",
   detectionTimeout: 45000,
   checkInterval: 1000,
-  maxAttempts: 45,
+  maxAttempts: 10,
   domChangeDebounce: 300,
   loanExtractionResetDelay: 500,
   presenceCheckInterval: 10000,
@@ -274,7 +274,6 @@ const ValidationSystem = {
     
     try {
       // Show loader if not already showing
-      LoaderManager.show("Verifying loan numbers...");
       this.isValidating = true;
       
       // Process inputs in sequence for better UX feedback
@@ -454,11 +453,6 @@ const TableDetector = {
         logger.warn("⚠️ Table detection timeout reached.");
         LoaderManager.hide(); // Hide loader if we can't find the table
         return;
-      }
-
-      // Update loader message periodically to show progress
-      if (attempts % 5 === 0) {
-        LoaderManager.updateText(`Searching for loan number table... (${attempts}/${CONFIG.maxAttempts})`);
       }
 
       state.tableDetectionTimer = TimerManager.setTimeout(detect, CONFIG.checkInterval);
@@ -768,9 +762,6 @@ const Main = {
     logger.info("🚀 Radian Loan Filter Script Starting...");
 
     try {
-      // Show loader immediately to prevent content flash
-      LoaderManager.show("Initializing loan number verification...");
-
       // Initialize
       await this.setup();
 
