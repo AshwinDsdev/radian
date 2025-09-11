@@ -411,9 +411,16 @@ const DOMMonitor = {
     console.log('🔄 Resetting loan extraction and re-validating...');
 
     try {
-      DOM.clearErrors();
-
       const table = DOM.getTable();
+      // Show loader and hide table while re-validating to ensure clean UX
+      if (table) {
+        table.style.visibility = "hidden";
+      }
+
+      // Clear previous errors and cached results to force a fresh extraction/validation
+      DOM.clearErrors();
+      state.validationCache.clear();
+
       if (table) {
         const inputs = DOM.getLoanInputs();
         inputs.forEach(input => DOM.resetInputStyling(input));
@@ -425,6 +432,12 @@ const DOMMonitor = {
       console.log('✅ Loan extraction reset completed');
     } catch (error) {
       console.error('❌ Error during loan extraction reset:', error);
+    } finally {
+      const table = DOM.getTable();
+      if (table) {
+        table.style.visibility = "";
+      }
+      LoaderManager.hide();
     }
   }
 };
