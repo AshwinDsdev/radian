@@ -200,8 +200,14 @@ const logger = {
 
 // Optimized configuration
 const CONFIG = {
-  tableId: "_GrdLoanNumberChange",
-  tableClass: "resultsTable",
+  // Multiple possible table selectors to handle different page structures
+  tableSelectors: [
+    "#_GrdLoanNumberChange", // Original selector
+    "table.resultsTable",    // Class-based selector
+    "table[id*='LoanNumber']", // Partial ID match
+    "table.dataTable",      // Common data table class
+    "div.contentmenu table" // Table within content menu
+  ],
   detectionTimeout: 120000, // 2 minutes for slow-loading live site
   checkInterval: 2000, // Check every 2 seconds to reduce CPU usage
   maxAttempts: 60, // 60 attempts * 2 seconds = 2 minutes
@@ -229,10 +235,18 @@ const state = {
 
 // Optimized DOM utilities
 const DOM = {
-  // Cache DOM queries
+  // Cache DOM queries with improved table detection
   getTable() {
     if (!state.table || !state.table.isConnected) {
-      state.table = document.getElementById(CONFIG.tableId);
+      // Try each selector until we find a matching table
+      for (const selector of CONFIG.tableSelectors) {
+        const table = document.querySelector(selector);
+        if (table) {
+          logger.info(`✅ Table found with selector: ${selector}`);
+          state.table = table;
+          break;
+        }
+      }
     }
     return state.table;
   },
@@ -241,11 +255,40 @@ const DOM = {
     const table = this.getTable();
     if (!table) return [];
 
-    const inputs = table.querySelectorAll('input[id*="_TxtLoanNumber"]');
+    // More flexible input detection with multiple selectors
+    const inputSelectors = [
+      'input[id*="_TxtLoanNumber"]',
+      'input[id*="LoanNumber"]',
+      'input[name*="LoanNumber"]',
+      'input[placeholder*="Loan"]',
+      'input[aria-label*="Loan"]'
+    ];
+
+    let allInputs = [];
+
+    // Try each selector
+    for (const selector of inputSelectors) {
+      const inputs = table.querySelectorAll(selector);
+      if (inputs.length > 0) {
+        logger.info(`✅ Found ${inputs.length} loan inputs with selector: ${selector}`);
+        allInputs = Array.from(inputs);
+        break;
+      }
+    }
+
+    // If no inputs found with selectors, look for any text inputs as fallback
+    if (allInputs.length === 0) {
+      const textInputs = table.querySelectorAll('input[type="text"]');
+      if (textInputs.length > 0) {
+        logger.info(`⚠️ Using fallback: found ${textInputs.length} text inputs`);
+        allInputs = Array.from(textInputs);
+      }
+    }
+
     // Update our cached set
     state.loanInputs.clear();
-    inputs.forEach(input => state.loanInputs.add(input));
-    return inputs;
+    allInputs.forEach(input => state.loanInputs.add(input));
+    return allInputs;
   },
 
   // Efficient content hash generation
@@ -513,15 +556,15 @@ const DOMMonitor = {
                 hasNewLoanInputs = true;
                 break;
               }
-              
+
               // Check for navigation elements
-              if (node.matches && (node.matches('a') || node.matches('button') || 
-                  node.matches('[role="menuitem"]') || node.matches('[role="button"]') ||
-                  node.matches('.menu-item') || node.matches('.nav-link'))) {
+              if (node.matches && (node.matches('a') || node.matches('button') ||
+                node.matches('[role="menuitem"]') || node.matches('[role="button"]') ||
+                node.matches('.menu-item') || node.matches('.nav-link'))) {
                 hasNavigationChanges = true;
               }
               if (node.querySelector && (node.querySelector('a') || node.querySelector('button') ||
-                  node.querySelector('[role="menuitem"]') || node.querySelector('.menu-item'))) {
+                node.querySelector('[role="menuitem"]') || node.querySelector('.menu-item'))) {
                 hasNavigationChanges = true;
               }
             }
@@ -529,11 +572,11 @@ const DOMMonitor = {
         } else if (mutation.type === 'attributes') {
           const target = mutation.target;
           if (target.matches && target.matches('input[id*="_TxtLoanNumber"]') &&
-              (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
+            (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
             hasRelevantChanges = true;
           } else if (target.matches && (target.matches('a') || target.matches('button') ||
-                     target.matches('[role="menuitem"]') || target.matches('[role="button"]') ||
-                     target.matches('.menu-item') || target.matches('.nav-link'))) {
+            target.matches('[role="menuitem"]') || target.matches('[role="button"]') ||
+            target.matches('.menu-item') || target.matches('.nav-link'))) {
             hasNavigationChanges = true;
           }
         }
@@ -624,7 +667,7 @@ const TableDetector = {
       attempts++;
       const table = DOM.getTable();
 
-      if (table && table.classList.contains(CONFIG.tableClass)) {
+      if (table) {
         logger.info(`✅ Table detected successfully after ${attempts} attempts (${attempts * CONFIG.checkInterval / 1000}s)!`);
         state.isTableDetected = true;
 
@@ -944,12 +987,18 @@ const LoaderManager = {
 // Main initialization
 const Main = {
   async initialize() {
+    // Simple execution guard for this window context
     if (window.loanNumberFilterExecuted) {
-      logger.warn("⚠️ Loan number filter already executed, skipping");
+      logger.warn("⚠️ Loan number filter already executed in this context, skipping");
       return;
     }
 
+    // Set execution flag for this window context
     window.loanNumberFilterExecuted = true;
+
+    // Release the global execution lock
+    window.loanNumberFilterExecuting = false;
+
     logger.info("🚀 Radian Loan Filter Script Starting...");
 
     try {
@@ -976,7 +1025,7 @@ const Main = {
 
     // Hide navigation links immediately
     hideNavigationLinks();
-    
+
     // Set up periodic navigation link checks as fallback
     this.setupNavigationMonitoring();
 
@@ -987,7 +1036,7 @@ const Main = {
     // Add event listeners for page load events to catch all possible DOM changes
     window.addEventListener('DOMContentLoaded', hideNavigationLinks);
     window.addEventListener('load', hideNavigationLinks);
-    
+
     // Listen for iframe load events
     function setupIframeListeners() {
       const iframes = document.querySelectorAll('iframe');
@@ -999,27 +1048,40 @@ const Main = {
         }
       });
     }
-    
+
     // Initial iframe setup
     setupIframeListeners();
-    
+
     logger.info("✅ Navigation monitoring set up for dynamic content (event-driven only)");
   }
 };
 
-// Entry point
+// Entry point with global execution guard
 (function () {
+  // Global guard to prevent multiple executions
+  if (window.loanNumberFilterExecuting) {
+    logger.warn("⚠️ Loan number filter already executing in another context, skipping");
+    return;
+  }
+
+  // Set global flag to prevent other instances from running
+  window.loanNumberFilterExecuting = true;
+
   function waitForDOM() {
     if (document && document.body) {
-      Main.initialize();
+      // Fix the 'this' binding issue by using a bound function
+      const boundInitialize = Main.initialize.bind(Main);
+      boundInitialize();
     } else if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", Main.initialize);
+      document.addEventListener("DOMContentLoaded", function () {
+        const boundInitialize = Main.initialize.bind(Main);
+        boundInitialize();
+      });
     } else {
       setTimeout(() => {
         if (document && document.body) {
-          Main.initialize();
-        } else {
-          Main.initialize();
+          const boundInitialize = Main.initialize.bind(Main);
+          boundInitialize();
         }
       }, 500);
     }
