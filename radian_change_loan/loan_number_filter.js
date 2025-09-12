@@ -93,9 +93,9 @@ const logger = {
 const CONFIG = {
   tableId: "_GrdLoanNumberChange",
   tableClass: "resultsTable",
-  detectionTimeout: 45000,
-  checkInterval: 1000,
-  maxAttempts: 10,
+  detectionTimeout: 120000, // 2 minutes for slow-loading live site
+  checkInterval: 2000, // Check every 2 seconds to reduce CPU usage
+  maxAttempts: 60, // 60 attempts * 2 seconds = 2 minutes
   domChangeDebounce: 300,
   loanExtractionResetDelay: 500,
   presenceCheckInterval: 10000,
@@ -188,7 +188,8 @@ const DOM = {
       if (error.isConnected) error.remove();
     });
     state.errorElements.clear();
-  }
+  },
+
 };
 
 // Optimized timer management
@@ -220,7 +221,7 @@ const TimerManager = {
 const ValidationSystem = {
   // Track active validation state
   isValidating: false,
-  
+
   // Debounced validation with cache
   async validateInput(input, showLoader = false) {
     const loanNumber = input.value.trim();
@@ -268,33 +269,35 @@ const ValidationSystem = {
   async validateAllInputs() {
     const inputs = DOM.getLoanInputs();
     if (inputs.length === 0) {
-      LoaderManager.hide();
       return [];
     }
-    
+
+    // Only validate inputs that have loan numbers
+    const inputsWithValues = inputs.filter(input => input.value.trim());
+    if (inputsWithValues.length === 0) {
+      return [];
+    }
+
     try {
-      // Show loader if not already showing
+      // Show loader only when we have loan numbers to validate
       this.isValidating = true;
-      
+      LoaderManager.show("Verifying loan access permissions...");
+
       // Process inputs in sequence for better UX feedback
       const results = [];
-      for (let i = 0; i < inputs.length; i++) {
-        const input = inputs[i];
+      for (let i = 0; i < inputsWithValues.length; i++) {
+        const input = inputsWithValues[i];
         const loanNumber = input.value.trim();
-        
-        if (loanNumber) {
-          LoaderManager.updateText(`Verifying loan ${i+1} of ${inputs.length}: ${loanNumber}`);
-          const result = await this.validateInput(input);
-          results.push(result);
-        } else {
-          results.push(true); // Empty inputs are considered valid
-        }
+
+        LoaderManager.updateText(`Verifying loan ${i + 1} of ${inputsWithValues.length}: ${loanNumber}`);
+        const result = await this.validateInput(input, false); // Don't show loader again
+        results.push(result);
       }
-      
+
       return results;
     } finally {
       this.isValidating = false;
-      // Note: We don't hide the loader here as it's handled by TableDetector.initializeFilter
+      LoaderManager.hide();
     }
   },
 
@@ -310,90 +313,123 @@ const ValidationSystem = {
       const debouncedValidation = () => {
         clearTimeout(timeout);
         timeout = TimerManager.setTimeout(() => {
-          // Only show loader for manual input validation if we're not in batch validation
-          this.validateInput(input, !this.isValidating);
+          // Only validate if we have a value and not in batch validation
+          if (input.value.trim() && !this.isValidating) {
+            this.validateInput(input, true);
+          }
         }, CONFIG.validationDebounce);
       };
 
       // Event listeners
       input.addEventListener("blur", () => {
-        if (input.value.trim()) {
-          // Only show loader for manual input validation if we're not in batch validation
-          this.validateInput(input, !this.isValidating);
+        if (input.value.trim() && !this.isValidating) {
+          this.validateInput(input, true);
         }
       });
-      
+
       input.addEventListener("input", debouncedValidation);
-      
+
       input.addEventListener("focus", () => {
-        if (input.value.trim()) {
-          // Only show loader for manual input validation if we're not in batch validation
-          this.validateInput(input, !this.isValidating);
+        if (input.value.trim() && !this.isValidating) {
+          this.validateInput(input, true);
         }
       });
+
+      // Monitor for programmatic value changes using property descriptor
+      this.setupValueChangeMonitoring(input);
 
       input._hasValidationListeners = true;
     });
+  },
+
+  // Monitor for programmatic value changes without polling
+  setupValueChangeMonitoring(input) {
+    let lastValue = input.value;
+
+    // Override the value setter to detect programmatic changes
+    const originalDescriptor = Object.getOwnPropertyDescriptor(input, 'value') ||
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+    if (originalDescriptor && originalDescriptor.set) {
+      const originalSetter = originalDescriptor.set;
+
+      Object.defineProperty(input, 'value', {
+        get: originalDescriptor.get,
+        set: function (newValue) {
+          originalSetter.call(this, newValue);
+
+          // Check if this is a programmatic change with a meaningful value
+          if (newValue !== lastValue && newValue && newValue.trim()) {
+            lastValue = newValue;
+            console.log('🔄 Programmatic value change detected:', newValue);
+
+            // Trigger validation immediately - loader will be shown inside validateInput
+            setTimeout(() => {
+              ValidationSystem.validateInput(input, true);
+            }, 100);
+          }
+        },
+        configurable: true
+      });
+    }
   }
 };
 
-// Optimized DOM monitoring
+// Optimized DOM monitoring for dynamic content
 const DOMMonitor = {
   setupObserver() {
-    const table = DOM.getTable();
-    if (!table) return;
-
     // Disconnect existing observer
     if (state.mutationObserver) {
       state.mutationObserver.disconnect();
     }
 
-    // Single optimized observer
+    // Enhanced observer that watches the entire document for dynamic loan number inputs
     state.mutationObserver = new MutationObserver((mutations) => {
       let hasRelevantChanges = false;
+      let hasNewLoanInputs = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.matches && node.matches('input[id*="_TxtLoanNumber"]') ||
-                node.querySelector && node.querySelector('input[id*="_TxtLoanNumber"]')) {
+              // Check if the added node is a loan input or contains loan inputs
+              if (node.matches && node.matches('input[id*="_TxtLoanNumber"]')) {
                 hasRelevantChanges = true;
+                hasNewLoanInputs = true;
                 break;
               }
-            }
-          }
-
-          for (const node of mutation.removedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
               if (node.querySelector && node.querySelector('input[id*="_TxtLoanNumber"]')) {
                 hasRelevantChanges = true;
+                hasNewLoanInputs = true;
                 break;
               }
             }
           }
         } else if (mutation.type === 'attributes' &&
           mutation.target.matches &&
-          mutation.target.matches('input[id*="_TxtLoanNumber"]')) {
+          mutation.target.matches('input[id*="_TxtLoanNumber"]') &&
+          (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
           hasRelevantChanges = true;
         }
       }
 
       if (hasRelevantChanges) {
-        this.handleChange();
+        this.handleChange(hasNewLoanInputs);
       }
     });
 
-    // Observe with optimized options
-    state.mutationObserver.observe(table, {
+    // Observe the entire document for maximum coverage of dynamic content
+    state.mutationObserver.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['value', 'disabled', 'style', 'class']
     });
+
+    logger.info("✅ DOM observer is now listening for table and loan number changes...");
   },
 
-  handleChange() {
+  handleChange(hasNewLoanInputs = false) {
     if (state.domChangeTimer) {
       clearTimeout(state.domChangeTimer);
     }
@@ -402,20 +438,16 @@ const DOMMonitor = {
       const currentHash = DOM.getContentHash();
       if (currentHash !== state.lastTableContent) {
         state.lastTableContent = currentHash;
-        this.resetAndRevalidate();
+        this.resetAndRevalidate(hasNewLoanInputs);
       }
     }, CONFIG.domChangeDebounce);
   },
 
-  async resetAndRevalidate() {
+  async resetAndRevalidate(hasNewLoanInputs = false) {
     console.log('🔄 Resetting loan extraction and re-validating...');
 
     try {
       const table = DOM.getTable();
-      // Show loader and hide table while re-validating to ensure clean UX
-      if (table) {
-        table.style.visibility = "hidden";
-      }
 
       // Clear previous errors and cached results to force a fresh extraction/validation
       DOM.clearErrors();
@@ -427,27 +459,33 @@ const DOMMonitor = {
       }
 
       ValidationSystem.setupValidation();
-      await ValidationSystem.validateAllInputs();
+
+      // Only validate if we have loan numbers to check
+      const inputs = DOM.getLoanInputs();
+      const hasLoanNumbers = inputs.some(input => input.value.trim());
+
+      if (hasLoanNumbers) {
+        await ValidationSystem.validateAllInputs();
+      }
 
       console.log('✅ Loan extraction reset completed');
     } catch (error) {
       console.error('❌ Error during loan extraction reset:', error);
-    } finally {
-      const table = DOM.getTable();
-      if (table) {
-        table.style.visibility = "";
-      }
-      LoaderManager.hide();
     }
   }
 };
 
-// Optimized table detection
+// Optimized table detection with continuous monitoring
 const TableDetector = {
   startDetection() {
     if (state.isTableDetected) return;
 
-    logger.info("🔄 Starting table detection...");
+    logger.info("🔄 Starting table detection (2-minute timeout)...");
+    logger.info("📡 Setting up DOM observer to listen for table changes...");
+
+    // Set up DOM observer immediately for dynamic content detection
+    DOMMonitor.setupObserver();
+
     let attempts = 0;
 
     const detect = () => {
@@ -455,17 +493,27 @@ const TableDetector = {
       const table = DOM.getTable();
 
       if (table && table.classList.contains(CONFIG.tableClass)) {
-        logger.info("✅ Table detected successfully!");
+        logger.info(`✅ Table detected successfully after ${attempts} attempts (${attempts * CONFIG.checkInterval / 1000}s)!`);
         state.isTableDetected = true;
-        LoaderManager.updateText("Table found - initializing validation...");
+
+        // Clear the detection timer since we found the table
+        if (state.tableDetectionTimer) {
+          clearTimeout(state.tableDetectionTimer);
+          state.tableDetectionTimer = null;
+        }
+
         this.initializeFilter(table);
         return;
       }
 
       if (attempts >= CONFIG.maxAttempts) {
-        logger.warn("⚠️ Table detection timeout reached.");
-        LoaderManager.hide(); // Hide loader if we can't find the table
+        logger.warn(`⚠️ Table detection timeout reached after ${CONFIG.maxAttempts} attempts (${CONFIG.maxAttempts * CONFIG.checkInterval / 1000}s).`);
         return;
+      }
+
+      // Log progress every 10 attempts (20 seconds)
+      if (attempts % 10 === 0) {
+        logger.info(`🔍 Still searching for table... (${attempts}/${CONFIG.maxAttempts} attempts)`);
       }
 
       state.tableDetectionTimer = TimerManager.setTimeout(detect, CONFIG.checkInterval);
@@ -480,23 +528,26 @@ const TableDetector = {
     state.lastTableContent = DOM.getContentHash();
     state.table = table;
 
-    // Hide the table temporarily until validation completes
-    if (table) {
-      table.style.visibility = "hidden";
-    }
-
     ValidationSystem.setupValidation();
-    DOMMonitor.setupObserver();
     this.setupPresenceCheck();
 
-    // Start validation with loader visible
-    ValidationSystem.validateAllInputs().finally(() => {
-      // Show the table after validation completes
+    // Only validate if we have loan numbers to check
+    const inputs = DOM.getLoanInputs();
+    const hasLoanNumbers = inputs.some(input => input.value.trim());
+
+    if (hasLoanNumbers) {
+      // Hide the table temporarily until validation completes
       if (table) {
-        table.style.visibility = "";
+        table.style.visibility = "hidden";
       }
-      LoaderManager.hide();
-    });
+
+      ValidationSystem.validateAllInputs().finally(() => {
+        // Show the table after validation completes
+        if (table) {
+          table.style.visibility = "";
+        }
+      });
+    }
   },
 
   setupPresenceCheck() {
@@ -504,17 +555,23 @@ const TableDetector = {
       const table = DOM.getTable();
       if (!table || !table.classList.contains(CONFIG.tableClass)) {
         this.resetDetection();
-        LoaderManager.show("Table changed - reinitializing verification...");
         setTimeout(() => this.startDetection(), 1000);
       }
     }, CONFIG.presenceCheckInterval);
   },
+
 
   resetDetection() {
     logger.info("🔄 Resetting table detection state");
     state.isTableDetected = false;
     state.table = null;
     state.lastTableContent = null;
+
+    // Clear the detection timer
+    if (state.tableDetectionTimer) {
+      clearTimeout(state.tableDetectionTimer);
+      state.tableDetectionTimer = null;
+    }
 
     if (state.mutationObserver) {
       state.mutationObserver.disconnect();
@@ -533,30 +590,22 @@ const FormHandler = {
     submitButtons.forEach(button => {
       button.addEventListener("click", async (event) => {
         logger.info("Form validation triggered for button:", button.id);
-        
-        // Show loader for form submission
-        LoaderManager.show("Validating loan numbers before submission...");
-        
+
         try {
           // Validate all inputs before form submission
           const validationResults = await ValidationSystem.validateAllInputs();
-          
+
           // If any validation failed, prevent form submission
           if (validationResults.includes(false)) {
             event.preventDefault();
             event.stopPropagation();
-            LoaderManager.updateText("Some loan numbers are restricted");
-            setTimeout(() => LoaderManager.hide(), 1500);
             return false;
           }
-          
+
           // All validations passed, allow form submission
-          LoaderManager.updateText("All loan numbers validated successfully");
-          // Don't hide loader here as the form will submit and page will refresh
-          
+
         } catch (error) {
           logger.error("Error during form validation:", error);
-          LoaderManager.hide();
           // Let the form submit normally if there's an error in validation
         }
       }, true);
@@ -576,7 +625,7 @@ const FormHandler = {
           if (loanInput.value.trim()) {
             state.validationCache.delete(loanInput.value.trim());
           }
-          
+
           DOM.resetInputStyling(loanInput);
           const error = loanInput.parentNode.querySelector(".error-msg");
           if (error) error.remove();
@@ -588,16 +637,13 @@ const FormHandler = {
     const cancelButton = document.getElementById("_ImgBtnCancel");
     if (cancelButton) {
       cancelButton.addEventListener("click", () => {
-        // Hide any active loader
-        LoaderManager.hide();
-        
         const inputs = DOM.getLoanInputs();
         inputs.forEach(input => {
           // Clear validation cache for all inputs
           if (input.value.trim()) {
             state.validationCache.delete(input.value.trim());
           }
-          
+
           DOM.resetInputStyling(input);
           const error = input.parentNode.querySelector(".error-msg");
           if (error) error.remove();
@@ -671,10 +717,10 @@ const CleanupManager = {
 const LoaderManager = {
   loaderInstance: null,
   styleAdded: false,
-  
+
   createStyles() {
     if (this.styleAdded) return null;
-    
+
     const style = document.createElement("style");
     style.textContent = `
       #loaderOverlay {
@@ -703,32 +749,32 @@ const LoaderManager = {
     if (this.loaderInstance && document.body.contains(this.loaderInstance)) {
       return this.loaderInstance;
     }
-    
+
     const loader = document.createElement("div");
     loader.id = "loaderOverlay";
-    
+
     const spinner = document.createElement("div");
     spinner.className = "spinner";
-    
+
     const text = document.createElement("div");
     text.className = "loader-text";
     text.textContent = "Verifying loan access...";
     text.id = "loaderText";
-    
+
     loader.appendChild(spinner);
     loader.appendChild(text);
-    
+
     this.loaderInstance = loader;
     return loader;
   },
-  
+
   updateText(message) {
     const textElement = document.getElementById("loaderText");
     if (textElement) {
       textElement.textContent = message;
     }
   },
-  
+
   show(message = "Verifying loan access...") {
     if (!document.head.querySelector('style#loader-style')) {
       const style = this.createStyles();
@@ -737,13 +783,13 @@ const LoaderManager = {
         document.head.appendChild(style);
       }
     }
-    
+
     let loader = document.getElementById("loaderOverlay");
     if (!loader) {
       loader = this.createLoader();
       document.body.appendChild(loader);
     }
-    
+
     loader.classList.remove("hidden");
     this.updateText(message);
     return loader;
@@ -783,14 +829,12 @@ const Main = {
 
     } catch (error) {
       logger.error("❌ Failed to initialize filter:", error);
-      LoaderManager.hide();
     }
   },
 
   async setup() {
     logger.info("✅ DOM Ready - Initializing filter...");
 
-    LoaderManager.updateText("Connecting to verification service...");
     await waitForListener();
 
     URLMonitor.setup();
@@ -798,7 +842,6 @@ const Main = {
     FormHandler.setupValidation();
     FormHandler.setupCancelHandlers();
 
-    LoaderManager.updateText("Searching for loan number table...");
     TableDetector.startDetection();
   }
 };
