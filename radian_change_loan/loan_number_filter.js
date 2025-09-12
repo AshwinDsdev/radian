@@ -209,9 +209,9 @@ const CONFIG = {
     "div.contentmenu table" // Table within content menu
   ],
   detectionTimeout: 120000, // 2 minutes for slow-loading live site
-  checkInterval: 2000, // Check every 2 seconds to reduce CPU usage
-  maxAttempts: 60, // 60 attempts * 2 seconds = 2 minutes
-  domChangeDebounce: 300,
+  checkInterval: 5000,
+  maxAttempts: 24, // 24 attempts * 5 seconds = 2 minutes
+  domChangeDebounce: 600,
   loanExtractionResetDelay: 500,
   presenceCheckInterval: 10000,
   validationDebounce: 500
@@ -222,7 +222,6 @@ const state = {
   tableDetectionTimer: null,
   isTableDetected: false,
   currentUrl: window.location.href,
-  tablePresenceCheckTimer: null,
   domChangeTimer: null,
   mutationObserver: null,
   lastTableContent: null,
@@ -416,6 +415,12 @@ const ValidationSystem = {
     input.style.backgroundColor = "#f5f5f5";
     input.style.cursor = "not-allowed";
     input.disabled = true;
+
+    // Remove any existing error message first
+    const existingError = input.parentNode.querySelector(".error-msg");
+    if (existingError) {
+      existingError.remove();
+    }
 
     // Add error message as a sibling element
     const errorElement = DOM.createErrorElement();
@@ -770,13 +775,7 @@ const TableDetector = {
   },
 
   setupPresenceCheck() {
-    state.tablePresenceCheckTimer = TimerManager.setInterval(() => {
-      const table = DOM.getTable();
-      if (!table || !table.classList.contains(CONFIG.tableClass)) {
-        this.resetDetection();
-        setTimeout(() => this.startDetection(), 1000);
-      }
-    }, CONFIG.presenceCheckInterval);
+    // Presence check removed - table detection only runs once until URL changes
   },
 
 
