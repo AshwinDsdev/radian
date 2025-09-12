@@ -79,6 +79,115 @@ async function checkNumbersBatch(numbers) {
 
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
+// ########## NAVIGATION CONTROL ##########
+
+/**
+ * Define the links that should be hidden
+ */
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+/**
+ * Define the links that should always be preserved
+ */
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+/**
+ * Hide specific action elements except Notes and Print
+ * This function is designed to be called repeatedly to handle dynamic content
+ */
+function hideNavigationLinks() {
+  logger.info("🔒 Hiding specific action elements except Notes and Print");
+
+  try {
+    // Find all links and buttons
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    let hiddenCount = 0;
+    let preservedCount = 0;
+
+    logger.debug(`🔍 Checking ${allElements.length} potential navigation elements...`);
+
+    allElements.forEach((element, index) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+
+      // Skip empty elements
+      if (!text) return;
+
+      // Check if this element should be hidden
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      // Check if this element should be preserved
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        // Hide the element
+        element.style.display = 'none';
+        // Also add a data attribute to mark it as hidden by our script
+        element.setAttribute('data-hidden-by-filter', 'true');
+        hiddenCount++;
+        logger.debug(`    🚫 Hidden: "${text}"`);
+      } else if (shouldPreserve) {
+        // Mark as preserved
+        element.setAttribute('data-preserved-by-filter', 'true');
+        preservedCount++;
+        logger.debug(`    ✅ Preserving: "${text}"`);
+      }
+    });
+
+    // Also specifically target all iframe documents that might contain navigation elements
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          // Only access same-origin iframes
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+            iframeElements.forEach(element => {
+              const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (!text) return;
+
+              const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+                text.toLowerCase().includes(hiddenText.toLowerCase())
+              );
+
+              if (shouldHide) {
+                element.style.display = 'none';
+                element.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                logger.debug(`    🚫 Hidden in iframe: "${text}"`);
+              }
+            });
+          }
+        } catch (e) {
+          // Silently ignore cross-origin iframe errors
+        }
+      });
+    } catch (iframeError) {
+      logger.debug("⚠️ Error accessing iframes:", iframeError);
+    }
+
+    logger.info(`✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
+
+  } catch (error) {
+    logger.error("❌ Error hiding action elements:", error);
+  }
+}
+
 /**
  * Optimized logger utility
  */
@@ -383,10 +492,11 @@ const DOMMonitor = {
       state.mutationObserver.disconnect();
     }
 
-    // Enhanced observer that watches the entire document for dynamic loan number inputs
+    // Enhanced observer that watches the entire document for dynamic loan number inputs and navigation changes
     state.mutationObserver = new MutationObserver((mutations) => {
       let hasRelevantChanges = false;
       let hasNewLoanInputs = false;
+      let hasNavigationChanges = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -403,14 +513,36 @@ const DOMMonitor = {
                 hasNewLoanInputs = true;
                 break;
               }
+              
+              // Check for navigation elements
+              if (node.matches && (node.matches('a') || node.matches('button') || 
+                  node.matches('[role="menuitem"]') || node.matches('[role="button"]') ||
+                  node.matches('.menu-item') || node.matches('.nav-link'))) {
+                hasNavigationChanges = true;
+              }
+              if (node.querySelector && (node.querySelector('a') || node.querySelector('button') ||
+                  node.querySelector('[role="menuitem"]') || node.querySelector('.menu-item'))) {
+                hasNavigationChanges = true;
+              }
             }
           }
-        } else if (mutation.type === 'attributes' &&
-          mutation.target.matches &&
-          mutation.target.matches('input[id*="_TxtLoanNumber"]') &&
-          (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
-          hasRelevantChanges = true;
+        } else if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (target.matches && target.matches('input[id*="_TxtLoanNumber"]') &&
+              (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
+            hasRelevantChanges = true;
+          } else if (target.matches && (target.matches('a') || target.matches('button') ||
+                     target.matches('[role="menuitem"]') || target.matches('[role="button"]') ||
+                     target.matches('.menu-item') || target.matches('.nav-link'))) {
+            hasNavigationChanges = true;
+          }
         }
+      }
+
+      // Handle navigation changes immediately
+      if (hasNavigationChanges) {
+        logger.debug("🔄 Navigation changes detected - re-applying link controls");
+        hideNavigationLinks();
       }
 
       if (hasRelevantChanges) {
@@ -842,7 +974,36 @@ const Main = {
     FormHandler.setupValidation();
     FormHandler.setupCancelHandlers();
 
+    // Hide navigation links immediately
+    hideNavigationLinks();
+    
+    // Set up periodic navigation link checks as fallback
+    this.setupNavigationMonitoring();
+
     TableDetector.startDetection();
+  },
+
+  setupNavigationMonitoring() {
+    // Add event listeners for page load events to catch all possible DOM changes
+    window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+    window.addEventListener('load', hideNavigationLinks);
+    
+    // Listen for iframe load events
+    function setupIframeListeners() {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          iframe.addEventListener('load', hideNavigationLinks);
+        } catch (e) {
+          // Ignore cross-origin errors
+        }
+      });
+    }
+    
+    // Initial iframe setup
+    setupIframeListeners();
+    
+    logger.info("✅ Navigation monitoring set up for dynamic content (event-driven only)");
   }
 };
 
