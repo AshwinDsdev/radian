@@ -56,73 +56,31 @@ async function waitForListener(maxRetries = 20, initialDelay = 100) {
 /**
  * Request a batch of numbers from the storage script
  */
-// async function checkNumbersBatch(numbers) {
-//   return new Promise((resolve, reject) => {
-//     chrome.runtime.sendMessage(
-//       EXTENSION_ID,
-//       { type: "queryLoans", loanIds: numbers },
-//       (response) => {
-//         if (chrome.runtime.lastError) {
-//           return reject(chrome.runtime.lastError.message);
-//         } else if (response.error) {
-//           return reject(response.error);
-//         }
+async function checkNumbersBatch(numbers) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      EXTENSION_ID,
+      { type: "queryLoans", loanIds: numbers },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(chrome.runtime.lastError.message);
+        } else if (response.error) {
+          return reject(response.error);
+        }
 
-//         const available = Object.keys(response.result).filter(
-//           (key) => response.result[key]
-//         );
-//         resolve(available);
-//       }
-//     );
-//   });
-// }
+        const available = Object.keys(response.result).filter(
+          (key) => response.result[key]
+        );
+        resolve(available);
+      }
+    );
+  });
+}
 
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
 // ########## NAVIGATION CONTROL ##########
-const LoanNums = [
-  "0194737052",
-  "0151410206",
-  "0180995748",
-  "0000000612",
-  "0000000687",
-  "0000000711",
-  "0000000786",
-  "0000000927",
-  "0000000976",
-  "0194737052",
-  "0000001180",
-  "0000001230",
-  "0151410206",
-  "0000001453",
-  "0000001537",
-  "0000001594",
-  "0000001669",
-  "0000001677",
-  "0000001719",
-  "0000001792",
-  "0000001834",
-  "0000001891",
-  "0000002063",
-  "0180995748",
-  "0000002352",
-  "0000002410",
-  "0000002436",
-  "0000002477",
-  "0000002485",
-  "0000002493",
-  "0000002535",
-  "0000002550",
-  "0000002600",
-  "0000002642",
-  "0000002667",
-  "0000002691",
-];
 
-const checkNumbersBatch = async (numbers) => {
-  const available = numbers.filter((num) => LoanNums.includes(num));
-  return available;
-};
 /**
  * Define the links that should be hidden
  */
@@ -300,9 +258,9 @@ const DOM = {
     // STRICT selectors that ONLY match loan number inputs (not certificate inputs)
     // Looking at the HTML structure, loan inputs have specific IDs like "_GrdLoanNumberChange_ctl02__TxtLoanNumber"
     const loanInputs = table.querySelectorAll('input[id$="_TxtLoanNumber"]');
-    
+
     logger.info(`✅ Found ${loanInputs.length} loan inputs with strict selector`);
-    
+
     // Update our cached set
     state.loanInputs.clear();
     loanInputs.forEach(input => state.loanInputs.add(input));
@@ -398,9 +356,9 @@ const ValidationSystem = {
     if (!input.id || !input.id.endsWith('_TxtLoanNumber')) {
       return true;
     }
-    
+
     const loanNumber = input.value.trim();
-    
+
     // Don't validate empty loan numbers
     if (!loanNumber) {
       // Clean up any existing error messages
@@ -413,12 +371,12 @@ const ValidationSystem = {
     // Check cache first
     if (state.validationCache.has(loanNumber)) {
       const isValid = state.validationCache.get(loanNumber);
-      
+
       // Apply styling based on cached result
       if (!isValid) {
         this.applyRestrictedStyling(input);
       }
-      
+
       return isValid;
     }
 
@@ -450,7 +408,7 @@ const ValidationSystem = {
       return true; // Default to allowing access on error
     }
   },
-  
+
   // Apply restricted styling without affecting other elements
   applyRestrictedStyling(input) {
     // Only modify the input element itself
@@ -458,7 +416,7 @@ const ValidationSystem = {
     input.style.backgroundColor = "#f5f5f5";
     input.style.cursor = "not-allowed";
     input.disabled = true;
-    
+
     // Add error message as a sibling element
     const errorElement = DOM.createErrorElement();
     input.parentNode.appendChild(errorElement);
@@ -473,12 +431,12 @@ const ValidationSystem = {
     }
 
     // Only validate inputs that have loan numbers and are loan number inputs (not certificates)
-    const inputsWithValues = inputs.filter(input => 
-      input.id && 
-      input.id.endsWith('_TxtLoanNumber') && 
+    const inputsWithValues = inputs.filter(input =>
+      input.id &&
+      input.id.endsWith('_TxtLoanNumber') &&
       input.value.trim()
     );
-    
+
     if (inputsWithValues.length === 0) {
       return [];
     }
@@ -676,11 +634,11 @@ const DOMMonitor = {
 
     try {
       const table = DOM.getTable();
-      
+
       // Only clear errors for loan number inputs, not certificate inputs
       if (table) {
         const loanInputs = DOM.getLoanInputs();
-        
+
         // Only clear errors for loan inputs, not certificate inputs
         state.errorElements.forEach(error => {
           // Check if the error is attached to a loan input
@@ -692,7 +650,7 @@ const DOMMonitor = {
             }
           }
         });
-        
+
         // Only reset styling for loan inputs
         loanInputs.forEach(input => {
           if (input.id && input.id.endsWith('_TxtLoanNumber')) {
@@ -700,21 +658,21 @@ const DOMMonitor = {
           }
         });
       }
-      
+
       // Clear validation cache for a fresh start
       state.validationCache.clear();
 
       // Setup validation for loan inputs
       ValidationSystem.setupValidation();
-      
+
       // Only validate if we have loan numbers to check
       const inputs = DOM.getLoanInputs();
-      const inputsWithValues = inputs.filter(input => 
-        input.id && 
-        input.id.endsWith('_TxtLoanNumber') && 
+      const inputsWithValues = inputs.filter(input =>
+        input.id &&
+        input.id.endsWith('_TxtLoanNumber') &&
         input.value.trim()
       );
-      
+
       if (inputsWithValues.length > 0) {
         await ValidationSystem.validateAllInputs();
       }
@@ -785,21 +743,21 @@ const TableDetector = {
 
     // Only validate if we have loan numbers to check - not on initial load
     const inputs = DOM.getLoanInputs();
-    const inputsWithValues = inputs.filter(input => 
-      input.id && 
-      input.id.endsWith('_TxtLoanNumber') && 
+    const inputsWithValues = inputs.filter(input =>
+      input.id &&
+      input.id.endsWith('_TxtLoanNumber') &&
       input.value.trim()
     );
-    
+
     // Only run validation if we have actual loan numbers with values
     if (inputsWithValues.length > 0) {
       logger.info(`Found ${inputsWithValues.length} loan inputs with values - validating`);
-      
+
       // Hide the table temporarily until validation completes
       if (table) {
         table.style.visibility = "hidden";
       }
-      
+
       ValidationSystem.validateAllInputs().finally(() => {
         // Show the table after validation completes
         if (table) {
@@ -1102,7 +1060,7 @@ const Main = {
   async setup() {
     logger.info("✅ DOM Ready - Initializing filter...");
 
-    // await waitForListener();
+    await waitForListener();
 
     URLMonitor.setup();
     CleanupManager.setup();
