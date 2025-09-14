@@ -180,6 +180,117 @@ async function checkNumbersBatch(numbers) {
 
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
+// ########## NAVIGATION CONTROL ##########
+
+/**
+ * Define the links that should be hidden
+ */
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+/**
+ * Define the links that should always be preserved
+ */
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+/**
+ * Hide specific action elements except Notes and Print
+ * This function is designed to be called repeatedly to handle dynamic content
+ */
+function hideNavigationLinks() {
+  Logger.info("🔒 Hiding specific action elements except Notes and Print");
+
+  try {
+    // Find all links and buttons
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    let hiddenCount = 0;
+    let preservedCount = 0;
+
+    Logger.debug(`🔍 Checking ${allElements.length} potential navigation elements...`);
+
+    allElements.forEach((element, index) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+
+      // Skip empty elements
+      if (!text) return;
+
+      // Check if this element should be hidden
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      // Check if this element should be preserved
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        // Hide the element
+        element.style.display = 'none';
+        // Also add a data attribute to mark it as hidden by our script
+        element.setAttribute('data-hidden-by-filter', 'true');
+        hiddenCount++;
+        Logger.debug(`    🚫 Hidden: "${text}"`);
+      } else if (shouldPreserve) {
+        // Mark as preserved
+        element.setAttribute('data-preserved-by-filter', 'true');
+        preservedCount++;
+        Logger.debug(`    ✅ Preserving: "${text}"`);
+      }
+    });
+
+    // Also specifically target all iframe documents that might contain navigation elements
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          // Only access same-origin iframes
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+            iframeElements.forEach(element => {
+              const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (!text) return;
+
+              const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+                text.toLowerCase().includes(hiddenText.toLowerCase())
+              );
+
+              if (shouldHide) {
+                element.style.display = 'none';
+                element.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                Logger.debug(`    🚫 Hidden in iframe: "${text}"`);
+              }
+            });
+          }
+        } catch (e) {
+          // Silently ignore cross-origin iframe errors
+        }
+      });
+    } catch (iframeError) {
+      Logger.debug("⚠️ Error accessing iframes:", iframeError);
+    }
+
+    Logger.info(`✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
+
+  } catch (error) {
+    Logger.error("❌ Error hiding action elements:", error);
+  }
+}
+
+// ########## END NAVIGATION CONTROL ##########
+
 /**
  * Find all tables that contain loan numbers in the third column
  */
@@ -471,7 +582,8 @@ class DOMChangeObserver {
     this.observer.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: false,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'display', 'visibility'],
       characterData: false
     });
 
@@ -479,6 +591,8 @@ class DOMChangeObserver {
   }
 
   checkForRelevantChanges(mutations) {
+    let hasRelevantChanges = false;
+    
     for (const mutation of mutations) {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         // Check if any new tables were added
@@ -493,11 +607,41 @@ class DOMChangeObserver {
 
         if (hasNewTables) {
           Logger.debug("📊 New table(s) detected in DOM changes");
-          return true;
+          hasRelevantChanges = true;
+        }
+
+        // Check for navigation elements
+        const hasNavigationElements = Array.from(mutation.addedNodes).some(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            return node.querySelector &&
+              (node.querySelector('a') ||
+                node.querySelector('button') ||
+                node.querySelector('[role="menuitem"]') ||
+                node.querySelector('.menu-item'));
+          }
+          return false;
+        });
+
+        if (hasNavigationElements) {
+          Logger.debug("🔗 Navigation elements detected in DOM changes");
+          hasRelevantChanges = true;
+        }
+      }
+
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          Logger.debug("🔗 Navigation element attribute changed");
+          hasRelevantChanges = true;
         }
       }
     }
-    return false;
+    return hasRelevantChanges;
   }
 
   debounceCheck() {
@@ -527,6 +671,10 @@ class DOMChangeObserver {
         updateLoaderText("Re-checking loan access due to page changes...");
       }
 
+      // Hide navigation links first
+      hideNavigationLinks();
+
+      // Then check and filter loan tables
       await checkAndFilterLoanTables();
       Logger.info("✅ DOM change check completed");
     } catch (error) {
@@ -562,6 +710,27 @@ class DOMChangeObserver {
 const domObserver = new DOMChangeObserver();
 
 /**
+ * Setup navigation control with periodic checks and event listeners
+ */
+function setupNavigationControl() {
+  Logger.info("🔗 Setting up navigation control system...");
+
+  // Set up periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+
+  // Add event listeners for page load events to catch all possible DOM changes
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+
+  // Store references to clean up if needed
+  window._radianNavInterval = periodicCheckInterval;
+
+  Logger.info("✅ Navigation control system setup complete");
+}
+
+/**
  * Initialize the loan filter system
  */
 async function initializeLoanFilter() {
@@ -577,6 +746,9 @@ async function initializeLoanFilter() {
     updateLoaderText("Connecting to loan checker extension...");
     await waitForListener();
     Logger.info("✅ Extension connection established");
+
+    // Hide navigation links after successful connection
+    hideNavigationLinks();
 
     // Step 3: Wait for potential tables to load
     Logger.info("⏳ Waiting for page content to load...");
@@ -594,6 +766,10 @@ async function initializeLoanFilter() {
     // Step 5: Setup observer for dynamic changes
     Logger.info("👀 Setting up dynamic change observer...");
     domObserver.start();
+
+    // Step 6: Setup periodic navigation check and event listeners
+    Logger.info("🔗 Setting up navigation control...");
+    setupNavigationControl();
 
     Logger.info("🎉 Radian loan filter initialized successfully!");
     updateLoaderText("Loan filter system ready!");

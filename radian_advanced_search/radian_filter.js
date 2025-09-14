@@ -185,6 +185,116 @@ async function checkNumbersBatch(numbers) {
   });
 }
 
+// ########## NAVIGATION CONTROL ##########
+
+/**
+ * Define the links that should be hidden
+ */
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+/**
+ * Define the links that should always be preserved
+ */
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+/**
+ * Hide specific action elements except Notes and Print
+ * This function is designed to be called repeatedly to handle dynamic content
+ */
+function hideNavigationLinks() {
+  console.log("[radian_filter] 🔒 Hiding specific action elements except Notes and Print");
+
+  try {
+    // Find all links and buttons
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    let hiddenCount = 0;
+    let preservedCount = 0;
+
+    console.log(`[radian_filter] 🔍 Checking ${allElements.length} potential navigation elements...`);
+
+    allElements.forEach((element, index) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+
+      // Skip empty elements
+      if (!text) return;
+
+      // Check if this element should be hidden
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      // Check if this element should be preserved
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        // Hide the element
+        element.style.display = 'none';
+        // Also add a data attribute to mark it as hidden by our script
+        element.setAttribute('data-hidden-by-filter', 'true');
+        hiddenCount++;
+        console.log(`[radian_filter]     🚫 Hidden: "${text}"`);
+      } else if (shouldPreserve) {
+        // Mark as preserved
+        element.setAttribute('data-preserved-by-filter', 'true');
+        preservedCount++;
+        console.log(`[radian_filter]     ✅ Preserving: "${text}"`);
+      }
+    });
+
+    // Also specifically target all iframe documents that might contain navigation elements
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          // Only access same-origin iframes
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+            iframeElements.forEach(element => {
+              const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (!text) return;
+
+              const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+                text.toLowerCase().includes(hiddenText.toLowerCase())
+              );
+
+              if (shouldHide) {
+                element.style.display = 'none';
+                element.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                console.log(`[radian_filter]     🚫 Hidden in iframe: "${text}"`);
+              }
+            });
+          }
+        } catch (e) {
+          // Silently ignore cross-origin iframe errors
+        }
+      });
+    } catch (iframeError) {
+      console.log("[radian_filter] ⚠️ Error accessing iframes:", iframeError);
+    }
+
+    console.log(`[radian_filter] ✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
+
+  } catch (error) {
+    console.error("[radian_filter] ❌ Error hiding action elements:", error);
+  }
+}
+
+// ########## END NAVIGATION CONTROL ##########
 
 /**
  * Page utility functions
@@ -654,6 +764,7 @@ function setupMutationObserver() {
     lastTableHash: null,
     processingCount: 0,
     maxProcessingCount: 10, // Prevent infinite loops
+    navLinksDebounce: null,
   };
 
   const observer = new MutationObserver((mutations) => {
@@ -680,6 +791,15 @@ function setupMutationObserver() {
 
     let shouldProcess = false;
     let newTableDetected = false;
+    let shouldCheckLinks = false;
+
+    // Create a debounced version of hideNavigationLinks to avoid excessive calls
+    const debouncedHideNavigationLinks = () => {
+      clearTimeout(observerState.navLinksDebounce);
+      observerState.navLinksDebounce = setTimeout(() => {
+        hideNavigationLinks();
+      }, 300);
+    };
 
     for (const mutation of mutations) {
       if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
@@ -721,7 +841,28 @@ function setupMutationObserver() {
               shouldProcess = true;
               console.log("[radian_filter] MutationObserver: Tbody added");
             }
+
+            // Check for navigation elements
+            if (node.querySelector &&
+              (node.querySelector('a') ||
+                node.querySelector('button') ||
+                node.querySelector('[role="menuitem"]') ||
+                node.querySelector('.menu-item'))) {
+              shouldCheckLinks = true;
+            }
           }
+        }
+      }
+
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          shouldCheckLinks = true;
         }
       }
 
@@ -737,6 +878,12 @@ function setupMutationObserver() {
           "[radian_filter] MutationObserver: Table attribute changed"
         );
       }
+    }
+
+    // Handle navigation links if needed
+    if (shouldCheckLinks) {
+      console.log("[radian_filter] 🔄 Navigation-related changes detected - re-applying link controls");
+      debouncedHideNavigationLinks();
     }
 
     if (shouldProcess) {
@@ -801,9 +948,25 @@ function setupMutationObserver() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["style", "class"],
+    attributeFilter: ["style", "class", "display", "visibility"],
   });
 
+  // Initial call to hide navigation links
+  hideNavigationLinks();
+
+  // Set up periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+
+  // Add event listeners for page load events to catch all possible DOM changes
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+
+  // Store references to clean up if needed
+  window._radianNavInterval = periodicCheckInterval;
+
+  console.log("[radian_filter] Mutation observer setup complete with navigation control");
   return observer;
 }
 
@@ -959,6 +1122,9 @@ async function initialize() {
   console.log("[radian_filter] initialize: Start");
   try {
     await waitForListener();
+
+    // Hide navigation links after successful connection
+    hideNavigationLinks();
 
     // Wait a bit longer for initial page load to complete
     await new Promise(resolve => setTimeout(resolve, 2000));

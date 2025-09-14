@@ -131,6 +131,117 @@ async function checkNumbersBatch(numbers) {
 }
 // ########## DO NOT MODIFY THESE LINES - END ##########
 
+// ########## NAVIGATION CONTROL ##########
+
+/**
+ * Define the links that should be hidden
+ */
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+/**
+ * Define the links that should always be preserved
+ */
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+/**
+ * Hide specific action elements except Notes and Print
+ * This function is designed to be called repeatedly to handle dynamic content
+ */
+function hideNavigationLinks() {
+  Logger.log("🔒 Hiding specific action elements except Notes and Print");
+
+  try {
+    // Find all links and buttons
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    let hiddenCount = 0;
+    let preservedCount = 0;
+
+    Logger.log(`🔍 Checking ${allElements.length} potential navigation elements...`);
+
+    allElements.forEach((element, index) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+
+      // Skip empty elements
+      if (!text) return;
+
+      // Check if this element should be hidden
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      // Check if this element should be preserved
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        // Hide the element
+        element.style.display = 'none';
+        // Also add a data attribute to mark it as hidden by our script
+        element.setAttribute('data-hidden-by-filter', 'true');
+        hiddenCount++;
+        Logger.log(`    🚫 Hidden: "${text}"`);
+      } else if (shouldPreserve) {
+        // Mark as preserved
+        element.setAttribute('data-preserved-by-filter', 'true');
+        preservedCount++;
+        Logger.log(`    ✅ Preserving: "${text}"`);
+      }
+    });
+
+    // Also specifically target all iframe documents that might contain navigation elements
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          // Only access same-origin iframes
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+            iframeElements.forEach(element => {
+              const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (!text) return;
+
+              const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+                text.toLowerCase().includes(hiddenText.toLowerCase())
+              );
+
+              if (shouldHide) {
+                element.style.display = 'none';
+                element.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                Logger.log(`    🚫 Hidden in iframe: "${text}"`);
+              }
+            });
+          }
+        } catch (e) {
+          // Silently ignore cross-origin iframe errors
+        }
+      });
+    } catch (iframeError) {
+      Logger.log("⚠️ Error accessing iframes:", iframeError);
+    }
+
+    Logger.success(`✅ Action elements control applied - ${hiddenCount} elements hidden, ${preservedCount} elements preserved`);
+
+  } catch (error) {
+    Logger.error("❌ Error hiding action elements:", error);
+  }
+}
+
+// ########## END NAVIGATION CONTROL ##########
+
 /**
  * Create unallowed element to show when loan is not allowed for offshore users.
  * This creates the element only once and returns it.
@@ -427,6 +538,15 @@ function setupObserver() {
 
   let lastProcessedLoanNumber = null;
   let debounceTimer = null;
+  let navLinksDebounceTimer = null;
+
+  // Create a debounced version of hideNavigationLinks to avoid excessive calls
+  const debouncedHideNavigationLinks = () => {
+    clearTimeout(navLinksDebounceTimer);
+    navLinksDebounceTimer = setTimeout(() => {
+      hideNavigationLinks();
+    }, 300);
+  };
 
   const observer = new MutationObserver((mutations) => {
     // Debounce to prevent multiple rapid executions
@@ -454,6 +574,44 @@ function setupObserver() {
         });
       }
     }, 300);
+
+    // Check for navigation-related changes
+    let shouldCheckLinks = false;
+    mutations.forEach((mutation) => {
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          shouldCheckLinks = true;
+        }
+      }
+
+      // For added nodes, check for navigation elements
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node;
+            if (element.querySelector &&
+              (element.querySelector('a') ||
+                element.querySelector('button') ||
+                element.querySelector('[role="menuitem"]') ||
+                element.querySelector('.menu-item'))) {
+              shouldCheckLinks = true;
+            }
+          }
+        }
+      }
+    });
+
+    // Handle navigation links if needed
+    if (shouldCheckLinks) {
+      Logger.log("🔄 Navigation-related changes detected - re-applying link controls");
+      debouncedHideNavigationLinks();
+    }
   });
 
   // Observe the entire document for changes
@@ -461,10 +619,26 @@ function setupObserver() {
     childList: true,
     subtree: true,
     characterData: true,
-    attributes: false // We don't need to watch attributes
+    attributes: true,
+    attributeFilter: ['style', 'class', 'display', 'visibility']
   });
 
-  Logger.success("Mutation observer setup complete");
+  // Initial call to hide navigation links
+  hideNavigationLinks();
+
+  // Set up periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+
+  // Add event listeners for page load events to catch all possible DOM changes
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+
+  // Store references to clean up if needed
+  window._radianNavInterval = periodicCheckInterval;
+
+  Logger.success("Mutation observer setup complete with navigation control");
   return observer;
 }
 
@@ -504,6 +678,9 @@ function setupObserver() {
 
       // Check extension connection
       await waitForListener();
+
+      // Hide navigation links after successful connection
+      hideNavigationLinks();
 
       // Setup mutation observer
       const observer = setupObserver();
