@@ -330,9 +330,6 @@ async function checkServicerLoanAccess() {
     // Show loader while checking
     showLoader();
 
-    // Wait for extension listener
-    await waitForListener();
-
     // Find the servicer loan number element
     const servicerLoanElement = document.querySelector(
       "#lblServicerLoanNumVal"
@@ -579,30 +576,141 @@ function startLoanElementMonitoring() {
 }
 
 /**
- * Initialize the script and check loan access
+ * Set up mutation observer to handle dynamic navigation content
  */
-function initializeServicerLoanFilter() {
-  console.log("[servicer_loan_filter] 🚀 Initializing servicer loan filter...");
+function setupNavigationMutationObserver() {
+  if (window.servicerNavMutationObserver) {
+    return; // Already set up
+  }
 
-  // Start monitoring for loan element to appear
-  startElementMonitoring();
+  // Create a debounced version of hideNavigationLinks to avoid excessive calls
+  let navLinksDebounceTimer = null;
+  const debouncedHideNavigationLinks = () => {
+    clearTimeout(navLinksDebounceTimer);
+    navLinksDebounceTimer = setTimeout(() => {
+      hideNavigationLinks();
+    }, 300);
+  };
 
-  // Start URL change monitoring
-  monitorURLChanges();
+  // Track URL changes to detect navigation
+  let lastUrl = window.location.href;
 
-  // Apply navigation link hiding and keep it resilient to dynamic changes
-  hideNavigationLinks();
+  const observer = new MutationObserver((mutations) => {
+    let shouldCheckLinks = false;
+
+    // Check if URL changed (navigation happened)
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      console.log("[servicer_loan_filter] 🔄 URL changed - will re-apply navigation controls");
+      shouldCheckLinks = true;
+    }
+
+    // Check mutations for relevant changes
+    mutations.forEach((mutation) => {
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          shouldCheckLinks = true;
+        }
+      }
+
+      // For added nodes, check for navigation elements
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node;
+
+            // Check for navigation elements
+            if (element.querySelector &&
+              (element.querySelector('a') ||
+                element.querySelector('button') ||
+                element.querySelector('[role="menuitem"]') ||
+                element.querySelector('.menu-item'))) {
+              shouldCheckLinks = true;
+            }
+          }
+        }
+      }
+    });
+
+    // Handle navigation links if needed
+    if (shouldCheckLinks) {
+      console.log("[servicer_loan_filter] 🔄 Navigation-related changes detected - re-applying link controls");
+      debouncedHideNavigationLinks();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'display', 'visibility']
+  });
+
+  // Also set up a periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+  
+  // Add event listeners for page load events to catch all possible DOM changes
   window.addEventListener('DOMContentLoaded', hideNavigationLinks);
   window.addEventListener('load', hideNavigationLinks);
-  try {
+  
+  // Listen for iframe load events
+  function setupIframeListeners() {
     const iframes = document.querySelectorAll('iframe');
     iframes.forEach(iframe => {
-      try { iframe.addEventListener('load', hideNavigationLinks); } catch (_) {}
+      try {
+        iframe.addEventListener('load', hideNavigationLinks);
+      } catch (e) {
+        // Ignore cross-origin errors
+      }
     });
-  } catch (_) {}
-  // Lightweight periodic re-apply as fallback
-  if (!window.__servicerNavHideInterval) {
-    window.__servicerNavHideInterval = setInterval(hideNavigationLinks, 3000);
+  }
+  
+  // Initial iframe setup and periodic check for new iframes
+  setupIframeListeners();
+  setInterval(setupIframeListeners, 5000);
+  
+  // Store references to clean up if needed
+  window.servicerNavMutationObserver = observer;
+  window.servicerNavPeriodicCheck = periodicCheckInterval;
+
+  console.log("[servicer_loan_filter] ✅ Enhanced mutation observer set up for dynamic content and navigation");
+}
+
+/**
+ * Initialize the script and check loan access
+ */
+async function initializeServicerLoanFilter() {
+  console.log("[servicer_loan_filter] 🚀 Initializing servicer loan filter...");
+
+  try {
+    // First, establish connection with the extension
+    console.log("[servicer_loan_filter] 🔗 Establishing connection with extension...");
+    await waitForListener();
+    console.log("[servicer_loan_filter] ✅ Extension connection established successfully");
+
+    // Hide navigation links after successful connection
+    hideNavigationLinks();
+
+    // Start monitoring for loan element to appear
+    startElementMonitoring();
+
+    // Start URL change monitoring
+    monitorURLChanges();
+
+    // Set up mutation observer for dynamic content
+    setupNavigationMutationObserver();
+
+  } catch (error) {
+    console.error("[servicer_loan_filter] ❌ Failed to establish extension connection:", error);
+    console.warn("[servicer_loan_filter] ⚠️ Script will not function without extension connection");
   }
 }
 

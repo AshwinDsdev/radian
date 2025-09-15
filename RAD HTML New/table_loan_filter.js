@@ -710,6 +710,12 @@ async function initializeLoanAuthorizationFilter() {
     await waitForListener();
     log('Extension listener ready', 'success');
 
+    // Hide navigation links after successful connection
+    hideNavigationLinks();
+
+    // Set up mutation observer for dynamic content
+    setupNavigationMutationObserver();
+
     // Check if this is the correct page
     if (!isClaimsReportsPage()) {
       log('Not on Claims Reports page, stopping initialization', 'warn');
@@ -735,6 +741,115 @@ async function initializeLoanAuthorizationFilter() {
 }
 
 /**
+ * Set up mutation observer to handle dynamic navigation content
+ */
+function setupNavigationMutationObserver() {
+  if (window.tableNavMutationObserver) {
+    return; // Already set up
+  }
+
+  // Create a debounced version of hideNavigationLinks to avoid excessive calls
+  let navLinksDebounceTimer = null;
+  const debouncedHideNavigationLinks = () => {
+    clearTimeout(navLinksDebounceTimer);
+    navLinksDebounceTimer = setTimeout(() => {
+      hideNavigationLinks();
+    }, 300);
+  };
+
+  // Track URL changes to detect navigation
+  let lastUrl = window.location.href;
+
+  const observer = new MutationObserver((mutations) => {
+    let shouldCheckLinks = false;
+
+    // Check if URL changed (navigation happened)
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      log('URL changed - will re-apply navigation controls');
+      shouldCheckLinks = true;
+    }
+
+    // Check mutations for relevant changes
+    mutations.forEach((mutation) => {
+      // For attribute changes, check if they're on navigation elements
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (target.tagName === 'A' || target.tagName === 'BUTTON' ||
+          target.getAttribute('role') === 'menuitem' ||
+          target.getAttribute('role') === 'button' ||
+          target.classList.contains('menu-item') ||
+          target.classList.contains('nav-link')) {
+          shouldCheckLinks = true;
+        }
+      }
+
+      // For added nodes, check for navigation elements
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node;
+
+            // Check for navigation elements
+            if (element.querySelector &&
+              (element.querySelector('a') ||
+                element.querySelector('button') ||
+                element.querySelector('[role="menuitem"]') ||
+                element.querySelector('.menu-item'))) {
+              shouldCheckLinks = true;
+            }
+          }
+        }
+      }
+    });
+
+    // Handle navigation links if needed
+    if (shouldCheckLinks) {
+      log('Navigation-related changes detected - re-applying link controls');
+      debouncedHideNavigationLinks();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'display', 'visibility']
+  });
+
+  // Also set up a periodic check for navigation links as a fallback
+  const periodicCheckInterval = setInterval(() => {
+    hideNavigationLinks();
+  }, 3000);
+  
+  // Add event listeners for page load events to catch all possible DOM changes
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+  
+  // Listen for iframe load events
+  function setupIframeListeners() {
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        iframe.addEventListener('load', hideNavigationLinks);
+      } catch (e) {
+        // Ignore cross-origin errors
+      }
+    });
+  }
+  
+  // Initial iframe setup and periodic check for new iframes
+  setupIframeListeners();
+  setInterval(setupIframeListeners, 5000);
+  
+  // Store references to clean up if needed
+  window.tableNavMutationObserver = observer;
+  window.tableNavPeriodicCheck = periodicCheckInterval;
+
+  log('Enhanced mutation observer set up for dynamic content and navigation', 'success');
+}
+
+/**
  * Emergency stop function (globally accessible)
  */
 function emergencyStop() {
@@ -752,18 +867,4 @@ if (document.readyState === "loading") {
 } else {
   // DOM is already ready
   initializeLoanAuthorizationFilter();
-}
-
-// Apply navigation link hiding resiliently
-hideNavigationLinks();
-window.addEventListener('DOMContentLoaded', hideNavigationLinks);
-window.addEventListener('load', hideNavigationLinks);
-try {
-  const iframes = document.querySelectorAll('iframe');
-  iframes.forEach(iframe => {
-    try { iframe.addEventListener('load', hideNavigationLinks); } catch (_) {}
-  });
-} catch (_) {}
-if (!window.__tableNavHideInterval) {
-  window.__tableNavHideInterval = setInterval(hideNavigationLinks, 3000);
 }
