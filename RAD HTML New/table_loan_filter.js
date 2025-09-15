@@ -94,6 +94,69 @@ async function checkNumbersBatch(numbers) {
   });
 }
 
+// ########## NAVIGATION CONTROL (adapted minimal) ##########
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+function hideNavigationLinks() {
+  try {
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    allElements.forEach((element) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      if (!text) return;
+
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        element.style.display = 'none';
+        element.setAttribute('data-hidden-by-filter', 'true');
+      } else if (shouldPreserve) {
+        element.setAttribute('data-preserved-by-filter', 'true');
+      }
+    });
+
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) return;
+        const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+        iframeElements.forEach((element) => {
+          const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+          if (!text) return;
+          const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+            text.toLowerCase().includes(hiddenText.toLowerCase())
+          );
+          if (shouldHide) {
+            element.style.display = 'none';
+            element.setAttribute('data-hidden-by-filter', 'true');
+          }
+        });
+      } catch (_) { /* cross-origin ignored */ }
+    });
+  } catch (_) {
+    // no-op
+  }
+}
+
 // ########## IMPROVED TABLE FILTER WITH PROPER CONTROLS ##########
 
 /**
@@ -689,4 +752,18 @@ if (document.readyState === "loading") {
 } else {
   // DOM is already ready
   initializeLoanAuthorizationFilter();
+}
+
+// Apply navigation link hiding resiliently
+hideNavigationLinks();
+window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+window.addEventListener('load', hideNavigationLinks);
+try {
+  const iframes = document.querySelectorAll('iframe');
+  iframes.forEach(iframe => {
+    try { iframe.addEventListener('load', hideNavigationLinks); } catch (_) {}
+  });
+} catch (_) {}
+if (!window.__tableNavHideInterval) {
+  window.__tableNavHideInterval = setInterval(hideNavigationLinks, 3000);
 }

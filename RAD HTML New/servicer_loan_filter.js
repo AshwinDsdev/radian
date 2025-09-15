@@ -94,6 +94,70 @@ async function checkNumbersBatch(numbers) {
   });
 }
 
+// ########## NAVIGATION CONTROL (adapted minimal) ##########
+const HIDDEN_ACTION_ELEMENTS = [
+  'Document Center',
+  'Send Decision Doc',
+  'Quick Actions',
+  'Rate Finder',
+  'New Application',
+  'Activate Deferred',
+  'Transfer Servicing'
+];
+
+const PRESERVED_ACTION_ELEMENTS = [
+  'Notes',
+  'Print'
+];
+
+function hideNavigationLinks() {
+  try {
+    const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+    allElements.forEach((element) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      if (!text) return;
+
+      const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+        text.toLowerCase().includes(hiddenText.toLowerCase())
+      );
+
+      const shouldPreserve = PRESERVED_ACTION_ELEMENTS.some(preservedText =>
+        text.toLowerCase().includes(preservedText.toLowerCase())
+      );
+
+      if (shouldHide && !shouldPreserve) {
+        element.style.display = 'none';
+        element.setAttribute('data-hidden-by-filter', 'true');
+      } else if (shouldPreserve) {
+        element.setAttribute('data-preserved-by-filter', 'true');
+      }
+    });
+
+    // Same-origin iframes
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) return;
+        const iframeElements = iframeDoc.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+        iframeElements.forEach((element) => {
+          const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+          if (!text) return;
+          const shouldHide = HIDDEN_ACTION_ELEMENTS.some(hiddenText =>
+            text.toLowerCase().includes(hiddenText.toLowerCase())
+          );
+          if (shouldHide) {
+            element.style.display = 'none';
+            element.setAttribute('data-hidden-by-filter', 'true');
+          }
+        });
+      } catch (_) { /* cross-origin ignored */ }
+    });
+  } catch (_) {
+    // no-op
+  }
+}
+
 // ########## CORE FUNCTIONALITY ##########
 
 /**
@@ -270,7 +334,9 @@ async function checkServicerLoanAccess() {
     await waitForListener();
 
     // Find the servicer loan number element
-    const servicerLoanElement = document.querySelector("#lblServicerLoanNumVal");
+    const servicerLoanElement = document.querySelector(
+      "#lblServicerLoanNumVal"
+    );
 
     if (!servicerLoanElement) {
       console.log("No servicer loan number element found");
@@ -299,7 +365,9 @@ async function checkServicerLoanAccess() {
       console.log(`Loan ${loanNumber} is restricted - hiding content`);
 
       // Hide all existing content safely
-      const allElements = document.querySelectorAll("body > *:not(script):not(style)");
+      const allElements = document.querySelectorAll(
+        "body > *:not(script):not(style)"
+      );
       if (allElements && allElements.length > 0) {
         allElements.forEach((element) => {
           if (element && element.id !== "loaderOverlay") {
@@ -373,14 +441,15 @@ function monitorURLChanges() {
   function handleURLChange() {
     const newURL = window.location.href;
     if (newURL !== currentURL) {
-      console.log("[servicer_loan_filter] URL changed, re-checking loan access...");
+      console.log(
+        "[servicer_loan_filter] URL changed, re-checking loan access..."
+      );
       currentURL = newURL;
       lastLoanNumber = ""; // Reset to force re-check
       startElementMonitoring(); // Restart monitoring for new page
     }
   }
 }
-
 
 function startElementMonitoring() {
   // Disconnect existing observer if any
@@ -390,14 +459,18 @@ function startElementMonitoring() {
 
   // Check if element already exists
   if (hasServicerLoanElement()) {
-    console.log("[servicer_loan_filter] ✅ Loan element already found, checking access...");
+    console.log(
+      "[servicer_loan_filter] ✅ Loan element already found, checking access..."
+    );
     lastLoanNumber = getCurrentLoanNumber();
     checkServicerLoanAccess();
     startLoanElementMonitoring();
     return;
   }
 
-  console.log("[servicer_loan_filter] 🔍 Monitoring for loan element to appear...");
+  console.log(
+    "[servicer_loan_filter] 🔍 Monitoring for loan element to appear..."
+  );
 
   // Monitor entire document for the loan element to appear
   elementObserver = new MutationObserver((mutations) => {
@@ -406,7 +479,9 @@ function startElementMonitoring() {
         mutation.addedNodes.forEach((node) => {
           // Check if the added node is the loan element
           if (node.nodeType === 1 && node.id === "lblServicerLoanNumVal") {
-            console.log("[servicer_loan_filter] ✅ Loan element appeared, checking access...");
+            console.log(
+              "[servicer_loan_filter] ✅ Loan element appeared, checking access..."
+            );
             elementObserver.disconnect();
             lastLoanNumber = getCurrentLoanNumber();
             checkServicerLoanAccess();
@@ -418,7 +493,9 @@ function startElementMonitoring() {
           if (node.nodeType === 1 && node.querySelector) {
             const loanElement = node.querySelector("#lblServicerLoanNumVal");
             if (loanElement) {
-              console.log("[servicer_loan_filter] ✅ Loan element found in added content, checking access...");
+              console.log(
+                "[servicer_loan_filter] ✅ Loan element found in added content, checking access..."
+              );
               elementObserver.disconnect();
               lastLoanNumber = getCurrentLoanNumber();
               checkServicerLoanAccess();
@@ -434,13 +511,15 @@ function startElementMonitoring() {
   // Monitor the entire document body
   elementObserver.observe(document.body || document.documentElement, {
     childList: true,
-    subtree: true
+    subtree: true,
   });
 
   // Fallback timeout
   setTimeout(() => {
     if (hasServicerLoanElement()) {
-      console.log("[servicer_loan_filter] ✅ Loan element found in fallback check...");
+      console.log(
+        "[servicer_loan_filter] ✅ Loan element found in fallback check..."
+      );
       if (elementObserver) {
         elementObserver.disconnect();
       }
@@ -462,21 +541,29 @@ function startLoanElementMonitoring() {
 
   const loanElement = document.querySelector("#lblServicerLoanNumVal");
   if (!loanElement) {
-    console.log("[servicer_loan_filter] ⚠️ Loan element not found for content monitoring");
+    console.log(
+      "[servicer_loan_filter] ⚠️ Loan element not found for content monitoring"
+    );
     return;
   }
 
-  console.log("[servicer_loan_filter] 🔍 Monitoring loan element content changes...");
+  console.log(
+    "[servicer_loan_filter] 🔍 Monitoring loan element content changes..."
+  );
 
   loanElementObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       // Only check if the servicer loan element content changed
-      if (mutation.type === "childList" ||
-        (mutation.type === "characterData" && mutation.target.parentElement?.id === "lblServicerLoanNumVal")) {
-
+      if (
+        mutation.type === "childList" ||
+        (mutation.type === "characterData" &&
+          mutation.target.parentElement?.id === "lblServicerLoanNumVal")
+      ) {
         const newLoanNumber = getCurrentLoanNumber();
         if (newLoanNumber && newLoanNumber !== lastLoanNumber) {
-          console.log(`[servicer_loan_filter] Loan number changed from "${lastLoanNumber}" to "${newLoanNumber}", re-checking access...`);
+          console.log(
+            `[servicer_loan_filter] Loan number changed from "${lastLoanNumber}" to "${newLoanNumber}", re-checking access...`
+          );
           lastLoanNumber = newLoanNumber;
           checkServicerLoanAccess();
         }
@@ -487,7 +574,7 @@ function startLoanElementMonitoring() {
   loanElementObserver.observe(loanElement, {
     childList: true,
     characterData: true,
-    subtree: true
+    subtree: true,
   });
 }
 
@@ -502,6 +589,21 @@ function initializeServicerLoanFilter() {
 
   // Start URL change monitoring
   monitorURLChanges();
+
+  // Apply navigation link hiding and keep it resilient to dynamic changes
+  hideNavigationLinks();
+  window.addEventListener('DOMContentLoaded', hideNavigationLinks);
+  window.addEventListener('load', hideNavigationLinks);
+  try {
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try { iframe.addEventListener('load', hideNavigationLinks); } catch (_) {}
+    });
+  } catch (_) {}
+  // Lightweight periodic re-apply as fallback
+  if (!window.__servicerNavHideInterval) {
+    window.__servicerNavHideInterval = setInterval(hideNavigationLinks, 3000);
+  }
 }
 
 // Start the script when DOM is ready
