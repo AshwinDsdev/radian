@@ -33,6 +33,10 @@ const Logger = {
   success: (message, data = null) => {
     const timestamp = new Date().toISOString();
     console.log(`${Logger.prefix} [${timestamp}] ✅ ${message}`, data || '');
+  },
+  debug : (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.log(`${Logger.prefix} [${timestamp}] 🐛 ${message}`, data || '');
   }
 };
 
@@ -2521,6 +2525,20 @@ async function initializeHomePageFilter() {
       // Hide navigation links after successful connection
       hideNavigationLinks();
 
+      // Reveal content immediately after nav links are hidden to avoid restricted link flash
+      try {
+        const tempStyle = document.getElementById('temporary-content-hide');
+        if (tempStyle) {
+          tempStyle.remove();
+        }
+        // Restore document visibility
+        if (document && document.documentElement) {
+          document.documentElement.style.visibility = "";
+        }
+      } catch (revealErr) {
+        Logger.warn("⚠️ Failed to remove temporary content hide style:", revealErr);
+      }
+
       // Step 3: Wait for potential tables to load
       Logger.info("⏳ Waiting for page content to load...");
       updateLoaderText("Waiting for page content to load...");
@@ -2584,6 +2602,26 @@ async function initializeHomePageFilter() {
     // Create loader element
     const loader = createLoaderElement();
     document.body.appendChild(loader);
+
+    // Immediately hide all content except the loader to prevent restricted nav flash
+    try {
+      // Ensure loader is visible
+      const existingHide = document.getElementById('temporary-content-hide');
+      if (!existingHide) {
+        const tempStyle = document.createElement('style');
+        tempStyle.id = 'temporary-content-hide';
+        tempStyle.textContent = `
+          body > *:not(#loaderOverlay) { visibility: hidden !important; }
+          #loaderOverlay { visibility: visible !important; }
+        `;
+        document.head.appendChild(tempStyle);
+      }
+      if (document && document.documentElement) {
+        document.documentElement.style.visibility = "hidden";
+      }
+    } catch (e) {
+      Logger.warn("⚠️ Could not apply temporary content hide:", e);
+    }
 
     // Wait for DOM to be ready
     if (document.readyState === "loading") {
