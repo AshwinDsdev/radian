@@ -18,6 +18,10 @@ const Logger = {
     const timestamp = new Date().toISOString();
     console.log(`${Logger.prefix} [${timestamp}] ${message}`, data || '');
   },
+  info: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.info(`${Logger.prefix} [${timestamp}] ℹ️ ${message}`, data || '');
+  },
   warn: (message, data = null) => {
     const timestamp = new Date().toISOString();
     console.warn(`${Logger.prefix} [${timestamp}] ⚠️ ${message}`, data || '');
