@@ -153,7 +153,7 @@ function detectCurrentFilter() {
     return 'CHANGE_LOAN_NUMBER';
   } else if (currentUrl.includes('/Search/Inquiry-details')) {
     return 'SEARCH_INQUIRY_DETAILS';
-  } else if (currentUrl.includes('/Home') || hostname.includes('mionline.biz')) {
+  } else if (currentUrl.includes('mionline.biz/Home')) {
     return 'HOME_PAGE';
   } else if (currentUrl.includes('/Search/Inquiry')) {
     return 'SEARCH_INQUIRY';
@@ -1651,7 +1651,7 @@ async function initializeSearchInquiryDetailsFilter() {
             logger.debug(`⏳ Still waiting for payment iframe... (attempt ${attempts}/${maxAttempts})`);
           }
           setTimeout(checkForIframe, interval);
-        } else {
+      } else {
           reject(new Error("Payment history iframe not found or not accessible"));
         }
       }
@@ -1884,13 +1884,13 @@ async function initializeSearchInquiryDetailsFilter() {
           LoaderManager.hide();
           hideInquiryMIInformationFrame();
         }, 1000);
-      } else {
+              } else {
         LoaderManager.updateText("Access granted");
         logger.info(`✅ Loan ${loanNumber} is AUTHORIZED - showing content`);
         setTimeout(() => LoaderManager.hide(), 1000);
       }
 
-    } catch (error) {
+          } catch (error) {
       logger.error("❌ Error in InquiryMIInformation context handling:", error);
       LoaderManager.updateText("Error occurred during access verification");
       setTimeout(() => LoaderManager.hide(), 2000);
@@ -1912,8 +1912,8 @@ async function initializeSearchInquiryDetailsFilter() {
     // Prevent multiple executions
     if (window.paymentHistoryFilterExecuted) {
       logger.warn("⚠️ Payment history filter already executed, skipping");
-      return;
-    }
+        return;
+      }
 
     window.paymentHistoryFilterExecuted = true;
     logger.info("🚀 Initializing Payment History Filter");
