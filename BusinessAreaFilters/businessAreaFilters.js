@@ -34,7 +34,7 @@ const Logger = {
     const timestamp = new Date().toISOString();
     console.log(`${Logger.prefix} [${timestamp}] ✅ ${message}`, data || '');
   },
-  debug : (message, data = null) => {
+  debug: (message, data = null) => {
     const timestamp = new Date().toISOString();
     console.log(`${Logger.prefix} [${timestamp}] 🐛 ${message}`, data || '');
   }
@@ -1655,7 +1655,7 @@ async function initializeSearchInquiryDetailsFilter() {
             logger.debug(`⏳ Still waiting for payment iframe... (attempt ${attempts}/${maxAttempts})`);
           }
           setTimeout(checkForIframe, interval);
-      } else {
+        } else {
           reject(new Error("Payment history iframe not found or not accessible"));
         }
       }
@@ -1888,13 +1888,13 @@ async function initializeSearchInquiryDetailsFilter() {
           LoaderManager.hide();
           hideInquiryMIInformationFrame();
         }, 1000);
-              } else {
+      } else {
         LoaderManager.updateText("Access granted");
         logger.info(`✅ Loan ${loanNumber} is AUTHORIZED - showing content`);
         setTimeout(() => LoaderManager.hide(), 1000);
       }
 
-          } catch (error) {
+    } catch (error) {
       logger.error("❌ Error in InquiryMIInformation context handling:", error);
       LoaderManager.updateText("Error occurred during access verification");
       setTimeout(() => LoaderManager.hide(), 2000);
@@ -1916,8 +1916,8 @@ async function initializeSearchInquiryDetailsFilter() {
     // Prevent multiple executions
     if (window.paymentHistoryFilterExecuted) {
       logger.warn("⚠️ Payment history filter already executed, skipping");
-        return;
-      }
+      return;
+    }
 
     window.paymentHistoryFilterExecuted = true;
     logger.info("🚀 Initializing Payment History Filter");
@@ -2645,197 +2645,639 @@ async function initializeHomePageFilter() {
  * SEARCH INQUIRY FILTER
  * URL: https://www.mionline.biz/Search/Inquiry
  */
+
 async function initializeSearchInquiryFilter() {
-  Logger.log("Initializing Search Inquiry Filter");
 
-  const logger = {
-    debug: (...args) => console.debug('[PaymentHistoryFilter]', ...args),
-    info: (...args) => console.info('[PaymentHistoryFilter]', ...args),
-    warn: (...args) => console.warn('[PaymentHistoryFilter]', ...args),
-    error: (...args) => console.error('[PaymentHistoryFilter]', ...args),
-  };
 
-  // ########## LOADER MANAGEMENT ##########
-
-  const LoaderManager = {
-    createStyles() {
-      const style = document.createElement("style");
-      style.textContent = `
-        #paymentHistoryLoader {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: rgba(255, 255, 255, 0.95);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          z-index: 99999;
-          transition: opacity 0.3s ease;
-          font-family: Arial, sans-serif;
-        }
-        .payment-spinner {
-          width: 80px;
-          height: 80px;
-          border: 8px solid #e0e0e0;
-          border-top-color: #2b6cb0;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 20px;
-        }
-        @keyframes spin {
-          to {transform: rotate(360deg);}
-        }
-        #paymentHistoryLoader.hidden {
-          opacity: 0;
-          pointer-events: none;
-        }
-        .loader-text {
-          font-size: 18px;
-          color: #2b6cb0;
-          font-weight: 500;
-          text-align: center;
-          max-width: 400px;
-          line-height: 1.4;
-        }
-        .loader-steps {
-          margin-top: 15px;
-          font-size: 14px;
-          color: #666;
-          text-align: center;
-        }
-      `;
-      return style;
-    },
-
-    createElement() {
-      const loader = document.createElement("div");
-      loader.id = "paymentHistoryLoader";
-
-      const spinner = document.createElement("div");
-      spinner.className = "payment-spinner";
-
-      const loadingText = document.createElement("div");
-      loadingText.className = "loader-text";
-      loadingText.textContent = "Verifying loan access permissions...";
-
-      const stepsText = document.createElement("div");
-      stepsText.className = "loader-steps";
-      stepsText.id = "paymentLoaderSteps";
-      stepsText.textContent = "Initializing...";
-
-      loader.appendChild(spinner);
-      loader.appendChild(loadingText);
-      loader.appendChild(stepsText);
-
-      return loader;
-    },
-
-    show() {
-      const existingLoader = document.getElementById("paymentHistoryLoader");
-      if (existingLoader) {
-        existingLoader.remove();
-      }
-
-      const style = this.createStyles();
-      const loader = this.createElement();
-
-      if (document.head && style) {
-        document.head.appendChild(style);
-      }
-      if (document.body && loader) {
-        document.body.appendChild(loader);
-      }
-    },
-
-    updateText(stepText) {
-      const stepsElement = document.getElementById("paymentLoaderSteps");
-      if (stepsElement) {
-        stepsElement.textContent = stepText;
-      }
-    },
-
-    hide() {
-      const loader = document.getElementById("paymentHistoryLoader");
-      if (loader && loader.parentNode) {
-        loader.classList.add("hidden");
-        setTimeout(() => {
-          if (loader.parentNode) {
-            loader.parentNode.removeChild(loader);
-          }
-
-          // Remove the temporary style that hides content
-          const tempStyle = document.getElementById("temporary-content-hide");
-          if (tempStyle && tempStyle.parentNode) {
-            tempStyle.parentNode.removeChild(tempStyle);
-          }
-
-          // Make content visible again
-          document.documentElement.style.visibility = "";
-        }, 300);
-      }
-    }
-  };
-
-  // ########## CONTEXT DETECTION ##########
+  let processedElements = new WeakSet();
 
   /**
-   * Detect if we're in InquiryMIInformation.aspx context (frmMIOnlineContent iframe)
+   * Cache for storing allowed loan numbers to reduce API calls
    */
-  function isInquiryMIInformationContext() {
+  const allowedLoansCache = {
+    loans: new Set(),
+    lastUpdated: 0,
+    cacheTimeout: 5 * 60 * 1000, // 5 minutes
+
+    isAllowed(loanNumber) {
+      return this.loans.has(loanNumber);
+    },
+
+    addLoans(loanNumbers) {
+      loanNumbers.forEach((loan) => this.loans.add(loan));
+      this.lastUpdated = Date.now();
+    },
+
+    isCacheValid() {
+      return (
+        this.lastUpdated > 0 && Date.now() - this.lastUpdated < this.cacheTimeout
+      );
+    },
+
+    clear() {
+      this.loans.clear();
+      this.lastUpdated = 0;
+    },
+  };
+
+  /**
+   * Returns the main data table element.
+   * Uses a generic selector for robustness against dynamic class names.
+   */
+  function getTargetTable() {
+    const selectors = [
+      "table",
+      'table[class*="table"]',
+      'table[class*="data"]',
+      'table[class*="grid"]',
+      ".table table",
+      ".data-table table",
+      ".results table",
+    ];
+
+    for (const selector of selectors) {
+      const table = document.querySelector(selector);
+      if (table) {
+        const tbody = table.querySelector("tbody");
+        const rows = table.querySelectorAll("tr");
+
+        if (tbody || rows.length > 1) {
+          console.log(
+            "[radian_filter] getTargetTable: Found table with selector:",
+            selector
+          );
+          return table;
+        }
+      }
+    }
+
+    console.log("[radian_filter] getTargetTable: No suitable table found");
+    return null;
+  }
+
+  // ########## NAVIGATION CONTROL ##########
+  // Use the global hideNavigationLinks defined in the unified section above
+
+  // ########## END NAVIGATION CONTROL ##########
+
+  /**
+   * Page utility functions
+   */
+  function showPage(val) {
+    if (document.body?.style) {
+      document.body.style.opacity = val ? 1 : 0;
+    }
+  }
+
+  function togglePageDisplay(val) {
+    document.body.style.display = val;
+  }
+
+  /**
+   * Create unallowed element to show when loan is not allowed
+   */
+  function createUnallowedElement() {
+    const unallowed = document.createElement("tr");
+    const td = document.createElement("td");
+    td.setAttribute("colspan", "7");
+    td.appendChild(
+      document.createTextNode(
+        "You are not provisioned to see the restricted loan"
+      )
+    );
+    td.style.textAlign = "center";
+    td.style.padding = "15px";
+    td.style.fontWeight = "bold";
+    td.style.color = "#721c24";
+    td.style.backgroundColor = "#f8d7da";
+    td.style.border = "1px solid #f5c6cb";
+
+    unallowed.appendChild(td);
+    return unallowed;
+  }
+
+  /**
+   * Check if a loan number is allowed for the current user
+   */
+  async function isLoanNumberAllowed(loanNumber) {
     try {
-      // Only check for content indicators, no URL checks
-      if (document.body && document.body.textContent &&
-        document.body.textContent.includes('Lender/Servicer Loan Number')) {
-        logger.info("✅ In InquiryMIInformation context (content detected)");
+      if (
+        allowedLoansCache.isCacheValid() &&
+        allowedLoansCache.isAllowed(loanNumber)
+      ) {
         return true;
       }
 
-      return false;
+      const allowedNumbers = await checkNumbersBatch([loanNumber]);
+      allowedLoansCache.addLoans(allowedNumbers);
+      const isAllowed = allowedNumbers.includes(loanNumber);
+      return isAllowed;
     } catch (error) {
-      logger.warn("⚠️ Error detecting InquiryMIInformation context:", error);
+      console.error(
+        "[radian_filter] isLoanNumberAllowed: Error for",
+        loanNumber,
+        error
+      );
       return false;
     }
   }
 
-  // ########## MUTATION OBSERVER ##########
+  /**
+   * Check if text contains a potential loan number
+   */
+  function containsLoanNumber(text) {
+    return /\b\d{5,}\b/.test(text) || /\b[A-Z0-9]{5,}\b/.test(text);
+  }
 
   /**
-   * Set up mutation observer to handle dynamic content loading
+   * Extract potential loan numbers from text
    */
-  function setupMutationObserver() {
-    if (window.paymentHistoryMutationObserver) {
-      return; // Already set up
+  function extractLoanNumbers(text) {
+    const matches = [];
+    const digitMatches = text.match(/\b\d{5,}\b/g);
+    const alphaNumMatches = text.match(/\b[A-Z0-9]{5,}\b/g);
+
+    if (digitMatches) matches.push(...digitMatches);
+    if (alphaNumMatches) matches.push(...alphaNumMatches);
+
+    return [...new Set(matches)];
+  }
+
+  /**
+   * Class to manage the visibility of table rows containing loan information
+   */
+  class TableRowFilter {
+    constructor(row) {
+      this.row = row;
+      this.parent = row.parentElement;
+      this.loanNumber = this.getLoanNumber();
     }
 
-    // Create a debounced version of hideNavigationLinks to avoid excessive calls
-    let navLinksDebounceTimer = null;
-    const debouncedHideNavigationLinks = () => {
-      clearTimeout(navLinksDebounceTimer);
-      navLinksDebounceTimer = setTimeout(() => {
-        hideNavigationLinks();
-      }, 300);
-    };
-
-    // Track URL changes to detect navigation
-    let lastUrl = window.location.href;
-
-    const observer = new MutationObserver((mutations) => {
-      let shouldCheckLinks = false;
-      let shouldCheckLoanInfo = false;
-
-      // Check if URL changed (navigation happened)
-      if (lastUrl !== window.location.href) {
-        lastUrl = window.location.href;
-        logger.info("🔄 URL changed - will re-apply navigation controls");
-        shouldCheckLinks = true;
-        shouldCheckLoanInfo = true;
+    getLoanNumber() {
+      if (!this.row.cells || this.row.cells.length === 0) {
+        return null;
       }
 
-      // Check mutations for relevant changes
-      mutations.forEach((mutation) => {
+      const table = this.row.closest("table");
+      if (!table) {
+        return null;
+      }
+
+      const headerRow = table.querySelector("thead tr");
+      if (!headerRow) {
+        if (this.row.cells.length >= 3) {
+          return this.row.cells[2].textContent.trim();
+        }
+        return null;
+      }
+
+      // Find the index of the "Loan Number" column
+      let loanNumberIndex = -1;
+      const headerCells = headerRow.cells;
+      for (let i = 0; i < headerCells.length; i++) {
+        if (headerCells[i].textContent.trim() === "Loan Number") {
+          loanNumberIndex = i;
+          break;
+        }
+      }
+
+      if (loanNumberIndex !== -1 && this.row.cells.length > loanNumberIndex) {
+        return this.row.cells[loanNumberIndex].textContent.trim();
+      }
+
+      if (this.row.cells.length >= 3) {
+        return this.row.cells[2].textContent.trim();
+      }
+
+      return null;
+    }
+
+    async filter() {
+      if (!this.loanNumber) {
+        return false;
+      }
+
+      const isAllowed = await isLoanNumberAllowed(this.loanNumber);
+
+      if (!isAllowed) {
+        this.hide();
+        return true;
+      }
+
+      return false;
+    }
+
+    hide() {
+      if (this.parent && this.row) {
+        try {
+          this.row.style.display = "none";
+        } catch (error) {
+          console.error("[radian_filter] Error hiding row:", error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Clear any existing restriction or no-results messages from the table
+   */
+  function clearExistingMessages(tbody) {
+    if (!tbody) return;
+
+    const existingMessages = tbody.querySelectorAll('tr td[colspan]');
+    existingMessages.forEach(td => {
+      const text = td.textContent.trim();
+      if (text === "No results found." ||
+        text === "You are not provisioned to see the restricted loan" ||
+        text.includes("not provisioned") ||
+        text.includes("restricted loan")) {
+        const row = td.closest('tr');
+        if (row) {
+          row.remove();
+          console.log("[radian_filter] clearExistingMessages: Removed existing message:", text);
+        }
+      }
+    });
+  }
+
+  /**
+   * Process all table rows in the search results and hide those containing unauthorized loan numbers
+   */
+  async function processTableRows() {
+    console.log("[radian_filter] processTableRows: Start");
+    processedElements = new WeakSet();
+
+    const table = getTargetTable();
+    if (!table) {
+      console.warn("[radian_filter] processTableRows: Table not found");
+      showPage(true);
+      return;
+    }
+
+    const tbody = table.querySelector("tbody");
+    if (!tbody) {
+      console.warn("[radian_filter] processTableRows: Tbody not found");
+      showPage(true);
+      return;
+    }
+
+    const headerRow = table.querySelector("thead tr");
+    if (!headerRow) {
+      console.warn("[radian_filter] processTableRows: Header row not found");
+      showPage(true);
+      return;
+    }
+
+    const columnCount = headerRow.cells.length;
+
+    // Clear any existing "no results" or restriction messages first
+    clearExistingMessages(tbody);
+
+    const originalRows = Array.from(tbody.querySelectorAll("tr"));
+
+    // Reset all rows to visible before filtering
+    originalRows.forEach(row => {
+      row.style.display = "";
+    });
+
+    const allowedRows = [];
+    let dataRowsCount = 0;
+    let dataRowsRemoved = 0;
+
+    for (const row of originalRows) {
+      if (row.cells.length === 1 && row.cells[0].hasAttribute("colspan")) {
+        allowedRows.push(row);
+        continue;
+      }
+
+      if (row.cells.length > 1) {
+        dataRowsCount++;
+
+        let loanNumber = null;
+        if (row.cells.length > 2) {
+          loanNumber = row.cells[2].textContent.trim();
+        }
+
+        if (!loanNumber) {
+          allowedRows.push(row);
+          continue;
+        }
+        const isAllowed = await isLoanNumberAllowed(loanNumber);
+        console.log(
+          "[radian_filter] processTableRows: Row loanNumber",
+          loanNumber,
+          "isAllowed",
+          isAllowed
+        );
+
+        if (isAllowed) {
+          allowedRows.push(row);
+        } else {
+          row.style.display = "none";
+          dataRowsRemoved++;
+        }
+      } else {
+        allowedRows.push(row);
+      }
+    }
+
+    // Count only visible rows (not hidden)
+    let actualDisplayedRows = originalRows.filter(row => row.style.display !== "none").length;
+
+    // If all rows are hidden, show appropriate message
+    if (actualDisplayedRows === 0) {
+      // Remove all rows first
+      while (tbody.firstChild) {
+        tbody.removeChild(tbody.firstChild);
+      }
+
+      if (dataRowsCount === 1 && dataRowsRemoved === 1) {
+        const unallowedElement = createUnallowedElement();
+        unallowedElement
+          .querySelector("td")
+          .setAttribute("colspan", columnCount.toString());
+        tbody.appendChild(unallowedElement);
+        actualDisplayedRows = 0;
+        console.log(
+          "[radian_filter] processTableRows: All rows removed, showing unallowed message"
+        );
+      } else {
+        const noResultsRow = document.createElement("tr");
+        const td = document.createElement("td");
+        td.setAttribute("colspan", columnCount.toString());
+        td.textContent = "No results found.";
+        td.style.textAlign = "center";
+        noResultsRow.appendChild(td);
+        tbody.appendChild(noResultsRow);
+        actualDisplayedRows = 0;
+        console.log(
+          "[radian_filter] processTableRows: All rows removed, showing no results"
+        );
+      }
+    }
+
+    // Update pagination counts
+    updatePaginationCounts(actualDisplayedRows);
+
+    showPage(true);
+    console.log("[radian_filter] processTableRows: End");
+  }
+
+  /**
+   * Update pagination counts to reflect the actual number of filtered rows
+   */
+  function updatePaginationCounts(actualRowCount) {
+    try {
+      // Primary target: find the pagination element with class "number_styling"
+      const paginationElement = document.querySelector(".number_styling");
+
+      if (paginationElement) {
+        updateSinglePaginationElement(paginationElement, actualRowCount);
+      } else {
+        console.log(
+          "[radian_filter] Primary pagination element (.number_styling) not found"
+        );
+      }
+
+      // Fallback: search for other common pagination patterns
+      const alternativePaginationSelectors = [
+        ".pagination-info",
+        ".results-count",
+        ".page-info",
+        ".styling_ordering .number_styling", // More specific selector
+        '[class*="pagination"] [class*="number"]',
+        '[class*="results"] [class*="count"]',
+        '[class*="page"] [class*="info"]',
+      ];
+
+      let alternativeFound = false;
+      alternativePaginationSelectors.forEach((selector) => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((element) => {
+          if (updateSinglePaginationElement(element, actualRowCount)) {
+            alternativeFound = true;
+          }
+        });
+      });
+
+      // Last resort: search for any element containing pagination-like text pattern
+      if (!paginationElement && !alternativeFound) {
+        const allElements = document.querySelectorAll("*");
+        for (const element of allElements) {
+          const text = element.textContent?.trim() || "";
+          if (text.match(/^\d+\s*-\s*\d+\s*of\s*\d+$/)) {
+            updateSinglePaginationElement(element, actualRowCount);
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[radian_filter] Error updating pagination counts:", error);
+    }
+  }
+
+  /**
+   * Update a single pagination element
+   */
+  function updateSinglePaginationElement(element, actualRowCount) {
+    try {
+      const originalText = element.textContent?.trim() || "";
+
+      // Check if this element contains pagination-like text
+      if (!originalText.match(/\d+\s*-\s*\d+\s*of\s*\d+/)) {
+        return false;
+      }
+
+      // Extract the original total count from the text (e.g., "1 - 10 of 174930")
+      const totalMatch = originalText.match(/of\s*(\d+)/);
+      const originalTotal = totalMatch ? totalMatch[1] : "0";
+
+      let newText;
+      if (actualRowCount === 0) {
+        newText = `0 - 0 of ${originalTotal}`;
+      } else if (actualRowCount === 1) {
+        newText = `1 - 1 of ${originalTotal}`;
+      } else {
+        // For multiple rows, show 1 to actualRowCount
+        newText = `1 - ${actualRowCount} of ${originalTotal}`;
+      }
+
+      element.textContent = newText;
+      return true;
+    } catch (error) {
+      console.error(
+        "[radian_filter] Error updating single pagination element:",
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Determine if an element should be hidden based on the loan numbers it contains
+   */
+  async function shouldHideElement(element) {
+    if (
+      element.tagName === "SCRIPT" ||
+      element.tagName === "STYLE" ||
+      element.tagName === "META" ||
+      element.tagName === "LINK"
+    ) {
+      return false;
+    }
+
+    const text = element.innerText || element.textContent || "";
+    if (!containsLoanNumber(text)) return false;
+
+    const potentialLoanNumbers = extractLoanNumbers(text);
+    if (potentialLoanNumbers.length === 0) return false;
+
+    for (const loanNumber of potentialLoanNumbers) {
+      if (await isLoanNumberAllowed(loanNumber)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Process generic elements that might contain loan information
+   */
+  async function processGenericElements() {
+    const potentialContainers = document.querySelectorAll(
+      '.sc-kXOizl, .sc-dJkDXt, [class*="loan"], [class*="borrower"]'
+    );
+
+    for (const container of potentialContainers) {
+      if (processedElements.has(container)) continue;
+      processedElements.add(container);
+
+      if (await shouldHideElement(container)) {
+        if (container.parentElement) {
+          container.parentElement.removeChild(container);
+        }
+      }
+    }
+  }
+
+  /**
+   * Process the entire page to hide unauthorized loan information
+   */
+  async function processPage() {
+    try {
+      await processTableRows();
+
+      showPage(true);
+    } catch (error) {
+      console.error("Error processing page:", error);
+      showPage(true);
+    }
+  }
+
+  /**
+   * Set up mutation observer to monitor DOM changes
+   */
+  function setupMutationObserver() {
+    console.log("[radian_filter] setupMutationObserver");
+    const observerState = {
+      processingDebounce: null,
+      lastProcessed: Date.now(),
+      ignoreNextMutations: false,
+      isProcessing: false,
+      lastTableHash: null,
+      processingCount: 0,
+      maxProcessingCount: 10, // Prevent infinite loops
+      navLinksDebounce: null,
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      if (observerState.ignoreNextMutations || observerState.isProcessing) {
+        return;
+      }
+
+      // Prevent processing if we just processed recently (within 3 seconds)
+      const timeSinceLastProcess = Date.now() - observerState.lastProcessed;
+      if (timeSinceLastProcess < 3000) {
+        console.log("[radian_filter] MutationObserver: Skipping - too soon since last process");
+        return;
+      }
+
+      // Prevent excessive processing
+      if (observerState.processingCount >= observerState.maxProcessingCount) {
+        console.log("[radian_filter] MutationObserver: Skipping - max processing count reached");
+        return;
+      }
+
+      if (observerState.processingDebounce) {
+        clearTimeout(observerState.processingDebounce);
+      }
+
+      let shouldProcess = false;
+      let newTableDetected = false;
+      let shouldCheckLinks = false;
+
+      // Create a debounced version of hideNavigationLinks to avoid excessive calls
+      const debouncedHideNavigationLinks = () => {
+        clearTimeout(observerState.navLinksDebounce);
+        observerState.navLinksDebounce = setTimeout(() => {
+          hideNavigationLinks();
+        }, 300);
+      };
+
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === 1) {
+              // Check if a table was added
+              if (
+                node.nodeName === "TABLE" ||
+                (node.querySelector && node.querySelector("table"))
+              ) {
+                newTableDetected = true;
+                shouldProcess = true;
+                console.log(
+                  "[radian_filter] MutationObserver: New table detected"
+                );
+                break;
+              }
+
+              // Check if table rows were added to existing table
+              if (
+                node.nodeName === "TR" ||
+                (node.querySelector && node.querySelector("tr"))
+              ) {
+                const table = getTargetTable();
+                if (table) {
+                  const tbody = table.querySelector("tbody");
+                  if (tbody && tbody.contains(node)) {
+                    shouldProcess = true;
+                    console.log("[radian_filter] MutationObserver: Table rows added");
+                  }
+                }
+              }
+
+              // Check if tbody was added (common in dynamic tables)
+              if (
+                node.nodeName === "TBODY" ||
+                (node.querySelector && node.querySelector("tbody"))
+              ) {
+                shouldProcess = true;
+                console.log("[radian_filter] MutationObserver: Tbody added");
+              }
+
+              // Check for navigation elements
+              if (node.querySelector &&
+                (node.querySelector('a') ||
+                  node.querySelector('button') ||
+                  node.querySelector('[role="menuitem"]') ||
+                  node.querySelector('.menu-item'))) {
+                shouldCheckLinks = true;
+              }
+            }
+          }
+        }
+
         // For attribute changes, check if they're on navigation elements
         if (mutation.type === 'attributes') {
           const target = mutation.target;
@@ -2848,46 +3290,81 @@ async function initializeSearchInquiryFilter() {
           }
         }
 
-        // For added nodes, check for both navigation and loan info
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node;
-
-              // Check for navigation elements
-              if (element.querySelector &&
-                (element.querySelector('a') ||
-                  element.querySelector('button') ||
-                  element.querySelector('[role="menuitem"]') ||
-                  element.querySelector('.menu-item'))) {
-                shouldCheckLinks = true;
-              }
-
-              // Check for loan information
-              if (element.textContent && element.textContent.includes('Lender/Servicer Loan Number')) {
-                logger.info("🔄 Dynamic content detected with loan information");
-                shouldCheckLoanInfo = true;
-              }
-            }
-          }
+        // Only process attribute changes if they're significant
+        if (
+          mutation.type === "attributes" &&
+          mutation.target &&
+          mutation.target.tagName === "TABLE" &&
+          (mutation.attributeName === "class" || mutation.attributeName === "style")
+        ) {
+          shouldProcess = true;
+          console.log(
+            "[radian_filter] MutationObserver: Table attribute changed"
+          );
         }
-      });
+      }
 
       // Handle navigation links if needed
       if (shouldCheckLinks) {
-        logger.debug("🔄 Navigation-related changes detected - re-applying link controls");
+        console.log("[radian_filter] 🔄 Navigation-related changes detected - re-applying link controls");
         debouncedHideNavigationLinks();
       }
 
-      // Handle loan information if needed
-      if (shouldCheckLoanInfo) {
-        setTimeout(() => {
-          if (isInquiryMIInformationContext() && !window.paymentHistoryLoanChecked) {
-            logger.info("🔄 Re-initializing due to dynamic content with loan information");
-            window.paymentHistoryLoanChecked = true;
-            handleInquiryMIInformationContext();
+      if (shouldProcess) {
+        const delay = newTableDetected ? 1500 : 500; // Longer delay to prevent flickering
+
+        observerState.processingDebounce = setTimeout(async () => {
+          // Check if table content has actually changed
+          const table = getTargetTable();
+          if (table) {
+            const tbody = table.querySelector("tbody");
+            if (tbody) {
+              const currentHash = getTableContentHash(tbody);
+              if (currentHash === observerState.lastTableHash) {
+                console.log("[radian_filter] MutationObserver: No actual change, skipping processing");
+                return; // No actual change, skip processing
+              }
+              observerState.lastTableHash = currentHash;
+            }
           }
-        }, 500);
+
+          observerState.lastProcessed = Date.now();
+          observerState.isProcessing = true;
+          observerState.processingCount++;
+
+          console.log(
+            "[radian_filter] MutationObserver: Processing changes, newTable:",
+            newTableDetected,
+            "processingCount:",
+            observerState.processingCount
+          );
+
+          try {
+            if (newTableDetected) {
+              // Wait for table to be fully populated
+              const tableReady = await waitForDynamicTable(15, 400);
+              if (tableReady) {
+                showPage(false);
+                await processPage();
+              } else {
+                console.warn(
+                  "[radian_filter] MutationObserver: New table not ready after waiting"
+                );
+              }
+            } else {
+              // Regular table update
+              await processPage();
+            }
+          } catch (error) {
+            console.error(
+              "[radian_filter] MutationObserver: Error processing changes:",
+              error
+            );
+            showPage(true);
+          } finally {
+            observerState.isProcessing = false;
+          }
+        }, delay);
       }
     });
 
@@ -2895,10 +3372,13 @@ async function initializeSearchInquiryFilter() {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['style', 'class', 'display', 'visibility']
+      attributeFilter: ["style", "class", "display", "visibility"],
     });
 
-    // Also set up a periodic check for navigation links as a fallback
+    // Initial call to hide navigation links
+    hideNavigationLinks();
+
+    // Set up periodic check for navigation links as a fallback
     const periodicCheckInterval = setInterval(() => {
       hideNavigationLinks();
     }, 3000);
@@ -2907,490 +3387,300 @@ async function initializeSearchInquiryFilter() {
     window.addEventListener('DOMContentLoaded', hideNavigationLinks);
     window.addEventListener('load', hideNavigationLinks);
 
-    // Listen for iframe load events
-    function setupIframeListeners() {
-      const iframes = document.querySelectorAll('iframe');
-      iframes.forEach(iframe => {
-        try {
-          iframe.addEventListener('load', hideNavigationLinks);
-        } catch (e) {
-          // Ignore cross-origin errors
+    // Store references to clean up if needed
+    window._radianNavInterval = periodicCheckInterval;
+
+    console.log("[radian_filter] Mutation observer setup complete with navigation control");
+    return observer;
+  }
+
+  /**
+   * Wait for table to be available
+   */
+  async function waitForTable(maxAttempts = 10, delay = 300) {
+    console.log(
+      "[radian_filter] waitForTable: Start, maxAttempts",
+      maxAttempts,
+      "delay",
+      delay
+    );
+    for (let i = 0; i < maxAttempts; i++) {
+      const table = getTargetTable();
+      if (table) {
+        console.log("[radian_filter] waitForTable: Table found");
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    console.warn("[radian_filter] waitForTable: Table not found after attempts");
+    return false;
+  }
+
+  /**
+   * Generate a hash of table content to detect actual changes
+   */
+  function getTableContentHash(tbody) {
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const content = rows.map(row => {
+      const cells = Array.from(row.querySelectorAll("td, th"));
+      return cells.map(cell => cell.textContent.trim()).join("|");
+    }).join("||");
+
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash;
+  }
+
+  /**
+   * Wait for table to be available with longer timeout for dynamic content
+   */
+  async function waitForDynamicTable(maxAttempts = 30, delay = 500) {
+    console.log(
+      "[radian_filter] waitForDynamicTable: Start, maxAttempts",
+      maxAttempts,
+      "delay",
+      delay
+    );
+    for (let i = 0; i < maxAttempts; i++) {
+      const table = getTargetTable();
+      if (table) {
+        // Also check if table has actual data rows
+        const tbody = table.querySelector("tbody");
+        const rows = tbody ? tbody.querySelectorAll("tr") : [];
+        if (rows.length > 0) {
+          console.log(
+            "[radian_filter] waitForDynamicTable: Table with data found"
+          );
+          return true;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    console.warn(
+      "[radian_filter] waitForDynamicTable: Table with data not found after attempts"
+    );
+    return false;
+  }
+
+  /**
+   * Manually refresh pagination counts based on current table state
+   */
+  function refreshPaginationCounts() {
+    try {
+      const table = getTargetTable();
+      if (!table) {
+        console.warn("[radian_filter] refreshPaginationCounts: Table not found");
+        return;
+      }
+
+      const tbody = table.querySelector("tbody");
+      if (!tbody) {
+        console.warn("[radian_filter] refreshPaginationCounts: Tbody not found");
+        return;
+      }
+
+      // Count actual data rows (exclude rows with colspan like messages and hidden rows)
+      const dataRows = Array.from(tbody.querySelectorAll("tr")).filter((row) => {
+        return row.style.display !== "none" && !(row.cells.length === 1 && row.cells[0].hasAttribute("colspan"));
+      });
+
+      updatePaginationCounts(dataRows.length);
+    } catch (error) {
+      console.error("[radian_filter] Error refreshing pagination counts:", error);
+    }
+  }
+
+
+
+
+
+
+
+  /**
+   * Set up event listeners for table updates
+   */
+  function setupTableUpdateListeners() {
+    console.log("[radian_filter] setupTableUpdateListeners");
+
+    let isProcessingSearch = false;
+
+    // Listen for Enter key in search inputs
+    const searchInputs = document.querySelectorAll('input[type="text"]');
+    searchInputs.forEach((input) => {
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          if (isProcessingSearch) {
+            e.preventDefault();
+            return; // Prevent multiple simultaneous searches
+          }
+
+          console.log(
+            "[radian_filter] Search input Enter pressed, preparing for table update"
+          );
+          isProcessingSearch = true;
+          showPage(false);
+
+          setTimeout(async () => {
+            const tableReady = await waitForDynamicTable(20, 500);
+            if (tableReady) {
+              await processPage();
+            } else {
+              showPage(true);
+            }
+            isProcessingSearch = false;
+          }, 1500);
         }
       });
-    }
-
-    // Initial iframe setup and periodic check for new iframes
-    setupIframeListeners();
-    setInterval(setupIframeListeners, 5000);
-
-    // Store references to clean up if needed
-    window.paymentHistoryMutationObserver = observer;
-    window.paymentHistoryPeriodicCheck = periodicCheckInterval;
-
-    logger.info("✅ Enhanced mutation observer set up for dynamic content and navigation");
-  }
-
-  // ########## UTILITY FUNCTIONS ##########
-
-  /**
-   * Apply styles to an element safely
-   */
-  function applyElementStyles(element, styles) {
-    if (!element || !styles) return;
-    Object.entries(styles).forEach(([property, value]) => {
-      element.style[property] = value;
     });
   }
 
   /**
-   * Create unauthorized access message element
+   * Initialize the filter script
    */
-  function createUnauthorizedElement() {
-    // Create a centered card that fits within the parent container (e.g., contentmenu)
-    const unauthorizedContainer = document.createElement("div");
-    applyElementStyles(unauthorizedContainer, {
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      width: "100%",
-      minHeight: "200px",
-      backgroundColor: "#f8f9fa",
-      border: "2px solid #dc3545",
-      borderRadius: "8px",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-      margin: "20px 0",
-      zIndex: "1000"
-    });
-
-    const messageContainer = document.createElement("div");
-    applyElementStyles(messageContainer, {
-      textAlign: "center",
-      color: "#dc3545",
-      fontSize: "18px",
-      fontWeight: "bold",
-      padding: "20px",
-    });
-
-    const iconElement = document.createElement("i");
-    iconElement.className = "fas fa-exclamation-triangle";
-    applyElementStyles(iconElement, {
-      fontSize: "24px",
-      marginBottom: "10px",
-    });
-
-    const textElement = document.createElement("div");
-    textElement.textContent = "You are not authorized to view this loan information";
-    applyElementStyles(textElement, {
-      marginTop: "10px",
-    });
-
-    messageContainer.appendChild(iconElement);
-    messageContainer.appendChild(textElement);
-    unauthorizedContainer.appendChild(messageContainer);
-
-    return unauthorizedContainer;
-  }
-
-  // ########## IFRAME MONITORING ##########
-
-  /**
-   * Wait for payment history iframe to load after tab click
-   */
-  async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
-    return new Promise((resolve, reject) => {
-      let attempts = 0;
-
-      function checkForIframe() {
-        // Look for the payment history iframe
-        const paymentIframe = document.querySelector('#containerTab_tabPaymentHistory_frmPaymentHistory');
-
-        if (paymentIframe) {
-          try {
-            // Check if iframe is accessible and has loaded content
-            if (paymentIframe.contentDocument && paymentIframe.contentWindow) {
-              const iframeDoc = paymentIframe.contentDocument;
-
-              // Check if iframe has substantial content (not just loading)
-              const hasContent = iframeDoc.body &&
-                (iframeDoc.body.children.length > 0 ||
-                  iframeDoc.querySelector('#_LblLenderNumInfo') ||
-                  iframeDoc.querySelector('table'));
-
-              if (hasContent && iframeDoc.readyState === 'complete') {
-                logger.info("✅ Payment history iframe loaded with content");
-                resolve(paymentIframe);
-                return;
-              } else if (hasContent) {
-                logger.debug("📋 Payment history iframe has content but still loading...");
-              }
-            }
-          } catch (e) {
-            logger.warn("⚠️ Payment iframe found but not accessible:", e.message);
-          }
-        }
-
-        if (++attempts < maxAttempts) {
-          if (attempts === 1) {
-            logger.info("⏳ Waiting for payment history iframe to load...");
-          }
-          if (attempts % 5 === 0) {
-            logger.debug(`⏳ Still waiting for payment iframe... (attempt ${attempts}/${maxAttempts})`);
-          }
-          setTimeout(checkForIframe, interval);
-        } else {
-          reject(new Error("Payment history iframe not found or not accessible"));
-        }
-      }
-
-      checkForIframe();
-    });
-  }
-
-  // ########## NAVIGATION CONTROL ##########
-
-  /**
-   * Define the links that should be hidden
-   */
-
-  // ########## ACCESS CONTROL ##########
-
-  /**
-   * Hide contentmenu div and show unauthorized message
-   */
-  function hideInquiryMIInformationFrame() {
-    logger.info("🔒 Hiding contentmenu div - unauthorized access");
-
-    // Find the contentmenu div
-    const contentMenuDiv = document.querySelector('.contentmenu');
-    if (contentMenuDiv) {
-      // Create unauthorized message
-      const unauthorizedElement = createUnauthorizedElement();
-
-      // Insert the unauthorized message in place of the contentmenu div
-      if (contentMenuDiv.parentNode && unauthorizedElement) {
-        contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
-        contentMenuDiv.style.display = "none";
-        logger.info("✅ contentmenu div hidden and unauthorized message placed in its position");
-      } else {
-        // Fallback: just hide the contentmenu div
-        contentMenuDiv.style.display = "none";
-        logger.info("✅ contentmenu div hidden successfully");
-      }
-    } else {
-      logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
-      // Fallback: Hide all content if contentmenu div is not found
-      const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-      if (allElements && allElements.length > 0) {
-        allElements.forEach((element) => {
-          if (element && element.id !== "paymentHistoryLoader") {
-            element.style.display = "none";
-          }
-        });
-      }
-
-      // Show unauthorized message at body level as fallback
-      const unauthorizedElement = createUnauthorizedElement();
-      const documentBody = document.body;
-      if (documentBody && unauthorizedElement) {
-        documentBody.appendChild(unauthorizedElement);
-      }
-    }
-
-    logger.info("✅ Unauthorized message displayed");
-  }
-
-  // ########## MAIN LOGIC ##########
-
-  /**
-   * Handle Payment History context - check loan access from within payhist_viewAll.html
-   */
-  async function handlePaymentHistoryContext() {
+  async function initialize() {
+    console.log("[radian_filter] initialize: Start");
     try {
-      logger.info("🔄 Handling Payment History context");
-      LoaderManager.show();
-      LoaderManager.updateText("Checking loan access permissions...");
-
-      // Wait a bit for the page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Extract loan number using the new structure
-      LoaderManager.updateText("Extracting loan number...");
-      const loanNumber = extractLoanNumberDirectly();
-
-      if (!loanNumber) {
-        LoaderManager.updateText("Error: Loan number not found");
-        setTimeout(() => LoaderManager.hide(), 2000);
-        return;
-      }
-
-      // Check loan access
-      LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
-      const allowedLoans = await checkNumbersBatch([loanNumber]);
-
-      if (!allowedLoans || allowedLoans.length === 0) {
-        LoaderManager.updateText("Access denied - Hiding restricted content...");
-        logger.debug(`🚫 Loan ${loanNumber} is restricted`);
-
-        // Hide content and show unauthorized message  
-        setTimeout(() => {
-          LoaderManager.hide();
-
-          // Hide only the contentmenu div which contains the loan information
-          const contentMenuDiv = document.querySelector('.contentmenu');
-          if (contentMenuDiv) {
-            // Create unauthorized message
-            const unauthorizedElement = createUnauthorizedElement();
-
-            // Insert the unauthorized message in place of the contentmenu div
-            if (contentMenuDiv.parentNode && unauthorizedElement) {
-              contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
-              contentMenuDiv.style.display = "none";
-              logger.info("✅ contentmenu div hidden and unauthorized message placed in its position in payment history context");
-            } else {
-              // Fallback: just hide the contentmenu div
-              contentMenuDiv.style.display = "none";
-              logger.info("✅ contentmenu div hidden successfully in payment history context");
-            }
-          } else {
-            logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
-            // Fallback: Hide all content if contentmenu div is not found
-            const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-            allElements.forEach((element) => {
-              if (element && element.id !== "paymentHistoryLoader") {
-                element.style.display = "none";
-              }
-            });
-
-            // Show unauthorized message at body level as fallback
-            const unauthorizedElement = createUnauthorizedElement();
-            if (document.body) {
-              document.body.appendChild(unauthorizedElement);
-            }
-          }
-        }, 1000);
-      } else {
-        LoaderManager.updateText("Access granted");
-        logger.debug(`✅ Loan ${loanNumber} is authorized`);
-        setTimeout(() => LoaderManager.hide(), 1000);
-      }
-
-    } catch (error) {
-      logger.error("❌ Error in Payment History context handling:", error);
-      LoaderManager.updateText("Error occurred during access verification");
-      setTimeout(() => LoaderManager.hide(), 2000);
-    }
-  }
-
-  /**
-   * Extract loan number directly from InquiryMIInformation page - simplified for new structure
-   */
-  function extractLoanNumberDirectly() {
-    try {
-      logger.info("🔍 Starting loan number extraction...");
-
-      // Method 1: Find elements containing "Lender/Servicer Loan Number"
-      const allElements = document.querySelectorAll('*');
-      logger.debug(`Found ${allElements.length} elements to search`);
-
-      for (const element of allElements) {
-        if (element.textContent && element.textContent.trim() === 'Lender/Servicer Loan Number') {
-          logger.info("📍 Found 'Lender/Servicer Loan Number' label");
-
-          // Found the label, look for the next sibling div that contains the loan number
-          const parentDiv = element.closest('div');
-          if (parentDiv && parentDiv.nextElementSibling) {
-            const nextDiv = parentDiv.nextElementSibling;
-            const pElement = nextDiv.querySelector('p');
-            if (pElement && pElement.textContent) {
-              const loanNumber = pElement.textContent.trim();
-              logger.debug(`Found potential loan number: '${loanNumber}'`);
-              if (loanNumber && /^\d+$/.test(loanNumber)) {
-                logger.info(`✅ Extracted loan number: ${loanNumber}`);
-                return loanNumber;
-              }
-            }
-          }
-        }
-      }
-
-      // Method 2: Broader search for numeric patterns near loan-related text
-      logger.debug("🔍 Trying broader extraction method...");
-      const textContent = document.body.textContent || "";
-      if (textContent.includes('Lender/Servicer Loan Number')) {
-        // Look for numeric patterns after the label
-        const patterns = textContent.match(/Lender\/Servicer Loan Number[\s\S]{0,200}?\b(\d{6,})\b/);
-        if (patterns && patterns[1]) {
-          const loanNumber = patterns[1];
-          logger.info(`✅ Extracted loan number via pattern: ${loanNumber}`);
-          return loanNumber;
-        }
-      }
-
-      logger.warn("⚠️ No loan number found with any method");
-      return null;
-    } catch (error) {
-      logger.error("❌ Error extracting loan number:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Handle InquiryMIInformation context - extract loan number directly and check access
-   */
-  async function handleInquiryMIInformationContext() {
-    try {
-      logger.info("🔄 Starting loan access verification");
-      LoaderManager.show();
-      LoaderManager.updateText("Extracting loan number directly...");
-
-      // Small delay to ensure page is ready
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Extract loan number directly from the page
-      LoaderManager.updateText("Extracting loan number from page...");
-      const loanNumber = extractLoanNumberDirectly();
-
-      if (!loanNumber) {
-        logger.warn("❌ No loan found - stopping verification");
-        LoaderManager.updateText("Error: Loan number not found");
-        setTimeout(() => {
-          LoaderManager.hide();
-        }, 2000);
-        return;
-      }
-
-      // Check loan access
-      logger.info(`🔍 Checking loan access for: ${loanNumber}`);
-      LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
-      const allowedLoans = await checkNumbersBatch([loanNumber]);
-
-      if (!allowedLoans || allowedLoans.length === 0) {
-        LoaderManager.updateText("Access denied - Hiding restricted content...");
-        logger.info(`🚫 Loan ${loanNumber} is RESTRICTED - hiding content`);
-
-        // Hide the entire InquiryMIInformation frame
-        setTimeout(() => {
-          LoaderManager.hide();
-          hideInquiryMIInformationFrame();
-        }, 1000);
-      } else {
-        LoaderManager.updateText("Access granted");
-        logger.info(`✅ Loan ${loanNumber} is AUTHORIZED - showing content`);
-        setTimeout(() => LoaderManager.hide(), 1000);
-      }
-
-    } catch (error) {
-      logger.error("❌ Error in InquiryMIInformation context handling:", error);
-      LoaderManager.updateText("Error occurred during access verification");
-      setTimeout(() => LoaderManager.hide(), 2000);
-    }
-  }
-
-  // ########## INITIALIZATION ##########
-
-  /**
-   * Global execution flags to prevent multiple runs
-   */
-  window.paymentHistoryFilterExecuted = window.paymentHistoryFilterExecuted || false;
-  window.paymentHistoryLoanChecked = window.paymentHistoryLoanChecked || false;
-
-  /**
-   * Main initialization function
-   */
-  async function initializePaymentHistoryFilter() {
-    // Prevent multiple executions
-    if (window.paymentHistoryFilterExecuted) {
-      logger.warn("⚠️ Payment history filter already executed, skipping");
-      return;
-    }
-
-    window.paymentHistoryFilterExecuted = true;
-    logger.info("🚀 Initializing Payment History Filter");
-
-    // Check if loader is already shown (from immediate execution)
-    const loaderAlreadyShown = document.getElementById("paymentHistoryLoader");
-
-    // Show loader if not already shown and in relevant context
-    if (!loaderAlreadyShown && (isInquiryMIInformationContext())) {
-      logger.info("🔒 Showing loader to prevent content exposure");
-      LoaderManager.show();
-      LoaderManager.updateText("Initializing access verification...");
-    }
-
-    try {
-      // Set up mutation observer for dynamic content
-      setupMutationObserver();
-
-      // First, establish connection with the extension
-      logger.info("🔗 Establishing connection with extension...");
       await waitForListener();
-      logger.info("✅ Extension connection established successfully");
 
       // Hide navigation links after successful connection
       hideNavigationLinks();
 
-      // Now determine context and handle accordingly
-      if (isInquiryMIInformationContext()) {
-        logger.info("📍 Detected InquiryMIInformation context - will start automated loan check");
-        // Start automated process after DOM is ready
-        setTimeout(() => handleInquiryMIInformationContext(), 1000);
-      }
-      else {
-        logger.info("📍 Not in recognized context - script will remain dormant");
-        // Hide loader if not in recognized context
-        LoaderManager.hide();
+      // Wait a bit longer for initial page load to complete
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const initialTable = getTargetTable();
+
+      console.log(
+        "[radian_filter] initialize: Initial table exists:",
+        !!initialTable
+      );
+
+      if (initialTable) {
+        console.log(
+          "[radian_filter] initialize: Initial table found, processing immediately"
+        );
+        showPage(false);
+
+        const tableReady = await waitForTable();
+        if (tableReady) {
+          await processPage();
+        } else {
+          showPage(true);
+          console.warn("[radian_filter] initialize: Initial table not ready");
+        }
+      } else {
+        console.log(
+          "[radian_filter] initialize: No table and no search functionality - showing page as-is"
+        );
+        showPage(true);
       }
 
+      // Always set up the mutation observer to watch for dynamic table creation
+      setupMutationObserver();
+
+      // Set up event listeners for search operations
+      setupTableUpdateListeners();
+
+      // Set up periodic table check as fallback for dynamic content
+      setupPeriodicTableCheck();
+
+      console.log("[radian_filter] initialize: Complete");
     } catch (error) {
-      logger.error("❌ Failed to establish extension connection:", error);
-      logger.warn("⚠️ Script will not function without extension connection");
-      // Hide loader on error
-      LoaderManager.hide();
+      showPage(true);
+      console.error("[radian_filter] initialize: Error", error);
     }
   }
 
-  // ########## AUTO-START ##########
+  /**
+   * Periodic check for new tables (fallback for mutation observer)
+   */
+  function setupPeriodicTableCheck() {
+    console.log("[radian_filter] setupPeriodicTableCheck: Starting periodic checks");
+    let lastTableCheck = 0;
+    const checkInterval = 5000; // Check every 5 seconds (increased to reduce flickering)
+    let lastTableHash = null;
 
-  // Show loader immediately to prevent content flash
-  // This must happen before any other processing and before DOM is fully loaded
-  (function showLoaderImmediately() {
-    try {
-      // Show loader immediately regardless of context to prevent any content flash
-      // We'll hide it later if we're not in the right context
-      logger.info("🔒 Showing loader immediately to prevent content exposure");
-      LoaderManager.show();
-      LoaderManager.updateText("Initializing access verification...");
+    setInterval(async () => {
+      const now = Date.now();
+      if (now - lastTableCheck < checkInterval) {
+        return;
+      }
 
-      // Hide all content temporarily until we can verify access
-      document.documentElement.style.visibility = "hidden";
-
-      // Create and insert a style element to hide content immediately
-      const style = document.createElement("style");
-      style.id = "temporary-content-hide";
-      style.textContent = `
-        body > *:not(#paymentHistoryLoader) {
-          visibility: hidden !important;
+      const table = getTargetTable();
+      if (table) {
+        const tbody = table.querySelector("tbody");
+        if (!tbody) {
+          return;
         }
-        #paymentHistoryLoader {
-          visibility: visible !important;
-        }
-      `;
-      document.head.appendChild(style);
-    } catch (error) {
-      logger.warn("⚠️ Could not show loader immediately:", error);
-    }
-  })();
 
-  // Start initialization when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(initializePaymentHistoryFilter, 100);
+        const currentHash = getTableContentHash(tbody);
+
+        // Only process if table content has actually changed
+        if (currentHash !== lastTableHash) {
+          const rows = tbody.querySelectorAll("tr");
+
+          // Check if this is a new table with data that we haven't processed
+          if (rows.length > 0) {
+            // Check if any row contains unprocessed loan data
+            let hasUnprocessedData = false;
+            for (const row of rows) {
+              if (row.cells && row.cells.length > 2) {
+                const cellText = row.cells[2].textContent.trim();
+                if (cellText && /\b\d{5,}\b/.test(cellText)) {
+                  hasUnprocessedData = true;
+                  break;
+                }
+              }
+            }
+
+            if (hasUnprocessedData) {
+              console.log(
+                "[radian_filter] setupPeriodicTableCheck: Found unprocessed table data, processing..."
+              );
+              showPage(false);
+              await processPage();
+              lastTableCheck = now;
+              lastTableHash = currentHash;
+            }
+          }
+        }
+      }
+    }, checkInterval);
+  }
+
+  // Initialize the script when DOM is ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          initialize();
+        }, 1000);
+      });
+    });
+  } else if (document.readyState === "interactive") {
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        initialize();
+      }, 1000);
     });
   } else {
-    setTimeout(initializePaymentHistoryFilter, 100);
+    setTimeout(() => {
+      initialize();
+    }, 1000);
   }
 
-  logger.info("📜 Payment History Filter script loaded");
+  window.radianFilter = {
+    refreshPaginationCounts,
+    updatePaginationCounts,
+    processPage,
+    allowedLoansCache,
+  };
+
 }
 
 /**
