@@ -36,7 +36,7 @@ const Logger = {
   },
   debug: (message, data = null) => {
     const timestamp = new Date().toISOString();
-    console.log(`${Logger.prefix} [${timestamp}] 🐛 ${message}`, data || '');
+    console.log(`${Logger.prefix} [${timestamp}] debug ${message}`, data || '');
   }
 };
 
@@ -46,7 +46,8 @@ const GLOBAL_HIDDEN_ACTION_ELEMENTS = [
   'Send Decision Doc',
   'Quick Actions',
   'Rate Finder',
-  'New Application',
+  'Order MI',
+  'Claims',
   'Activate Deferred',
   'Transfer Servicing'
 ];
@@ -153,11 +154,11 @@ function detectCurrentFilter() {
   Logger.log(`Current URL: ${currentUrl}`);
 
   // Check for specific URL patterns
-  if (currentUrl.includes('/Loan-Servicing/Loan-Number-Change')) {
+  if (currentUrl.includes('/Loan-Servicing/Loan-Number-Change') || currentUrl.includes('member/loannumchg/')) {
     return 'CHANGE_LOAN_NUMBER';
   } else if (currentUrl.includes('/Search/Inquiry-details')) {
     return 'SEARCH_INQUIRY_DETAILS';
-  } else if (currentUrl.includes('mionline.biz/Home')) {
+  } else if (currentUrl.includes('/home') || currentUrl.includes('/Home')) {
     return 'HOME_PAGE';
   } else if (currentUrl.includes('/Search/Inquiry')) {
     return 'SEARCH_INQUIRY';
@@ -250,17 +251,408 @@ async function checkNumbersBatch(numbers) {
 }
 
 /**
+ * Handle unknown URL pages
+ * This function manages extension connection and navigation hiding for unrecognized URLs
+ * Performance-optimized to minimize impact on page responsiveness
+ */
+async function handleUnknownUrlPage(hasListener) {
+  try {
+    Logger.log("🔍 Handling unknown URL page");
+    
+    // Create and show loader
+    const LoaderUtil = window.LoaderUtil || createDefaultLoaderUtil();
+    LoaderUtil.showLoader("Connecting to Radian extension...");
+    
+    // Create throttled version of hideNavigationLinks for event listeners
+    // This ensures we don't call it repeatedly in short succession
+    const throttledHideLinks = (() => {
+      let lastCallTime = 0;
+      const minInterval = 2000; // Minimum 2 seconds between calls
+      let scheduled = false;
+      
+      return () => {
+        const now = Date.now();
+        if (scheduled || now - lastCallTime < minInterval) {
+          return; // Skip if already scheduled or called recently
+        }
+        
+        scheduled = true;
+        
+        // Schedule for next animation frame to align with browser rendering
+        requestAnimationFrame(() => {
+          hideNavigationLinks();
+          lastCallTime = Date.now();
+          scheduled = false;
+        });
+      };
+    })();
+    
+    // Set up mutation observer to handle dynamic content changes
+    // This uses our optimized version that minimizes performance impact
+    setupDynamicContentObserver();
+    
+    // Hide navigation links immediately (first-time execution)
+    hideNavigationLinks();
+    
+    // Set up event listeners for critical page lifecycle events only
+    // Using the throttled version to prevent excessive calls
+    window.addEventListener('DOMContentLoaded', throttledHideLinks, { once: true });
+    
+    // For load event, use once: true to ensure it only fires once
+    window.addEventListener('load', () => {
+      throttledHideLinks();
+      
+      // After initial load, we only need to rely on the mutation observer
+      // This reduces the number of active event listeners
+      Logger.log("✅ Initial page load complete, relying on mutation observer");
+    }, { once: true });
+    
+    // Find and monitor iframes using our optimized implementation
+    monitorIframes();
+    
+    // Hide loader after a short delay to ensure UI is properly handled
+    setTimeout(() => {
+      LoaderUtil.hideLoader();
+      Logger.success("✅ Unknown page protection applied successfully");
+    }, 1500);
+    
+    return true;
+  } catch (error) {
+    Logger.error("❌ Error handling unknown URL page:", error);
+    return false;
+  }
+}
+
+/**
+ * Setup mutation observer to monitor dynamic content changes
+ * This ensures navigation links are hidden even when content loads dynamically
+ * Performance-optimized to minimize impact on page responsiveness
+ */
+function setupDynamicContentObserver() {
+  try {
+    // Track last execution time to prevent excessive calls
+    let lastExecutionTime = 0;
+    const minInterval = 1500; // Minimum 1.5 seconds between executions
+    
+    // Create a throttled version of hideNavigationLinks with strict timing control
+    const throttledHideLinks = throttle(hideNavigationLinks, minInterval);
+    
+    // Create mutation observer with optimized filtering
+    const observer = new MutationObserver((mutations) => {
+      // Skip if execution happened very recently
+      const now = Date.now();
+      if (now - lastExecutionTime < minInterval) return;
+      
+      // Only process if we have relevant mutations
+      const hasRelevantMutation = mutations.some(mutation => {
+        // Only care about added nodes (new content)
+        if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+          return false;
+        }
+        
+        // Check if any added node could contain navigation elements
+        return Array.from(mutation.addedNodes).some(node => {
+          // Only process element nodes
+          if (node.nodeType !== Node.ELEMENT_NODE) return false;
+          
+          // Check if this is a navigation-related element or could contain one
+          const nodeType = node.nodeName.toLowerCase();
+          return nodeType === 'nav' || 
+                 nodeType === 'header' || 
+                 nodeType === 'div' || 
+                 nodeType === 'ul' ||
+                 nodeType === 'iframe' ||
+                 node.classList?.contains('nav') ||
+                 node.classList?.contains('menu') ||
+                 node.classList?.contains('header') ||
+                 node.hasAttribute('role');
+        });
+      });
+      
+      if (hasRelevantMutation) {
+        throttledHideLinks();
+        lastExecutionTime = now;
+      }
+    });
+    
+    // Start observing with optimized configuration
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: false,  // Don't watch attribute changes
+      characterData: false  // Don't watch text content changes
+    });
+    
+    // Store observer reference to prevent garbage collection
+    window._navigationObserver = observer;
+    
+    Logger.log("👀 Performance-optimized dynamic content observer set up successfully");
+  } catch (error) {
+    Logger.error("❌ Error setting up dynamic content observer:", error);
+  }
+}
+
+/**
+ * Monitor iframes for navigation elements
+ * Performance-optimized to minimize impact on page responsiveness
+ */
+function monitorIframes() {
+  try {
+    // Track processed iframes to avoid duplicate handlers
+    const processedIframes = new WeakSet();
+    
+    // Track last execution time
+    let lastIframeProcessTime = 0;
+    const minIframeInterval = 2000; // Minimum 2 seconds between iframe scans
+    
+    // Create optimized iframe handler with throttling
+    const handleIframeLoad = (iframe) => {
+      // Skip if already processed
+      if (processedIframes.has(iframe)) return;
+      
+      // Mark as processed
+      processedIframes.add(iframe);
+      
+      // Use once option to ensure the event handler only runs once
+      iframe.addEventListener('load', () => {
+        // Throttle the actual processing
+        const now = Date.now();
+        if (now - lastIframeProcessTime < minIframeInterval) {
+          // Skip if too frequent
+          return;
+        }
+        
+        // Process the iframe with throttled hideNavigationLinks
+        throttle(hideNavigationLinks, minIframeInterval)();
+        lastIframeProcessTime = now;
+      }, { once: true });
+    };
+    
+    // Process existing iframes with delay to prioritize main content loading
+    setTimeout(() => {
+      const iframes = document.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        // Process iframes in batches to avoid blocking the main thread
+        let index = 0;
+        const processNextBatch = () => {
+          const endIndex = Math.min(index + 2, iframes.length);
+          for (let i = index; i < endIndex; i++) {
+            handleIframeLoad(iframes[i]);
+          }
+          index = endIndex;
+          
+          if (index < iframes.length) {
+            setTimeout(processNextBatch, 200);
+          }
+        };
+        
+        processNextBatch();
+      }
+    }, 1000);
+    
+    // Monitor for new iframes with reduced sensitivity
+    const iframeObserver = new MutationObserver(mutations => {
+      // Check if we need to process now or wait
+      const now = Date.now();
+      if (now - lastIframeProcessTime < minIframeInterval) return;
+      
+      // Look for iframe additions
+      let hasNewIframe = false;
+      
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (let i = 0; i < mutation.addedNodes.length; i++) {
+            const node = mutation.addedNodes[i];
+            if (node.nodeName === 'IFRAME') {
+              handleIframeLoad(node);
+              hasNewIframe = true;
+            }
+          }
+        }
+      }
+      
+      if (hasNewIframe) {
+        lastIframeProcessTime = now;
+      }
+    });
+    
+    // Start observing with optimized configuration
+    iframeObserver.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+      characterData: false
+    });
+    
+    // Store observer reference
+    window._iframeObserver = iframeObserver;
+    
+    Logger.log("🖼️ Performance-optimized iframe monitoring set up successfully");
+  } catch (error) {
+    Logger.error("❌ Error monitoring iframes:", error);
+  }
+}
+
+/**
+ * Create default loader utility if not available
+ * Uses the existing loader styles and elements from the codebase
+ */
+function createDefaultLoaderUtil() {
+  return {
+    loaderInstance: null,
+    
+    createLoader() {
+      if (this.loaderInstance && document.body.contains(this.loaderInstance)) {
+        return this.loaderInstance;
+      }
+      
+      // Use existing createLoaderElement function if available
+      if (typeof createLoaderElement === 'function') {
+        this.loaderInstance = createLoaderElement();
+        return this.loaderInstance;
+      }
+      
+      // Fallback implementation based on existing loader style
+      const loader = document.createElement("div");
+      loader.id = "loaderOverlay";
+      loader.innerHTML = `
+        <div class="spinner"></div>
+        <div class="loader-text">Connecting to Radian extension...</div>
+      `;
+      
+      this.loaderInstance = loader;
+      return loader;
+    },
+    
+    updateLoaderText(text) {
+      // Use existing updateLoaderText function if available
+      if (typeof updateLoaderText === 'function') {
+        updateLoaderText(text);
+        return;
+      }
+      
+      // Fallback implementation
+      const loaderText = document.querySelector('#loaderOverlay .loader-text');
+      if (loaderText) {
+        loaderText.textContent = text;
+      }
+    },
+    
+    showLoader(text = "Connecting to Radian extension...") {
+      // Add loader style if not present
+      if (!document.head.querySelector('style[id^="loader"]')) {
+        // Use existing createLoader function if available
+        if (typeof createLoader === 'function') {
+          const style = createLoader();
+          document.head.appendChild(style);
+        } else {
+          // Fallback implementation
+          const style = document.createElement('style');
+          style.id = "loader-style";
+          style.textContent = `
+            #loaderOverlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              background: rgba(255, 255, 255, 0.95);
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              z-index: 9999;
+              transition: opacity 0.3s ease;
+            }
+            .spinner {
+              width: 60px;
+              height: 60px;
+              border: 6px solid #ccc;
+              border-top-color: #2b6cb0;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+              margin-bottom: 20px;
+            }
+            .loader-text {
+              color: #2b6cb0;
+              font-size: 16px;
+              font-weight: 500;
+              text-align: center;
+            }
+            @keyframes spin {
+              to {transform: rotate(360deg);}
+            }
+            #loaderOverlay.hidden {
+              opacity: 0;
+              pointer-events: none;
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+      
+      let loader = document.getElementById("loaderOverlay");
+      if (!loader) {
+        loader = this.createLoader();
+        document.body.appendChild(loader);
+      }
+      
+      this.updateLoaderText(text);
+      loader.classList.remove("hidden");
+      
+      return loader;
+    },
+    
+    hideLoader() {
+      const loader = document.getElementById("loaderOverlay");
+      if (loader) {
+        loader.classList.add("hidden");
+        setTimeout(() => {
+          if (loader && loader.parentNode) {
+            loader.parentNode.removeChild(loader);
+          }
+        }, 300);
+      }
+      this.loaderInstance = null;
+    }
+  };
+}
+
+/**
+ * Utility function to throttle function calls
+ * This ensures the function is called at most once in a specified time period
+ */
+function throttle(func, limit) {
+  let inThrottle = false;
+  let lastExec = 0;
+  
+  return function(...args) {
+    const now = Date.now();
+    
+    // If it's been longer than the limit since last execution, execute immediately
+    if (now - lastExec >= limit) {
+      func(...args);
+      lastExec = now;
+    } else if (!inThrottle) {
+      // Otherwise schedule one more execution at the end of the throttle period
+      inThrottle = true;
+      setTimeout(() => {
+        inThrottle = false;
+        lastExec = Date.now();
+        func(...args);
+      }, limit - (now - lastExec));
+    }
+    // If we're in throttle period and already have a scheduled execution, do nothing
+  };
+}
+
+/**
  * Main Initialization Function
  */
 async function initializeFilter() {
   try {
     const currentFilter = detectCurrentFilter();
     Logger.log(`Detected filter type: ${currentFilter}`);
-
-    if (currentFilter === 'UNKNOWN') {
-      Logger.warn("Unknown page type, skipping filter initialization");
-      return;
-    }
 
     // Wait for extension listener
     const hasListener = await waitForListener();
@@ -269,6 +661,13 @@ async function initializeFilter() {
       Logger.success("Extension communication established");
     } else {
       Logger.warn("Running in standalone mode");
+    }
+
+    // Handle UNKNOWN URLs
+    if (currentFilter === 'UNKNOWN') {
+      Logger.warn("Unknown page type, initializing generic protection");
+      await handleUnknownUrlPage(hasListener);
+      return;
     }
 
     // Route to appropriate filter
