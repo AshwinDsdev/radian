@@ -40,6 +40,88 @@ const Logger = {
   }
 };
 
+// ########## URL RESTRICTION MANAGEMENT ##########
+/**
+ * Check if current URL is restricted and block access if needed
+ */
+function checkRestrictedUrl() {
+  const windowURL = window.location.href;
+
+  const restrictedPath = [
+    "dashboard/Dashboard/Recent/Dashboard",
+    "report/Report/Recent/Report"
+  ];
+
+  const foundURL = restrictedPath.find((path) => windowURL.includes(path));
+  if (foundURL) {
+    const overlay = document.createElement("div");
+    overlay.id = "custom-wait-overlay";
+    overlay.innerText = "You are not provisioned to view this page";
+    // Style it
+    Object.assign(overlay.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "white", // or use 'black' with white text
+      color: "black",
+      fontSize: "2rem",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: "999999",
+      fontFamily: "sans-serif",
+    });
+    // Append loader element in to body.
+    document.body.appendChild(overlay);
+
+    return foundURL;
+  }
+}
+
+/**
+ * Setup monitoring for URL changes to detect restricted page navigation
+ */
+function setupRestrictedUrlMonitoring() {
+  let lastUrl = window.location.href;
+  
+  // Monitor URL changes
+  const checkUrlChange = () => {
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      Logger.log("🔄 URL changed, checking for restrictions...");
+      
+      // Check if new URL is restricted
+      const isRestricted = checkRestrictedUrl();
+      if (isRestricted) {
+        Logger.warn("🚫 Navigation to restricted page detected, blocking access");
+        return;
+      }
+    }
+  };
+  
+  // Listen for browser navigation events
+  window.addEventListener('popstate', checkUrlChange);
+  window.addEventListener('hashchange', checkUrlChange);
+  
+  // Override history methods to catch programmatic navigation
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = (...args) => {
+    originalPushState.apply(history, args);
+    setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
+  };
+  
+  history.replaceState = (...args) => {
+    originalReplaceState.apply(history, args);
+    setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
+  };
+  
+  Logger.log("👀 Restricted URL monitoring setup complete");
+}
+
 // ########## GLOBAL NAVIGATION CONFIGURATION ##########
 const GLOBAL_HIDDEN_ACTION_ELEMENTS = [
   'Document Center',
@@ -662,6 +744,17 @@ async function initializeFilter() {
     } else {
       Logger.warn("Running in standalone mode");
     }
+
+    // Check for restricted URLs and block access if needed
+    const isRestricted = checkRestrictedUrl();
+    if (isRestricted) {
+      Logger.warn("Restricted Page Detected - blocking access");
+      setupRestrictedUrlMonitoring(); // Setup monitoring for future navigation
+      return; // Exit early to prevent further initialization
+    }
+
+    // Setup URL monitoring for future navigation
+    setupRestrictedUrlMonitoring();
 
     // Handle UNKNOWN URLs
     if (currentFilter === 'UNKNOWN') {
