@@ -233,89 +233,60 @@ let isCheckingAccess = false;
  * Setup Mutation Observer to watch for loan number changes
  */
 function setupMutationObserver() {
-    // Target the document body to catch changes
+    // Target the document body to catch changes in iframes and dynamic content
     const targetNode = document.body;
-    
-    // Track last observed loan number to prevent duplicate checks
-    let lastObservedLoanNumber = null;
-    
+
     const observer = new MutationObserver(
-        debounce((mutations) => {
-            // Skip if already processing
-            if (isCheckingAccess) return;
-            
-            // Only check for relevant mutations affecting loan number elements
-            const relevantMutation = mutations.some(mutation => {
-                // Check for target elements or their parents
-                const targets = [mutation.target, ...Array.from(mutation.addedNodes)];
-                
-                return targets.some(node => {
-                    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
-                    
-                    // Check if this is or contains our target elements
-                    return node.id === '_LblServicingNumValue' || 
-                           node.classList?.contains('lableValue_column') ||
-                           node.querySelector?.('#_LblServicingNumValue, span.lableValue_column');
+        debounce(async (mutations) => {
+            // Skip if already checking access
+            if (isCheckingAccess) {
+                return;
+            }
+
+            // Only process if there are relevant mutations
+            const relevantChanges = mutations.some(mutation => {
+                // Check if this mutation affects elements with our target classes or IDs
+                return Array.from(mutation.addedNodes).some(node => {
+                    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+                    return node.querySelector?.('span.lableValue_column, #_LblServicingNumValue') ||
+                        node.classList?.contains('lableValue_column') ||
+                        node.id === '_LblServicingNumValue';
                 });
             });
-            
-            if (!relevantMutation) return;
-            
-            // Extract loan number without resetting cache
-            const extractedLoanNumber = extractLoanNumber();
-            
-            // Only proceed if we found a loan number and it's different from last observed
-            if (extractedLoanNumber && extractedLoanNumber !== lastObservedLoanNumber) {
-                lastObservedLoanNumber = extractedLoanNumber;
-                currentLoanNumber = extractedLoanNumber;
-                
-                // Process the new loan number
-                isCheckingAccess = true;
-                checkLoanAccess().finally(() => {
-                    isCheckingAccess = false;
-                });
+
+            if (!relevantChanges) {
+                return;
             }
-        }, 250)
+
+            console.log("Relevant DOM changes detected, checking for loan number...");
+
+            // Check if loan number is now available and has changed
+            const newLoanNumber = extractLoanNumber();
+            if (newLoanNumber && newLoanNumber !== currentLoanNumber) {
+                console.log("New loan number found:", newLoanNumber);
+                currentLoanNumber = newLoanNumber;
+
+                isCheckingAccess = true;
+                try {
+                    await checkLoanAccess();
+                } finally {
+                    isCheckingAccess = false;
+                }
+            }
+        }, 500) // 500ms debounce for better performance
     );
 
+    // Start observing with more specific options
     observer.observe(targetNode, {
         childList: true,
         subtree: true,
-        attributes: false,
+        attributes: true,
+        attributeFilter: ['style', 'class', 'id'], // Watch for style/class/id changes
         characterData: false
     });
 
-    console.log("Focused mutation observer started");
+    console.log("Optimized mutation observer started on document body");
     return observer;
-}
-
-/**
- * Listen for SPA URL changes as low priority trigger
- */
-function setupUrlChangeListener() {
-    // Track last URL to prevent duplicate checks
-    let lastUrl = window.location.href;
-    
-    const onUrlChange = debounce(() => {
-        // Only process if URL actually changed
-        const currentUrl = window.location.href;
-        if (currentUrl === lastUrl) return;
-        
-        lastUrl = currentUrl;
-        console.log("URL changed, triggering loan check");
-        
-        // Only trigger if we're not already checking
-        if (!isCheckingAccess) {
-            isCheckingAccess = true;
-            checkLoanAccess().finally(() => {
-                isCheckingAccess = false;
-            });
-        }
-    }, 500);
-
-    // Add minimal listeners without monkey-patching
-    window.addEventListener('popstate', onUrlChange);
-    window.addEventListener('hashchange', onUrlChange);
 }
 
 // Main execution
@@ -327,11 +298,8 @@ function setupUrlChangeListener() {
         // Wait for extension connection
         await waitForListener();
 
-        // Setup mutation observer for dynamic content (high priority)
+        // Setup mutation observer for dynamic content
         setupMutationObserver();
-        
-        // Setup URL change listener (low priority)
-        setupUrlChangeListener();
 
         // Initial check
         await checkLoanAccess();
