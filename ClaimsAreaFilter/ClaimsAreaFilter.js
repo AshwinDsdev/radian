@@ -231,6 +231,9 @@ function detectCurrentFilter() {
     } else if (currentUrl.includes('/Claims/Reports') || currentUrl.includes('member/claims/ClaimsViewReport')) {
         return 'CLAIMS REPORTS'
     }
+    else if (currentUrl.includes('/Documents')) {
+        return 'DOCUMENT CENTER';
+    }
 
     return 'UNKNOWN';
 }
@@ -791,6 +794,9 @@ function setupRestrictedUrlMonitoring() {
                 break;
             case 'CLAIMS REPORTS':
                 await initializeClaimsReportsFilter();
+                break;
+            case 'DOCUMENT CENTER':
+                await initializeDocumentCenterFilter();
                 break;
             default:
                 Logger.warn(`No filter implementation for: ${currentFilter}`);
@@ -4261,6 +4267,271 @@ async function initializeClaimsReportsFilter() {
         initializeLoanAuthorizationFilter();
     }
 }
+
+async function initializeDocumentCenterFilter() {
+    console.log("Initializing document center filter...");
+    function createRestrictedMessage() {
+        const message = document.createElement("div");
+        message.id = "solicitation-restricted-message";
+        message.style.cssText = `
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        font-size: 18px;
+        color: #003b4d;
+        background-color: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        margin: 20px;
+        text-align: center;
+      `;
+        message.textContent = "Loan is not provisioned to you.";
+        return message;
+    }
+    
+    /**
+     * Extract loan number from the page
+     * @returns {string|null} The loan number or null if not found
+     */
+    function extractLoanNumber() {
+        // Document Center specific: Look for the servicing loan number span
+        const servicingNumSpan = document.getElementById('_LblServicingNumValue');
+        if (servicingNumSpan) {
+            const value = (servicingNumSpan.textContent || '').trim();
+            if (value && /^\d{10}$/.test(value)) {
+                return value;
+            }
+        }
+    
+        // Alternative: Look for any span with lableValue_column class that contains a 10-digit number
+        const valueSpans = document.querySelectorAll('span.lableValue_column');
+        for (const span of valueSpans) {
+            const text = (span.textContent || '').trim();
+            if (/^\d{10}$/.test(text)) {
+                return text;
+            }
+        }
+    
+        // Fallback: Look for any span containing a 10-digit loan number
+        const allSpans = document.querySelectorAll('span');
+        for (const span of allSpans) {
+            const text = (span.textContent || '').trim();
+            if (/^\d{10}$/.test(text)) {
+                return text;
+            }
+        }
+    
+        return null;
+    }
+    
+    /**
+     * Hide pageBody section and show restricted message
+     */
+    function hidePageAndShowRestricted() {
+        const loanInfoPanel = document.getElementById('_PnlLoanInfo');
+        if (loanInfoPanel) {
+            loanInfoPanel.style.display = 'none';
+    
+            // Check if restricted message already exists to prevent duplicates
+            const existingMessage = document.getElementById('solicitation-restricted-message');
+            if (!existingMessage) {
+                // Create and show restricted message only if it doesn't exist
+                const restrictedMessage = createRestrictedMessage();
+                loanInfoPanel.parentNode.insertBefore(restrictedMessage, loanInfoPanel.nextSibling);
+            }
+        }
+    }
+    
+    /**
+     * Show pageBody section and hide restricted message
+     */
+    function showPageAndHideRestricted() {
+        const loanInfoPanel = document.getElementById('_PnlLoanInfo');
+        const restrictedMessage = document.getElementById('solicitation-restricted-message');
+    
+        if (loanInfoPanel) {
+            loanInfoPanel.style.display = 'block';
+        }
+    
+        if (restrictedMessage) {
+            restrictedMessage.remove();
+        }
+    }
+    
+    /**
+     * Main function to check loan access
+     */
+    async function checkLoanAccess() {
+        try {
+            // Use cached loan number if available, otherwise extract it
+            const loanNumber = currentLoanNumber || extractLoanNumber();
+    
+            if (!loanNumber) {
+                console.warn("No loan number found on page");
+                return;
+            }
+    
+            // Store in cache for future reference
+            currentLoanNumber = loanNumber;
+    
+            // Check if loan is allowed
+            const allowedNumbers = await checkNumbersBatch([loanNumber]);
+    
+            if (allowedNumbers.length === 0) {
+                console.log("Loan not allowed, hiding page content");
+                hidePageAndShowRestricted();
+            } else {
+                console.log("Loan allowed, showing page content");
+                showPageAndHideRestricted();
+            }
+    
+        } catch (error) {
+            console.error("Error checking loan access:", error);
+            // On error, hide the page for security
+            hidePageAndShowRestricted();
+        }
+    }
+    
+    /**
+     * Wait for page to be ready
+     */
+    function waitForPageReady() {
+        return new Promise((resolve) => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve);
+            } else {
+                resolve();
+            }
+        });
+    }
+    
+    /**
+     * Debounce function to limit frequent executions
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+    
+    // Cache for the current loan number to avoid unnecessary checks
+    let currentLoanNumber = null;
+    let isCheckingAccess = false;
+    
+    /**
+     * Setup Mutation Observer to watch for loan number changes
+     */
+    function setupMutationObserver() {
+        // Target the document body to catch changes in iframes and dynamic content
+        const targetNode = document.body;
+    
+        // Observer state for better control and duplicate prevention
+        const observerState = {
+            processingDebounce: null,
+            lastProcessed: Date.now(),
+            ignoreNextMutations: false,
+            isProcessing: false,
+            processingCount: 0,
+            maxProcessingCount: 10, // Prevent infinite loops
+        };
+    
+        const observer = new MutationObserver(
+            debounce(async (mutations) => {
+                // Skip if already checking access or processing
+                if (isCheckingAccess || observerState.isProcessing) {
+                    console.log("Skipping mutation - already processing");
+                    return;
+                }
+    
+                // Prevent processing if we just processed recently (within 2 seconds)
+                const timeSinceLastProcess = Date.now() - observerState.lastProcessed;
+                if (timeSinceLastProcess < 2000) {
+                    console.log("Skipping mutation - too soon since last process");
+                    return;
+                }
+    
+                // Prevent excessive processing
+                if (observerState.processingCount >= observerState.maxProcessingCount) {
+                    console.log("Skipping mutation - max processing count reached");
+                    return;
+                }
+    
+                // Only process if there are relevant mutations
+                const relevantChanges = mutations.some(mutation => {
+                    // Check if this mutation affects elements with our target classes or IDs
+                    return Array.from(mutation.addedNodes).some(node => {
+                        if (node.nodeType !== Node.ELEMENT_NODE) return false;
+                        return node.querySelector?.('span.lableValue_column, #_LblServicingNumValue') ||
+                            node.classList?.contains('lableValue_column') ||
+                            node.id === '_LblServicingNumValue';
+                    });
+                });
+    
+                if (!relevantChanges) {
+                    return;
+                }
+    
+                console.log("Relevant DOM changes detected, checking for loan number...");
+    
+                // Check if loan number is now available and has changed
+                const newLoanNumber = extractLoanNumber();
+                if (newLoanNumber && newLoanNumber !== currentLoanNumber) {
+                    console.log("New loan number found:", newLoanNumber);
+                    currentLoanNumber = newLoanNumber;
+    
+                    // Update observer state
+                    observerState.isProcessing = true;
+                    observerState.processingCount++;
+                    observerState.lastProcessed = Date.now();
+    
+                    isCheckingAccess = true;
+                    try {
+                        await checkLoanAccess();
+                    } finally {
+                        isCheckingAccess = false;
+                        observerState.isProcessing = false;
+                    }
+                }
+            }, 500) // 500ms debounce for better performance
+        );
+    
+        // Start observing with more specific options
+        observer.observe(targetNode, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'id'], // Watch for style/class/id changes
+            characterData: false
+        });
+    
+        console.log("Optimized mutation observer started on document body with duplicate prevention");
+        return observer;
+    }
+    
+    // Main execution
+    (async function () {
+        try {
+            // Wait for page to be ready
+            await waitForPageReady();
+    
+            // Wait for extension connection
+            await waitForListener();
+    
+            // Setup mutation observer for dynamic content
+            setupMutationObserver();
+    
+            // Initial check
+            await checkLoanAccess();
+    
+        } catch (error) {
+            console.error("Solicitation filter failed:", error);
+        }
+    })();
+}
+
 // ########## INITIALIZATION ##########
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
