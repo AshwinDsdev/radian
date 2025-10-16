@@ -1,11 +1,13 @@
+
 /*!
  * @description : Unified Radian Filter Script
  * @portal : All Radian CLAIMS Online Portals
- * @author : Radian Team
- * @group : Radian Team
- * @owner : Radian
- * @lastModified : 2024
- * @version : 1.0.0
+ * @business area: CLAIMS
+ * @author : Rohith Kandikattu
+ * @group : Accelirate
+ * @owner : Cenlar
+ * @lastModified : October 10th 2025
+ * @version : 1.0.7
  */
 
 // ########## EXTENSION CONFIGURATION ##########
@@ -42,20 +44,63 @@ const Logger = {
 
 // ########## GLOBAL NAVIGATION CONFIGURATION ##########
 const GLOBAL_HIDDEN_ACTION_ELEMENTS = [
-    'Document Center',
     'Send Decision Doc',
     'Quick Actions',
     'Rate Finder',
     'Order MI',
-    'Activate Deferred',
-    'Transfer Servicing',
-    'Cancel MI'
+    'Servicing',
+    'Advanced Search'
 ];
 
 const GLOBAL_PRESERVED_ACTION_ELEMENTS = [
     'Notes',
     'Print'
 ];
+
+/**
+ * validation the Restricted Page & disabling it
+ */
+function checkRestrictedUrl() {
+  const windowURL = window.location.href;
+  console.log(windowURL,"windowURL");
+  const restrictedPath = [
+    "/Rate-Quote",
+    "/Order-Services/New-Application",
+    "/Order-Services/Resubmit-Application",
+    "/Loan-Servicing/Activate-Deferred",
+    "/Loan-Servicing/Servicing-Transfer",
+    "/Loan-Servicing/Cancel-Refund",
+    "/Loan-Servicing/Loan-Number-Change"
+     ];
+
+  const foundURL = restrictedPath.find((path) => windowURL.includes(path));
+  if (foundURL) {
+    const overlay = document.createElement("div");
+    overlay.id = "custom-wait-overlay";
+    overlay.innerText = "You are not provisioned to view this page";
+    // Style it
+    Object.assign(overlay.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "white", // or use 'black' with white text
+      color: "black",
+      fontSize: "2rem",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: "999999",
+      fontFamily: "sans-serif",
+    });
+    // Append loader element in to body.
+    document.body.appendChild(overlay);
+
+    return foundURL;
+  }
+}
+
 
 /**
  * Global Navigation Links Hiding Function
@@ -67,13 +112,13 @@ function hideNavigationLinks() {
 
     try {
         // Find all links and buttons
-        const allElements = document.querySelectorAll('a, button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
+        const allElements = document.querySelectorAll('a,button, .menu-item, [role="menuitem"], [role="button"], .nav-link, .navigation-item');
         let hiddenCount = 0;
         let preservedCount = 0;
 
         Logger.log(`🔍 Checking ${allElements.length} potential navigation elements...`);
 
-        allElements.forEach((element, index) => {
+        allElements.forEach((element) => {
             const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
 
             // Skip empty elements
@@ -101,6 +146,28 @@ function hideNavigationLinks() {
                 element.setAttribute('data-preserved-by-filter', 'true');
                 preservedCount++;
                 Logger.log(`    ✅ Preserving: "${text}"`);
+            }
+        });
+
+        // Specifically hide "Advanced Search" span and its next sibling span
+        const advancedSearchSpans = document.querySelectorAll('span');
+        advancedSearchSpans.forEach(span => {
+            const text = span.textContent?.replace(/\s+/g, ' ').trim() || '';
+            if (text.toLowerCase().includes('advanced search')) {
+                // Hide the Advanced Search span
+                span.style.display = 'none';
+                span.setAttribute('data-hidden-by-filter', 'true');
+                hiddenCount++;
+                Logger.log(`    🚫 Hidden Advanced Search span: "${text}"`);
+                
+                // Hide the next sibling span if it exists
+                const nextSpan = span.nextElementSibling;
+                if (nextSpan && nextSpan.tagName === 'SPAN') {
+                    nextSpan.style.display = 'none';
+                    nextSpan.setAttribute('data-hidden-by-filter', 'true');
+                    hiddenCount++;
+                    Logger.log(`🚫 Hidden next sibling span: "${nextSpan.textContent?.trim() || ''}"`);
+                }
             }
         });
 
@@ -149,14 +216,11 @@ function hideNavigationLinks() {
  */
 function detectCurrentFilter() {
     const currentUrl = window.location.href;
-    const hostname = window.location.hostname;
 
     Logger.log(`Current URL: ${currentUrl}`);
 
     // Check for specific URL patterns
-    if (currentUrl.includes('/Loan-Servicing/Loan-Number-Change') || currentUrl.includes('member/loannumchg/')) {
-        return 'CHANGE_LOAN_NUMBER';
-    } else if (currentUrl.includes('/Search/Inquiry-details')) {
+   if (currentUrl.includes('/Search/Inquiry-details')) {
         return 'SEARCH_INQUIRY_DETAILS';
     } else if (currentUrl.includes('/home') || currentUrl.includes('/Home')) {
         return 'HOME_PAGE';
@@ -171,7 +235,7 @@ function detectCurrentFilter() {
     return 'UNKNOWN';
 }
 
-async function handleUnknownUrlPage(hasListener) {
+async function handleUnknownUrlPage() {
     try {
         Logger.log("🔍 Handling unknown URL page");
 
@@ -566,7 +630,7 @@ function throttle(func, limit) {
  * Establish Communication with Loan Checker Extension
  */
 async function waitForListener(maxRetries = 20, initialDelay = 100) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
             Logger.warn("Chrome extension API not available. Running in standalone mode.");
             resolve(false);
@@ -659,19 +723,60 @@ async function initializeFilter() {
         } else {
             Logger.warn("Running in standalone mode");
         }
+    const isStillRestricted = checkRestrictedUrl();
+    if (isStillRestricted) {
+      Logger.warn("🚫 Restricted page detected after extension connection, blocking access");
+      return; // Exit early if page is restricted
+    }
+function setupRestrictedUrlMonitoring() {
+  let lastUrl = window.location.href;
+  
+  // Monitor URL changes
+  const checkUrlChange = () => {
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      Logger.log("🔄 URL changed, checking for restrictions...");
+      
+      // Check if new URL is restricted
+      const isRestricted = checkRestrictedUrl();
+      if (isRestricted) {
+        Logger.warn("🚫 Navigation to restricted page detected, blocking access");
+        return;
+      }
+    }
+  };
+  
+  // Listen for browser navigation events
+  window.addEventListener('popstate', checkUrlChange);
+  window.addEventListener('hashchange', checkUrlChange);
+  
+  // Override history methods to catch programmatic navigation
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = (...args) => {
+    originalPushState.apply(history, args);
+    setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
+  };
+  
+  history.replaceState = (...args) => {
+    originalReplaceState.apply(history, args);
+    setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
+  };
+  
+  Logger.log("👀 Restricted URL monitoring setup complete");
+}
 
+ setupRestrictedUrlMonitoring()
         // Handle UNKNOWN URLs
         if (currentFilter === 'UNKNOWN') {
             Logger.warn("Unknown page type, initializing generic protection");
-            await handleUnknownUrlPage(hasListener);
+            await handleUnknownUrlPage();
             return;
         }
 
         // Route to appropriate filter
         switch (currentFilter) {
-            case 'CHANGE_LOAN_NUMBER':
-                await initializeChangeLoanNumberFilter();
-                break;
             case 'SEARCH_INQUIRY_DETAILS':
                 await initializeSearchInquiryDetailsFilter();
                 break;
@@ -696,962 +801,9 @@ async function initializeFilter() {
     }
 }
 
+
 // ########## FILTER IMPLEMENTATIONS ##########
 
-/**
- * CHANGE LOAN NUMBER FILTER
- * URL: https://www.mionline.biz/Loan-Servicing/Loan-Number-Change
- */
-async function initializeChangeLoanNumberFilter() {
-    Logger.log("Initializing Change Loan Number Filter");
-
-    /**
-     * Optimized logger utility
-     */
-    const logger = {
-        debug: (...args) => console.debug('[LoanNumberFilter]', ...args),
-        info: (...args) => console.info('[LoanNumberFilter]', ...args),
-        warn: (...args) => console.warn('[LoanNumberFilter]', ...args),
-        error: (...args) => console.error('[LoanNumberFilter]', ...args),
-    };
-
-    // Optimized configuration
-    const CONFIG = {
-        // Multiple possible table selectors to handle different page structures
-        tableSelectors: [
-            "#_GrdLoanNumberChange", // Original selector
-            "table.resultsTable",    // Class-based selector
-            "table[id*='LoanNumber']", // Partial ID match
-            "table.dataTable",      // Common data table class
-            "div.contentmenu table" // Table within content menu
-        ],
-        detectionTimeout: 120000, // 2 minutes for slow-loading live site
-        checkInterval: 5000,
-        maxAttempts: 24, // 24 attempts * 5 seconds = 2 minutes
-        domChangeDebounce: 600,
-        loanExtractionResetDelay: 500,
-        presenceCheckInterval: 10000,
-        validationDebounce: 500
-    };
-
-    // Optimized state management
-    const state = {
-        tableDetectionTimer: null,
-        isTableDetected: false,
-        currentUrl: window.location.href,
-        domChangeTimer: null,
-        mutationObserver: null,
-        lastTableContent: null,
-        loanExtractionResetTimer: null,
-        table: null,
-        loanInputs: new Set(),
-        errorElements: new Set(),
-        validationCache: new Map()
-    };
-
-    // Optimized DOM utilities
-    const DOM = {
-        // Cache DOM queries with improved table detection
-        getTable() {
-            if (!state.table || !state.table.isConnected) {
-                // Try each selector until we find a matching table
-                for (const selector of CONFIG.tableSelectors) {
-                    const table = document.querySelector(selector);
-                    if (table) {
-                        logger.info(`✅ Table found with selector: ${selector}`);
-                        state.table = table;
-                        break;
-                    }
-                }
-            }
-            return state.table;
-        },
-
-        getLoanInputs() {
-            const table = this.getTable();
-            if (!table) return [];
-
-            // STRICT selectors that ONLY match loan number inputs (not certificate inputs)
-            // Looking at the HTML structure, loan inputs have specific IDs like "_GrdLoanNumberChange_ctl02__TxtLoanNumber"
-            const loanInputs = table.querySelectorAll('input[id$="_TxtLoanNumber"]');
-
-            logger.info(`✅ Found ${loanInputs.length} loan inputs with strict selector`);
-
-            // Update our cached set
-            state.loanInputs.clear();
-            loanInputs.forEach(input => state.loanInputs.add(input));
-            return Array.from(loanInputs);
-        },
-
-        // Efficient content hash generation
-        getContentHash() {
-            const table = this.getTable();
-            if (!table) return null;
-
-            try {
-                const inputs = this.getLoanInputs();
-                if (inputs.length === 0) return null;
-
-                // Use a more efficient hash method
-                let hash = 0;
-                for (const input of inputs) {
-                    const value = input.value.trim();
-                    const disabled = input.disabled;
-                    const hasError = !!input.parentNode.querySelector('.error-msg');
-
-                    // Simple but effective hash
-                    hash = ((hash << 5) - hash + value.length + (disabled ? 1 : 0) + (hasError ? 1 : 0)) | 0;
-                }
-                return hash;
-            } catch (error) {
-                console.warn('Error generating content hash:', error);
-                return null;
-            }
-        },
-
-        // Efficient error element creation
-        createErrorElement() {
-            const error = document.createElement("div");
-            error.textContent = "You are not provisioned to access restricted loan";
-            error.className = "error-msg";
-            error.style.cssText = "color: red; font-size: 0.9em; margin-top: 5px; font-weight: bold;";
-            return error;
-        },
-
-        // Batch DOM operations
-        resetInputStyling(input) {
-            input.style.border = '';
-            input.disabled = false;
-            input.style.backgroundColor = '';
-            input.style.cursor = '';
-        },
-
-        // Efficient error cleanup
-        clearErrors() {
-            state.errorElements.forEach(error => {
-                if (error.isConnected) error.remove();
-            });
-            state.errorElements.clear();
-        },
-
-    };
-
-    // Optimized timer management
-    const TimerManager = {
-        timers: new Set(),
-
-        setTimeout(callback, delay) {
-            const timer = setTimeout(callback, delay);
-            this.timers.add(timer);
-            return timer;
-        },
-
-        setInterval(callback, delay) {
-            const timer = setInterval(callback, delay);
-            this.timers.add(timer);
-            return timer;
-        },
-
-        clearAll() {
-            this.timers.forEach(timer => {
-                clearTimeout(timer);
-                clearInterval(timer);
-            });
-            this.timers.clear();
-        }
-    };
-
-    // Optimized validation system
-    const ValidationSystem = {
-        // Track active validation state
-        isValidating: false,
-
-        // Debounced validation with cache
-        async validateInput(input, showLoader = false) {
-            // Only validate if this is actually a loan number input (not certificate)
-            if (!input.id || !input.id.endsWith('_TxtLoanNumber')) {
-                return true;
-            }
-
-            const loanNumber = input.value.trim();
-
-            // Don't validate empty loan numbers
-            if (!loanNumber) {
-                // Clean up any existing error messages
-                DOM.resetInputStyling(input);
-                const existingError = input.parentNode.querySelector(".error-msg");
-                if (existingError) existingError.remove();
-                return true;
-            }
-
-            // Check cache first
-            if (state.validationCache.has(loanNumber)) {
-                const isValid = state.validationCache.get(loanNumber);
-
-                // Apply styling based on cached result
-                if (!isValid) {
-                    this.applyRestrictedStyling(input);
-                }
-
-                return isValid;
-            }
-
-            // Show loader if requested and we have a value to check
-            if (showLoader) {
-                LoaderManager.show(`Verifying loan number ${loanNumber}...`);
-                this.isValidating = true;
-            }
-
-            // Reset styling
-            DOM.resetInputStyling(input);
-            const existingError = input.parentNode.querySelector(".error-msg");
-            if (existingError) existingError.remove();
-
-            try {
-                const allowedLoans = await checkNumbersBatch([loanNumber]);
-                const isValid = allowedLoans.length > 0;
-
-                // Cache result
-                state.validationCache.set(loanNumber, isValid);
-
-                if (!isValid) {
-                    this.applyRestrictedStyling(input);
-                }
-
-                return isValid;
-            } catch (error) {
-                console.error("❌ Error checking loan number:", error);
-                return true; // Default to allowing access on error
-            }
-        },
-
-        // Apply restricted styling without affecting other elements
-        applyRestrictedStyling(input) {
-            // Only modify the input element itself
-            input.style.border = "2px solid red";
-            input.style.backgroundColor = "#f5f5f5";
-            input.style.cursor = "not-allowed";
-            input.disabled = true;
-
-            // Remove any existing error message first
-            const existingError = input.parentNode.querySelector(".error-msg");
-            if (existingError) {
-                existingError.remove();
-            }
-
-            // Add error message as a sibling element
-            const errorElement = DOM.createErrorElement();
-            input.parentNode.appendChild(errorElement);
-            state.errorElements.add(errorElement);
-        },
-
-        // Batch validation
-        async validateAllInputs() {
-            const inputs = DOM.getLoanInputs();
-            if (inputs.length === 0) {
-                return [];
-            }
-
-            // Only validate inputs that have loan numbers and are loan number inputs (not certificates)
-            const inputsWithValues = inputs.filter(input =>
-                input.id &&
-                input.id.endsWith('_TxtLoanNumber') &&
-                input.value.trim()
-            );
-
-            if (inputsWithValues.length === 0) {
-                return [];
-            }
-
-            try {
-                // Show loader only when we have loan numbers to validate
-                this.isValidating = true;
-                LoaderManager.show("Verifying loan access permissions...");
-
-                // Process inputs in sequence for better UX feedback
-                const results = [];
-                for (let i = 0; i < inputsWithValues.length; i++) {
-                    const input = inputsWithValues[i];
-                    const loanNumber = input.value.trim();
-
-                    LoaderManager.updateText(`Verifying loan ${i + 1} of ${inputsWithValues.length}: ${loanNumber}`);
-                    const result = await this.validateInput(input, false); // Don't show loader again
-                    results.push(result);
-                }
-
-                return results;
-            } finally {
-                this.isValidating = false;
-                LoaderManager.hide();
-            }
-        },
-
-        // Setup validation for inputs
-        setupValidation() {
-            const inputs = DOM.getLoanInputs();
-
-            inputs.forEach(input => {
-                if (input._hasValidationListeners) return;
-
-                // Debounced input validation
-                let timeout;
-                const debouncedValidation = () => {
-                    clearTimeout(timeout);
-                    timeout = TimerManager.setTimeout(() => {
-                        // Only validate if we have a value and not in batch validation
-                        if (input.value.trim() && !this.isValidating) {
-                            this.validateInput(input, true);
-                        }
-                    }, CONFIG.validationDebounce);
-                };
-
-                // Event listeners
-                input.addEventListener("blur", () => {
-                    if (input.value.trim() && !this.isValidating) {
-                        this.validateInput(input, true);
-                    }
-                });
-
-                input.addEventListener("input", debouncedValidation);
-
-                input.addEventListener("focus", () => {
-                    if (input.value.trim() && !this.isValidating) {
-                        this.validateInput(input, true);
-                    }
-                });
-
-                // Monitor for programmatic value changes using property descriptor
-                this.setupValueChangeMonitoring(input);
-
-                input._hasValidationListeners = true;
-            });
-        },
-
-        // Monitor for programmatic value changes without polling
-        setupValueChangeMonitoring(input) {
-            let lastValue = input.value;
-
-            // Override the value setter to detect programmatic changes
-            const originalDescriptor = Object.getOwnPropertyDescriptor(input, 'value') ||
-                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-
-            if (originalDescriptor && originalDescriptor.set) {
-                const originalSetter = originalDescriptor.set;
-
-                Object.defineProperty(input, 'value', {
-                    get: originalDescriptor.get,
-                    set: function (newValue) {
-                        originalSetter.call(this, newValue);
-
-                        // Check if this is a programmatic change with a meaningful value
-                        if (newValue !== lastValue && newValue && newValue.trim()) {
-                            lastValue = newValue;
-                            console.log('🔄 Programmatic value change detected:', newValue);
-
-                            // Trigger validation immediately - loader will be shown inside validateInput
-                            setTimeout(() => {
-                                ValidationSystem.validateInput(input, true);
-                            }, 100);
-                        }
-                    },
-                    configurable: true
-                });
-            }
-        }
-    };
-
-    // Optimized DOM monitoring for dynamic content
-    const DOMMonitor = {
-        setupObserver() {
-            // Disconnect existing observer
-            if (state.mutationObserver) {
-                state.mutationObserver.disconnect();
-            }
-
-            // Enhanced observer that watches the entire document for dynamic loan number inputs and navigation changes
-            state.mutationObserver = new MutationObserver((mutations) => {
-                let hasRelevantChanges = false;
-                let hasNewLoanInputs = false;
-                let hasNavigationChanges = false;
-
-                for (const mutation of mutations) {
-                    if (mutation.type === 'childList') {
-                        for (const node of mutation.addedNodes) {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                // Check if the added node is a loan input or contains loan inputs
-                                if (node.matches && node.matches('input[id*="_TxtLoanNumber"]')) {
-                                    hasRelevantChanges = true;
-                                    hasNewLoanInputs = true;
-                                    break;
-                                }
-                                if (node.querySelector && node.querySelector('input[id*="_TxtLoanNumber"]')) {
-                                    hasRelevantChanges = true;
-                                    hasNewLoanInputs = true;
-                                    break;
-                                }
-
-                                // Check for navigation elements
-                                if (node.matches && (node.matches('a') || node.matches('button') ||
-                                    node.matches('[role="menuitem"]') || node.matches('[role="button"]') ||
-                                    node.matches('.menu-item') || node.matches('.nav-link'))) {
-                                    hasNavigationChanges = true;
-                                }
-                                if (node.querySelector && (node.querySelector('a') || node.querySelector('button') ||
-                                    node.querySelector('[role="menuitem"]') || node.querySelector('.menu-item'))) {
-                                    hasNavigationChanges = true;
-                                }
-                            }
-                        }
-                    } else if (mutation.type === 'attributes') {
-                        const target = mutation.target;
-                        if (target.matches && target.matches('input[id*="_TxtLoanNumber"]') &&
-                            (mutation.attributeName === 'value' || mutation.attributeName === 'disabled')) {
-                            hasRelevantChanges = true;
-                        } else if (target.matches && (target.matches('a') || target.matches('button') ||
-                            target.matches('[role="menuitem"]') || target.matches('[role="button"]') ||
-                            target.matches('.menu-item') || target.matches('.nav-link'))) {
-                            hasNavigationChanges = true;
-                        }
-                    }
-                }
-
-                // Handle navigation changes immediately
-                if (hasNavigationChanges) {
-                    logger.debug("🔄 Navigation changes detected - re-applying link controls");
-                    hideNavigationLinks();
-                }
-
-                if (hasRelevantChanges) {
-                    this.handleChange(hasNewLoanInputs);
-                }
-            });
-
-            // Observe the entire document for maximum coverage of dynamic content
-            state.mutationObserver.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['value', 'disabled', 'style', 'class']
-            });
-
-            logger.info("✅ DOM observer is now listening for table and loan number changes...");
-        },
-
-        handleChange(hasNewLoanInputs = false) {
-            if (state.domChangeTimer) {
-                clearTimeout(state.domChangeTimer);
-            }
-
-            state.domChangeTimer = TimerManager.setTimeout(() => {
-                const currentHash = DOM.getContentHash();
-                if (currentHash !== state.lastTableContent) {
-                    state.lastTableContent = currentHash;
-                    this.resetAndRevalidate(hasNewLoanInputs);
-                }
-            }, CONFIG.domChangeDebounce);
-        },
-
-        async resetAndRevalidate(hasNewLoanInputs = false) {
-            console.log('🔄 Resetting loan extraction and re-validating...');
-
-            try {
-                const table = DOM.getTable();
-
-                // Only clear errors for loan number inputs, not certificate inputs
-                if (table) {
-                    const loanInputs = DOM.getLoanInputs();
-
-                    // Only clear errors for loan inputs, not certificate inputs
-                    state.errorElements.forEach(error => {
-                        // Check if the error is attached to a loan input
-                        const parentElement = error.parentNode;
-                        if (parentElement) {
-                            const loanInput = parentElement.querySelector('input[id$="_TxtLoanNumber"]');
-                            if (loanInput) {
-                                error.remove();
-                            }
-                        }
-                    });
-
-                    // Only reset styling for loan inputs
-                    loanInputs.forEach(input => {
-                        if (input.id && input.id.endsWith('_TxtLoanNumber')) {
-                            DOM.resetInputStyling(input);
-                        }
-                    });
-                }
-
-                // Clear validation cache for a fresh start
-                state.validationCache.clear();
-
-                // Setup validation for loan inputs
-                ValidationSystem.setupValidation();
-
-                // Only validate if we have loan numbers to check
-                const inputs = DOM.getLoanInputs();
-                const inputsWithValues = inputs.filter(input =>
-                    input.id &&
-                    input.id.endsWith('_TxtLoanNumber') &&
-                    input.value.trim()
-                );
-
-                if (inputsWithValues.length > 0) {
-                    await ValidationSystem.validateAllInputs();
-                }
-
-                console.log('✅ Loan extraction reset completed');
-            } catch (error) {
-                console.error('❌ Error during loan extraction reset:', error);
-            }
-        }
-    };
-
-    // Optimized table detection with continuous monitoring
-    const TableDetector = {
-        startDetection() {
-            if (state.isTableDetected) return;
-
-            logger.info("🔄 Starting table detection (2-minute timeout)...");
-            logger.info("📡 Setting up DOM observer to listen for table changes...");
-
-            // Set up DOM observer immediately for dynamic content detection
-            DOMMonitor.setupObserver();
-
-            let attempts = 0;
-
-            const detect = () => {
-                attempts++;
-                const table = DOM.getTable();
-
-                if (table) {
-                    logger.info(`✅ Table detected successfully after ${attempts} attempts (${attempts * CONFIG.checkInterval / 1000}s)!`);
-                    state.isTableDetected = true;
-
-                    // Clear the detection timer since we found the table
-                    if (state.tableDetectionTimer) {
-                        clearTimeout(state.tableDetectionTimer);
-                        state.tableDetectionTimer = null;
-                    }
-
-                    this.initializeFilter(table);
-                    return;
-                }
-
-                if (attempts >= CONFIG.maxAttempts) {
-                    logger.warn(`⚠️ Table detection timeout reached after ${CONFIG.maxAttempts} attempts (${CONFIG.maxAttempts * CONFIG.checkInterval / 1000}s).`);
-                    return;
-                }
-
-                // Log progress every 10 attempts (20 seconds)
-                if (attempts % 10 === 0) {
-                    logger.info(`🔍 Still searching for table... (${attempts}/${CONFIG.maxAttempts} attempts)`);
-                }
-
-                state.tableDetectionTimer = TimerManager.setTimeout(detect, CONFIG.checkInterval);
-            };
-
-            detect();
-        },
-
-        initializeFilter(table) {
-            logger.info("🔧 Initializing filter for table:", table.id);
-
-            state.lastTableContent = DOM.getContentHash();
-            state.table = table;
-
-            // Set up validation event listeners but don't validate empty inputs
-            ValidationSystem.setupValidation();
-            this.setupPresenceCheck();
-
-            // Only validate if we have loan numbers to check - not on initial load
-            const inputs = DOM.getLoanInputs();
-            const inputsWithValues = inputs.filter(input =>
-                input.id &&
-                input.id.endsWith('_TxtLoanNumber') &&
-                input.value.trim()
-            );
-
-            // Only run validation if we have actual loan numbers with values
-            if (inputsWithValues.length > 0) {
-                logger.info(`Found ${inputsWithValues.length} loan inputs with values - validating`);
-
-                // Hide the table temporarily until validation completes
-                if (table) {
-                    table.style.visibility = "hidden";
-                }
-
-                ValidationSystem.validateAllInputs().finally(() => {
-                    // Show the table after validation completes
-                    if (table) {
-                        table.style.visibility = "";
-                    }
-                });
-            } else {
-                logger.info("No loan inputs with values found - skipping initial validation");
-            }
-        },
-
-        setupPresenceCheck() {
-            // Presence check removed - table detection only runs once until URL changes
-        },
-
-
-        resetDetection() {
-            logger.info("🔄 Resetting table detection state");
-            state.isTableDetected = false;
-            state.table = null;
-            state.lastTableContent = null;
-
-            // Clear the detection timer
-            if (state.tableDetectionTimer) {
-                clearTimeout(state.tableDetectionTimer);
-                state.tableDetectionTimer = null;
-            }
-
-            if (state.mutationObserver) {
-                state.mutationObserver.disconnect();
-                state.mutationObserver = null;
-            }
-        }
-    };
-
-    // Optimized form handling
-    const FormHandler = {
-        setupValidation() {
-            const submitButtons = document.querySelectorAll(
-                'input[id="_ImgLookUp"], input[id="_ImgFinish"], button[id="_ImgLookUp"], button[id="_ImgFinish"]'
-            );
-
-            submitButtons.forEach(button => {
-                button.addEventListener("click", async (event) => {
-                    logger.info("Form validation triggered for button:", button.id);
-
-                    try {
-                        // Validate all inputs before form submission
-                        const validationResults = await ValidationSystem.validateAllInputs();
-
-                        // If any validation failed, prevent form submission
-                        if (validationResults.includes(false)) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            return false;
-                        }
-
-                        // All validations passed, allow form submission
-
-                    } catch (error) {
-                        logger.error("Error during form validation:", error);
-                        // Let the form submit normally if there's an error in validation
-                    }
-                }, true);
-            });
-        },
-
-        setupCancelHandlers() {
-            // Clear buttons
-            document.querySelectorAll('input[id*="_ImgBtnClear"]').forEach(button => {
-                button.addEventListener("click", (event) => {
-                    const row = button.closest("tr");
-                    if (!row) return;
-
-                    const loanInput = row.querySelector('input[id*="_TxtLoanNumber"]');
-                    if (loanInput) {
-                        // Clear validation cache for this input
-                        if (loanInput.value.trim()) {
-                            state.validationCache.delete(loanInput.value.trim());
-                        }
-
-                        DOM.resetInputStyling(loanInput);
-                        const error = loanInput.parentNode.querySelector(".error-msg");
-                        if (error) error.remove();
-                    }
-                });
-            });
-
-            // Main cancel button
-            const cancelButton = document.getElementById("_ImgBtnCancel");
-            if (cancelButton) {
-                cancelButton.addEventListener("click", () => {
-                    const inputs = DOM.getLoanInputs();
-                    inputs.forEach(input => {
-                        // Clear validation cache for all inputs
-                        if (input.value.trim()) {
-                            state.validationCache.delete(input.value.trim());
-                        }
-
-                        DOM.resetInputStyling(input);
-                        const error = input.parentNode.querySelector(".error-msg");
-                        if (error) error.remove();
-                    });
-                    logger.info("Cancel button clicked - cleared all validation errors");
-                });
-            }
-        }
-    };
-
-    // Optimized URL change detection
-    const URLMonitor = {
-        setup() {
-            logger.info("🔗 Setting up URL change detection...");
-
-            window.addEventListener('popstate', this.handleChange);
-            window.addEventListener('hashchange', this.handleChange);
-
-            // Override history methods
-            const originalPushState = history.pushState;
-            const originalReplaceState = history.replaceState;
-
-            history.pushState = (...args) => {
-                originalPushState.apply(history, args);
-                this.handleChange();
-            };
-
-            history.replaceState = (...args) => {
-                originalReplaceState.apply(history, args);
-                this.handleChange();
-            };
-        },
-
-        handleChange() {
-            const newUrl = window.location.href;
-            if (newUrl !== state.currentUrl) {
-                logger.info("URL change detected - resetting detection");
-                state.currentUrl = newUrl;
-                TableDetector.resetDetection();
-                setTimeout(() => TableDetector.startDetection(), 1000);
-            }
-        }
-    };
-
-    // Optimized cleanup system
-    const CleanupManager = {
-        setup() {
-            window.addEventListener('beforeunload', this.cleanup);
-            window.addEventListener('unload', this.cleanup);
-            window.addEventListener('pagehide', this.cleanup);
-        },
-
-        cleanup() {
-            logger.info("🧹 Cleaning up filter script...");
-
-            TimerManager.clearAll();
-            DOMMonitor.resetAndRevalidate();
-            DOM.clearErrors();
-            state.validationCache.clear();
-
-            if (state.mutationObserver) {
-                state.mutationObserver.disconnect();
-                state.mutationObserver = null;
-            }
-
-            logger.info("✅ Cleanup completed");
-        }
-    };
-
-    // Optimized loader system
-    const LoaderManager = {
-        loaderInstance: null,
-        styleAdded: false,
-
-        createStyles() {
-            if (this.styleAdded) return null;
-
-            const style = document.createElement("style");
-            style.textContent = `
-        #loaderOverlay {
-          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(255, 255, 255, 0.9); display: flex;
-          flex-direction: column; align-items: center; justify-content: center; 
-          z-index: 9999; transition: opacity 0.3s ease;
-        }
-        .spinner {
-          width: 60px; height: 60px; border: 6px solid #ccc;
-          border-top-color: #2b6cb0; border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        .loader-text {
-          margin-top: 15px; font-family: Arial, sans-serif;
-          color: #2b6cb0; font-size: 16px; font-weight: 500;
-        }
-        @keyframes spin { to {transform: rotate(360deg);} }
-        #loaderOverlay.hidden { opacity: 0; pointer-events: none; }
-      `;
-            this.styleAdded = true;
-            return style;
-        },
-
-        createLoader() {
-            if (this.loaderInstance && document.body.contains(this.loaderInstance)) {
-                return this.loaderInstance;
-            }
-
-            const loader = document.createElement("div");
-            loader.id = "loaderOverlay";
-
-            const spinner = document.createElement("div");
-            spinner.className = "spinner";
-
-            const text = document.createElement("div");
-            text.className = "loader-text";
-            text.textContent = "Verifying loan access...";
-            text.id = "loaderText";
-
-            loader.appendChild(spinner);
-            loader.appendChild(text);
-
-            this.loaderInstance = loader;
-            return loader;
-        },
-
-        updateText(message) {
-            const textElement = document.getElementById("loaderText");
-            if (textElement) {
-                textElement.textContent = message;
-            }
-        },
-
-        show(message = "Verifying loan access...") {
-            if (!document.head.querySelector('style#loader-style')) {
-                const style = this.createStyles();
-                if (style) {
-                    style.id = "loader-style";
-                    document.head.appendChild(style);
-                }
-            }
-
-            let loader = document.getElementById("loaderOverlay");
-            if (!loader) {
-                loader = this.createLoader();
-                document.body.appendChild(loader);
-            }
-
-            loader.classList.remove("hidden");
-            this.updateText(message);
-            return loader;
-        },
-
-        hide() {
-            const loader = document.getElementById("loaderOverlay");
-            if (loader) {
-                loader.classList.add("hidden");
-                setTimeout(() => {
-                    if (loader && loader.parentNode) {
-                        loader.parentNode.removeChild(loader);
-                    }
-                }, 300);
-            }
-            this.loaderInstance = null;
-        }
-    };
-
-    // Main initialization
-    const Main = {
-        async initialize() {
-            // Simple execution guard for this window context
-            if (window.loanNumberFilterExecuted) {
-                logger.warn("⚠️ Loan number filter already executed in this context, skipping");
-                return;
-            }
-
-            // Set execution flag for this window context
-            window.loanNumberFilterExecuted = true;
-
-            // Release the global execution lock
-            window.loanNumberFilterExecuting = false;
-
-            logger.info("🚀 Radian Loan Filter Script Starting...");
-
-            try {
-                // Initialize
-                await this.setup();
-
-                // Loader will be hidden after validation completes in ValidationSystem
-                // We don't remove it here anymore
-
-            } catch (error) {
-                logger.error("❌ Failed to initialize filter:", error);
-            }
-        },
-
-        async setup() {
-            logger.info("✅ DOM Ready - Initializing filter...");
-
-            await waitForListener();
-
-            URLMonitor.setup();
-            CleanupManager.setup();
-            FormHandler.setupValidation();
-            FormHandler.setupCancelHandlers();
-
-            // Hide navigation links immediately
-            hideNavigationLinks();
-
-            // Set up periodic navigation link checks as fallback
-            this.setupNavigationMonitoring();
-
-            TableDetector.startDetection();
-        },
-
-        setupNavigationMonitoring() {
-            // Add event listeners for page load events to catch all possible DOM changes
-            window.addEventListener('DOMContentLoaded', hideNavigationLinks);
-            window.addEventListener('load', hideNavigationLinks);
-
-            // Listen for iframe load events
-            function setupIframeListeners() {
-                const iframes = document.querySelectorAll('iframe');
-                iframes.forEach(iframe => {
-                    try {
-                        iframe.addEventListener('load', hideNavigationLinks);
-                    } catch (e) {
-                        // Ignore cross-origin errors
-                    }
-                });
-            }
-
-            // Initial iframe setup
-            setupIframeListeners();
-
-            logger.info("✅ Navigation monitoring set up for dynamic content (event-driven only)");
-        }
-    };
-
-    // Entry point with global execution guard
-    (function () {
-        // Global guard to prevent multiple executions
-        if (window.loanNumberFilterExecuting) {
-            logger.warn("⚠️ Loan number filter already executing in another context, skipping");
-            return;
-        }
-
-        // Set global flag to prevent other instances from running
-        window.loanNumberFilterExecuting = true;
-
-        function waitForDOM() {
-            if (document && document.body) {
-                // Fix the 'this' binding issue by using a bound function
-                const boundInitialize = Main.initialize.bind(Main);
-                boundInitialize();
-            } else if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", function () {
-                    const boundInitialize = Main.initialize.bind(Main);
-                    boundInitialize();
-                });
-            } else {
-                setTimeout(() => {
-                    if (document && document.body) {
-                        const boundInitialize = Main.initialize.bind(Main);
-                        boundInitialize();
-                    }
-                }, 500);
-            }
-        }
-
-        waitForDOM();
-    })();
-
-    // ================================================================
-}
 
 /**
  * SEARCH INQUIRY DETAILS FILTER
@@ -2007,67 +1159,6 @@ async function initializeSearchInquiryDetailsFilter() {
 
         return unauthorizedContainer;
     }
-
-    // ########## IFRAME MONITORING ##########
-
-    /**
-     * Wait for payment history iframe to load after tab click
-     */
-    async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-
-            function checkForIframe() {
-                // Look for the payment history iframe
-                const paymentIframe = document.querySelector('#containerTab_tabPaymentHistory_frmPaymentHistory');
-
-                if (paymentIframe) {
-                    try {
-                        // Check if iframe is accessible and has loaded content
-                        if (paymentIframe.contentDocument && paymentIframe.contentWindow) {
-                            const iframeDoc = paymentIframe.contentDocument;
-
-                            // Check if iframe has substantial content (not just loading)
-                            const hasContent = iframeDoc.body &&
-                                (iframeDoc.body.children.length > 0 ||
-                                    iframeDoc.querySelector('#_LblLenderNumInfo') ||
-                                    iframeDoc.querySelector('table'));
-
-                            if (hasContent && iframeDoc.readyState === 'complete') {
-                                logger.info("✅ Payment history iframe loaded with content");
-                                resolve(paymentIframe);
-                                return;
-                            } else if (hasContent) {
-                                logger.debug("📋 Payment history iframe has content but still loading...");
-                            }
-                        }
-                    } catch (e) {
-                        logger.warn("⚠️ Payment iframe found but not accessible:", e.message);
-                    }
-                }
-
-                if (++attempts < maxAttempts) {
-                    if (attempts === 1) {
-                        logger.info("⏳ Waiting for payment history iframe to load...");
-                    }
-                    if (attempts % 5 === 0) {
-                        logger.debug(`⏳ Still waiting for payment iframe... (attempt ${attempts}/${maxAttempts})`);
-                    }
-                    setTimeout(checkForIframe, interval);
-                } else {
-                    reject(new Error("Payment history iframe not found or not accessible"));
-                }
-            }
-
-            checkForIframe();
-        });
-    }
-
-    // ########## NAVIGATION CONTROL ##########
-    // Use global hideNavigationLinks from the unified section above to avoid duplication
-
-    // ########## ACCESS CONTROL ##########
-
     /**
      * Hide contentmenu div and show unauthorized message
      */
@@ -2111,88 +1202,6 @@ async function initializeSearchInquiryDetailsFilter() {
         }
 
         logger.info("✅ Unauthorized message displayed");
-    }
-
-    // ########## MAIN LOGIC ##########
-
-    /**
-     * Handle Payment History context - check loan access from within payhist_viewAll.html
-     */
-    async function handlePaymentHistoryContext() {
-        try {
-            logger.info("🔄 Handling Payment History context");
-            LoaderManager.show();
-            LoaderManager.updateText("Checking loan access permissions...");
-
-            // Wait a bit for the page to stabilize
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Extract loan number using the new structure
-            LoaderManager.updateText("Extracting loan number...");
-            const loanNumber = extractLoanNumberDirectly();
-
-            if (!loanNumber) {
-                LoaderManager.updateText("Error: Loan number not found");
-                setTimeout(() => LoaderManager.hide(), 2000);
-                return;
-            }
-
-            // Check loan access
-            LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
-            const allowedLoans = await checkNumbersBatch([loanNumber]);
-
-            if (!allowedLoans || allowedLoans.length === 0) {
-                LoaderManager.updateText("Access denied - Hiding restricted content...");
-                logger.debug(`🚫 Loan ${loanNumber} is restricted`);
-
-                // Hide content and show unauthorized message  
-                setTimeout(() => {
-                    LoaderManager.hide();
-
-                    // Hide only the contentmenu div which contains the loan information
-                    const contentMenuDiv = document.querySelector('.contentmenu');
-                    if (contentMenuDiv) {
-                        // Create unauthorized message
-                        const unauthorizedElement = createUnauthorizedElement();
-
-                        // Insert the unauthorized message in place of the contentmenu div
-                        if (contentMenuDiv.parentNode && unauthorizedElement) {
-                            contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
-                            contentMenuDiv.style.display = "none";
-                            logger.info("✅ contentmenu div hidden and unauthorized message placed in its position in payment history context");
-                        } else {
-                            // Fallback: just hide the contentmenu div
-                            contentMenuDiv.style.display = "none";
-                            logger.info("✅ contentmenu div hidden successfully in payment history context");
-                        }
-                    } else {
-                        logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
-                        // Fallback: Hide all content if contentmenu div is not found
-                        const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-                        allElements.forEach((element) => {
-                            if (element && element.id !== "paymentHistoryLoader") {
-                                element.style.display = "none";
-                            }
-                        });
-
-                        // Show unauthorized message at body level as fallback
-                        const unauthorizedElement = createUnauthorizedElement();
-                        if (document.body) {
-                            document.body.appendChild(unauthorizedElement);
-                        }
-                    }
-                }, 1000);
-            } else {
-                LoaderManager.updateText("Access granted");
-                logger.debug(`✅ Loan ${loanNumber} is authorized`);
-                setTimeout(() => LoaderManager.hide(), 1000);
-            }
-
-        } catch (error) {
-            logger.error("❌ Error in Payment History context handling:", error);
-            LoaderManager.updateText("Error occurred during access verification");
-            setTimeout(() => LoaderManager.hide(), 2000);
-        }
     }
 
     /**
@@ -2277,6 +1286,7 @@ async function initializeSearchInquiryDetailsFilter() {
             logger.info(`🔍 Checking loan access for: ${loanNumber}`);
             LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
             const allowedLoans = await checkNumbersBatch([loanNumber]);
+            console.log("allowedLoans",allowedLoans);
 
             if (!allowedLoans || allowedLoans.length === 0) {
                 LoaderManager.updateText("Access denied - Hiding restricted content...");
@@ -2442,22 +1452,6 @@ async function initializeHomePageFilter() {
 
             checkElement();
         });
-    }
-
-    /**
-     * Wait for multiple elements to be present
-     */
-    function waitForElements(selectors, timeout = 10000) {
-        Logger.info(`🔍 Waiting for multiple elements: ${selectors.join(', ')}`);
-
-        const promises = selectors.map(selector =>
-            waitForElement(selector, timeout).catch(error => {
-                Logger.warn(`⚠️ Element not found: ${selector}`, error.message);
-                return null;
-            })
-        );
-
-        return Promise.all(promises);
     }
     /**
      * Define the links that should be hidden
@@ -3113,10 +2107,6 @@ async function initializeSearchInquiryFilter() {
         console.log("[radian_filter] getTargetTable: No suitable table found");
         return null;
     }
-
-    // ########## NAVIGATION CONTROL ##########
-    // Use the global hideNavigationLinks defined in the unified section above
-
     // ########## END NAVIGATION CONTROL ##########
 
     /**
@@ -3126,10 +2116,6 @@ async function initializeSearchInquiryFilter() {
         if (document.body?.style) {
             document.body.style.opacity = val ? 1 : 0;
         }
-    }
-
-    function togglePageDisplay(val) {
-        document.body.style.display = val;
     }
 
     /**
@@ -3168,6 +2154,7 @@ async function initializeSearchInquiryFilter() {
             }
 
             const allowedNumbers = await checkNumbersBatch([loanNumber]);
+            console.log("allowedNumbers",allowedNumbers);
             allowedLoansCache.addLoans(allowedNumbers);
             const isAllowed = allowedNumbers.includes(loanNumber);
             return isAllowed;
@@ -3200,81 +2187,6 @@ async function initializeSearchInquiryFilter() {
         if (alphaNumMatches) matches.push(...alphaNumMatches);
 
         return [...new Set(matches)];
-    }
-
-    /**
-     * Class to manage the visibility of table rows containing loan information
-     */
-    class TableRowFilter {
-        constructor(row) {
-            this.row = row;
-            this.parent = row.parentElement;
-            this.loanNumber = this.getLoanNumber();
-        }
-
-        getLoanNumber() {
-            if (!this.row.cells || this.row.cells.length === 0) {
-                return null;
-            }
-
-            const table = this.row.closest("table");
-            if (!table) {
-                return null;
-            }
-
-            const headerRow = table.querySelector("thead tr");
-            if (!headerRow) {
-                if (this.row.cells.length >= 3) {
-                    return this.row.cells[2].textContent.trim();
-                }
-                return null;
-            }
-
-            // Find the index of the "Loan Number" column
-            let loanNumberIndex = -1;
-            const headerCells = headerRow.cells;
-            for (let i = 0; i < headerCells.length; i++) {
-                if (headerCells[i].textContent.trim() === "Loan Number") {
-                    loanNumberIndex = i;
-                    break;
-                }
-            }
-
-            if (loanNumberIndex !== -1 && this.row.cells.length > loanNumberIndex) {
-                return this.row.cells[loanNumberIndex].textContent.trim();
-            }
-
-            if (this.row.cells.length >= 3) {
-                return this.row.cells[2].textContent.trim();
-            }
-
-            return null;
-        }
-
-        async filter() {
-            if (!this.loanNumber) {
-                return false;
-            }
-
-            const isAllowed = await isLoanNumberAllowed(this.loanNumber);
-
-            if (!isAllowed) {
-                this.hide();
-                return true;
-            }
-
-            return false;
-        }
-
-        hide() {
-            if (this.parent && this.row) {
-                try {
-                    this.row.style.display = "none";
-                } catch (error) {
-                    console.error("[radian_filter] Error hiding row:", error);
-                }
-            }
-        }
     }
 
     /**
@@ -3538,26 +2450,6 @@ async function initializeSearchInquiryFilter() {
         }
 
         return true;
-    }
-
-    /**
-     * Process generic elements that might contain loan information
-     */
-    async function processGenericElements() {
-        const potentialContainers = document.querySelectorAll(
-            '.sc-kXOizl, .sc-dJkDXt, [class*="loan"], [class*="borrower"]'
-        );
-
-        for (const container of potentialContainers) {
-            if (processedElements.has(container)) continue;
-            processedElements.add(container);
-
-            if (await shouldHideElement(container)) {
-                if (container.parentElement) {
-                    container.parentElement.removeChild(container);
-                }
-            }
-        }
     }
 
     /**
@@ -4279,6 +3171,7 @@ async function initializeViewClaimsFilter() {
 
             // Check if loan is restricted
             const allowedLoans = await checkNumbersBatch([loanNumber]);
+            console.log("allowedLoans",allowedLoans);
 
             if (allowedLoans.length === 0) {
                 // Loan is restricted - hide content and show unauthorized message
@@ -4621,6 +3514,11 @@ async function initializeViewClaimsFilter() {
 
             // Hide navigation links after successful connection
             hideNavigationLinks();
+            const isRestricted = checkRestrictedUrl();
+      if (isRestricted) {
+        console.log("Restricted Page Detected");
+        return;
+      }
 
             // Start monitoring for loan element to appear
             startElementMonitoring();
@@ -5234,7 +4132,6 @@ async function initializeClaimsReportsFilter() {
             TableFilterState.isInitialized = true;
         }
     }
-
     /**
      * Set up mutation observer to handle dynamic navigation content
      */
