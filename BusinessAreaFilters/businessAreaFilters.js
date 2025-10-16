@@ -1,11 +1,12 @@
 /*!
- * @description : Unified Radian Filter Script
- * @portal : All Radian MI Online Portals
- * @author : Radian Team
- * @group : Radian Team
- * @owner : Radian
- * @lastModified : 2024
- * @version : 1.0.0
+ * @Portal : Radian
+ * @Bussiness Area: MI
+ * @Description : To restrict the unallowed Loan information to the offshore users as per the given business requirements.
+ * @Author : Rohith Kandikattu
+ * @Group : Accelirate
+ * @Owner : Cenlar
+ * @LastModified : October-10th-2025
+ * @Version : 1.0.10
  */
 
 // ########## EXTENSION CONFIGURATION ##########
@@ -48,8 +49,14 @@ function checkRestrictedUrl() {
   const windowURL = window.location.href;
 
   const restrictedPath = [
-    "dashboard/Dashboard/Recent/Dashboard",
-    "report/Report/Recent/Report"
+    "/Rate-Quote",
+    "/Order-Services/New-Application",
+    "/Order-Services/Resubmit-Application",
+    "/Loan-Servicing/Activate-Deferred",
+    "/Loan-Servicing/Servicing-Transfer",
+    "/Claims/Search",
+    "/Claims/Reports",
+    "/Documents",
   ];
 
   const foundURL = restrictedPath.find((path) => windowURL.includes(path));
@@ -85,13 +92,13 @@ function checkRestrictedUrl() {
  */
 function setupRestrictedUrlMonitoring() {
   let lastUrl = window.location.href;
-  
+
   // Monitor URL changes
   const checkUrlChange = () => {
     if (lastUrl !== window.location.href) {
       lastUrl = window.location.href;
       Logger.log("🔄 URL changed, checking for restrictions...");
-      
+
       // Check if new URL is restricted
       const isRestricted = checkRestrictedUrl();
       if (isRestricted) {
@@ -100,25 +107,25 @@ function setupRestrictedUrlMonitoring() {
       }
     }
   };
-  
+
   // Listen for browser navigation events
   window.addEventListener('popstate', checkUrlChange);
   window.addEventListener('hashchange', checkUrlChange);
-  
+
   // Override history methods to catch programmatic navigation
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
-  
+
   history.pushState = (...args) => {
     originalPushState.apply(history, args);
     setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
   };
-  
+
   history.replaceState = (...args) => {
     originalReplaceState.apply(history, args);
     setTimeout(checkUrlChange, 100); // Small delay to ensure URL is updated
   };
-  
+
   Logger.log("👀 Restricted URL monitoring setup complete");
 }
 
@@ -155,7 +162,7 @@ function hideNavigationLinks() {
 
     Logger.log(`🔍 Checking ${allElements.length} potential navigation elements...`);
 
-    allElements.forEach((element, index) => {
+    allElements.forEach((element) => {
       const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
 
       // Skip empty elements
@@ -231,7 +238,6 @@ function hideNavigationLinks() {
  */
 function detectCurrentFilter() {
   const currentUrl = window.location.href;
-  const hostname = window.location.hostname;
 
   Logger.log(`Current URL: ${currentUrl}`);
 
@@ -333,33 +339,81 @@ async function checkNumbersBatch(numbers) {
 }
 
 /**
+ * Create loader to show when trying to establish connection with extension
+ */
+function createLoader() {
+  Logger.info("🎨 Creating loader styles...");
+  const style = document.createElement("style");
+  style.id = "loader-style";
+  style.textContent = `
+      #loaderOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 6px solid #ccc;
+        border-top-color: #2b6cb0;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      .loader-text {
+        color: #2b6cb0;
+        font-size: 16px;
+        font-weight: 500;
+        text-align: center;
+      }
+      @keyframes spin {
+        to {transform: rotate(360deg);}
+      }
+      #loaderOverlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    `;
+  return style;
+}
+
+/**
  * Handle unknown URL pages
  * This function manages extension connection and navigation hiding for unrecognized URLs
  * Performance-optimized to minimize impact on page responsiveness
  */
-async function handleUnknownUrlPage(hasListener) {
+async function handleUnknownUrlPage() {
   try {
     Logger.log("🔍 Handling unknown URL page");
-    
+
     // Create and show loader
     const LoaderUtil = window.LoaderUtil || createDefaultLoaderUtil();
     LoaderUtil.showLoader("Connecting to Radian extension...");
-    
+
     // Create throttled version of hideNavigationLinks for event listeners
     // This ensures we don't call it repeatedly in short succession
     const throttledHideLinks = (() => {
       let lastCallTime = 0;
       const minInterval = 2000; // Minimum 2 seconds between calls
       let scheduled = false;
-      
+
       return () => {
         const now = Date.now();
         if (scheduled || now - lastCallTime < minInterval) {
           return; // Skip if already scheduled or called recently
         }
-        
+
         scheduled = true;
-        
+
         // Schedule for next animation frame to align with browser rendering
         requestAnimationFrame(() => {
           hideNavigationLinks();
@@ -368,36 +422,36 @@ async function handleUnknownUrlPage(hasListener) {
         });
       };
     })();
-    
+
     // Set up mutation observer to handle dynamic content changes
     // This uses our optimized version that minimizes performance impact
     setupDynamicContentObserver();
-    
+
     // Hide navigation links immediately (first-time execution)
     hideNavigationLinks();
-    
+
     // Set up event listeners for critical page lifecycle events only
     // Using the throttled version to prevent excessive calls
     window.addEventListener('DOMContentLoaded', throttledHideLinks, { once: true });
-    
+
     // For load event, use once: true to ensure it only fires once
     window.addEventListener('load', () => {
       throttledHideLinks();
-      
+
       // After initial load, we only need to rely on the mutation observer
       // This reduces the number of active event listeners
       Logger.log("✅ Initial page load complete, relying on mutation observer");
     }, { once: true });
-    
+
     // Find and monitor iframes using our optimized implementation
     monitorIframes();
-    
+
     // Hide loader after a short delay to ensure UI is properly handled
     setTimeout(() => {
       LoaderUtil.hideLoader();
       Logger.success("✅ Unknown page protection applied successfully");
     }, 1500);
-    
+
     return true;
   } catch (error) {
     Logger.error("❌ Error handling unknown URL page:", error);
@@ -415,48 +469,48 @@ function setupDynamicContentObserver() {
     // Track last execution time to prevent excessive calls
     let lastExecutionTime = 0;
     const minInterval = 1500; // Minimum 1.5 seconds between executions
-    
+
     // Create a throttled version of hideNavigationLinks with strict timing control
     const throttledHideLinks = throttle(hideNavigationLinks, minInterval);
-    
+
     // Create mutation observer with optimized filtering
     const observer = new MutationObserver((mutations) => {
       // Skip if execution happened very recently
       const now = Date.now();
       if (now - lastExecutionTime < minInterval) return;
-      
+
       // Only process if we have relevant mutations
       const hasRelevantMutation = mutations.some(mutation => {
         // Only care about added nodes (new content)
         if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
           return false;
         }
-        
+
         // Check if any added node could contain navigation elements
         return Array.from(mutation.addedNodes).some(node => {
           // Only process element nodes
           if (node.nodeType !== Node.ELEMENT_NODE) return false;
-          
+
           // Check if this is a navigation-related element or could contain one
           const nodeType = node.nodeName.toLowerCase();
-          return nodeType === 'nav' || 
-                 nodeType === 'header' || 
-                 nodeType === 'div' || 
-                 nodeType === 'ul' ||
-                 nodeType === 'iframe' ||
-                 node.classList?.contains('nav') ||
-                 node.classList?.contains('menu') ||
-                 node.classList?.contains('header') ||
-                 node.hasAttribute('role');
+          return nodeType === 'nav' ||
+            nodeType === 'header' ||
+            nodeType === 'div' ||
+            nodeType === 'ul' ||
+            nodeType === 'iframe' ||
+            node.classList?.contains('nav') ||
+            node.classList?.contains('menu') ||
+            node.classList?.contains('header') ||
+            node.hasAttribute('role');
         });
       });
-      
+
       if (hasRelevantMutation) {
         throttledHideLinks();
         lastExecutionTime = now;
       }
     });
-    
+
     // Start observing with optimized configuration
     observer.observe(document.body || document.documentElement, {
       childList: true,
@@ -464,10 +518,10 @@ function setupDynamicContentObserver() {
       attributes: false,  // Don't watch attribute changes
       characterData: false  // Don't watch text content changes
     });
-    
+
     // Store observer reference to prevent garbage collection
     window._navigationObserver = observer;
-    
+
     Logger.log("👀 Performance-optimized dynamic content observer set up successfully");
   } catch (error) {
     Logger.error("❌ Error setting up dynamic content observer:", error);
@@ -482,19 +536,19 @@ function monitorIframes() {
   try {
     // Track processed iframes to avoid duplicate handlers
     const processedIframes = new WeakSet();
-    
+
     // Track last execution time
     let lastIframeProcessTime = 0;
     const minIframeInterval = 2000; // Minimum 2 seconds between iframe scans
-    
+
     // Create optimized iframe handler with throttling
     const handleIframeLoad = (iframe) => {
       // Skip if already processed
       if (processedIframes.has(iframe)) return;
-      
+
       // Mark as processed
       processedIframes.add(iframe);
-      
+
       // Use once option to ensure the event handler only runs once
       iframe.addEventListener('load', () => {
         // Throttle the actual processing
@@ -503,13 +557,13 @@ function monitorIframes() {
           // Skip if too frequent
           return;
         }
-        
+
         // Process the iframe with throttled hideNavigationLinks
         throttle(hideNavigationLinks, minIframeInterval)();
         lastIframeProcessTime = now;
       }, { once: true });
     };
-    
+
     // Process existing iframes with delay to prioritize main content loading
     setTimeout(() => {
       const iframes = document.querySelectorAll('iframe');
@@ -522,25 +576,25 @@ function monitorIframes() {
             handleIframeLoad(iframes[i]);
           }
           index = endIndex;
-          
+
           if (index < iframes.length) {
             setTimeout(processNextBatch, 200);
           }
         };
-        
+
         processNextBatch();
       }
     }, 1000);
-    
+
     // Monitor for new iframes with reduced sensitivity
     const iframeObserver = new MutationObserver(mutations => {
       // Check if we need to process now or wait
       const now = Date.now();
       if (now - lastIframeProcessTime < minIframeInterval) return;
-      
+
       // Look for iframe additions
       let hasNewIframe = false;
-      
+
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
           for (let i = 0; i < mutation.addedNodes.length; i++) {
@@ -552,12 +606,12 @@ function monitorIframes() {
           }
         }
       }
-      
+
       if (hasNewIframe) {
         lastIframeProcessTime = now;
       }
     });
-    
+
     // Start observing with optimized configuration
     iframeObserver.observe(document.body || document.documentElement, {
       childList: true,
@@ -565,10 +619,10 @@ function monitorIframes() {
       attributes: false,
       characterData: false
     });
-    
+
     // Store observer reference
     window._iframeObserver = iframeObserver;
-    
+
     Logger.log("🖼️ Performance-optimized iframe monitoring set up successfully");
   } catch (error) {
     Logger.error("❌ Error monitoring iframes:", error);
@@ -582,18 +636,18 @@ function monitorIframes() {
 function createDefaultLoaderUtil() {
   return {
     loaderInstance: null,
-    
+
     createLoader() {
       if (this.loaderInstance && document.body.contains(this.loaderInstance)) {
         return this.loaderInstance;
       }
-      
+
       // Use existing createLoaderElement function if available
       if (typeof createLoaderElement === 'function') {
         this.loaderInstance = createLoaderElement();
         return this.loaderInstance;
       }
-      
+
       // Fallback implementation based on existing loader style
       const loader = document.createElement("div");
       loader.id = "loaderOverlay";
@@ -601,25 +655,25 @@ function createDefaultLoaderUtil() {
         <div class="spinner"></div>
         <div class="loader-text">Connecting to Radian extension...</div>
       `;
-      
+
       this.loaderInstance = loader;
       return loader;
     },
-    
+
     updateLoaderText(text) {
       // Use existing updateLoaderText function if available
       if (typeof updateLoaderText === 'function') {
         updateLoaderText(text);
         return;
       }
-      
+
       // Fallback implementation
       const loaderText = document.querySelector('#loaderOverlay .loader-text');
       if (loaderText) {
         loaderText.textContent = text;
       }
     },
-    
+
     showLoader(text = "Connecting to Radian extension...") {
       // Add loader style if not present
       if (!document.head.querySelector('style[id^="loader"]')) {
@@ -672,19 +726,19 @@ function createDefaultLoaderUtil() {
           document.head.appendChild(style);
         }
       }
-      
+
       let loader = document.getElementById("loaderOverlay");
       if (!loader) {
         loader = this.createLoader();
         document.body.appendChild(loader);
       }
-      
+
       this.updateLoaderText(text);
       loader.classList.remove("hidden");
-      
+
       return loader;
     },
-    
+
     hideLoader() {
       const loader = document.getElementById("loaderOverlay");
       if (loader) {
@@ -707,10 +761,10 @@ function createDefaultLoaderUtil() {
 function throttle(func, limit) {
   let inThrottle = false;
   let lastExec = 0;
-  
-  return function(...args) {
+
+  return function (...args) {
     const now = Date.now();
-    
+
     // If it's been longer than the limit since last execution, execute immediately
     if (now - lastExec >= limit) {
       func(...args);
@@ -1164,7 +1218,6 @@ async function initializeChangeLoanNumberFilter() {
       // Enhanced observer that watches the entire document for dynamic loan number inputs and navigation changes
       state.mutationObserver = new MutationObserver((mutations) => {
         let hasRelevantChanges = false;
-        let hasNewLoanInputs = false;
         let hasNavigationChanges = false;
 
         for (const mutation of mutations) {
@@ -1174,12 +1227,10 @@ async function initializeChangeLoanNumberFilter() {
                 // Check if the added node is a loan input or contains loan inputs
                 if (node.matches && node.matches('input[id*="_TxtLoanNumber"]')) {
                   hasRelevantChanges = true;
-                  hasNewLoanInputs = true;
                   break;
                 }
                 if (node.querySelector && node.querySelector('input[id*="_TxtLoanNumber"]')) {
                   hasRelevantChanges = true;
-                  hasNewLoanInputs = true;
                   break;
                 }
 
@@ -1215,7 +1266,7 @@ async function initializeChangeLoanNumberFilter() {
         }
 
         if (hasRelevantChanges) {
-          this.handleChange(hasNewLoanInputs);
+          this.handleChange();
         }
       });
 
@@ -1230,7 +1281,7 @@ async function initializeChangeLoanNumberFilter() {
       logger.info("✅ DOM observer is now listening for table and loan number changes...");
     },
 
-    handleChange(hasNewLoanInputs = false) {
+    handleChange() {
       if (state.domChangeTimer) {
         clearTimeout(state.domChangeTimer);
       }
@@ -1239,12 +1290,12 @@ async function initializeChangeLoanNumberFilter() {
         const currentHash = DOM.getContentHash();
         if (currentHash !== state.lastTableContent) {
           state.lastTableContent = currentHash;
-          this.resetAndRevalidate(hasNewLoanInputs);
+          this.resetAndRevalidate();
         }
       }, CONFIG.domChangeDebounce);
     },
 
-    async resetAndRevalidate(hasNewLoanInputs = false) {
+    async resetAndRevalidate() {
       console.log('🔄 Resetting loan extraction and re-validating...');
 
       try {
@@ -1443,7 +1494,7 @@ async function initializeChangeLoanNumberFilter() {
     setupCancelHandlers() {
       // Clear buttons
       document.querySelectorAll('input[id*="_ImgBtnClear"]').forEach(button => {
-        button.addEventListener("click", (event) => {
+        button.addEventListener("click", () => {
           const row = button.closest("tr");
           if (!row) return;
 
@@ -2100,67 +2151,6 @@ async function initializeSearchInquiryDetailsFilter() {
 
     return unauthorizedContainer;
   }
-
-  // ########## IFRAME MONITORING ##########
-
-  /**
-   * Wait for payment history iframe to load after tab click
-   */
-  async function waitForPaymentHistoryIframe(maxAttempts = 30, interval = 1000) {
-    return new Promise((resolve, reject) => {
-      let attempts = 0;
-
-      function checkForIframe() {
-        // Look for the payment history iframe
-        const paymentIframe = document.querySelector('#containerTab_tabPaymentHistory_frmPaymentHistory');
-
-        if (paymentIframe) {
-          try {
-            // Check if iframe is accessible and has loaded content
-            if (paymentIframe.contentDocument && paymentIframe.contentWindow) {
-              const iframeDoc = paymentIframe.contentDocument;
-
-              // Check if iframe has substantial content (not just loading)
-              const hasContent = iframeDoc.body &&
-                (iframeDoc.body.children.length > 0 ||
-                  iframeDoc.querySelector('#_LblLenderNumInfo') ||
-                  iframeDoc.querySelector('table'));
-
-              if (hasContent && iframeDoc.readyState === 'complete') {
-                logger.info("✅ Payment history iframe loaded with content");
-                resolve(paymentIframe);
-                return;
-              } else if (hasContent) {
-                logger.debug("📋 Payment history iframe has content but still loading...");
-              }
-            }
-          } catch (e) {
-            logger.warn("⚠️ Payment iframe found but not accessible:", e.message);
-          }
-        }
-
-        if (++attempts < maxAttempts) {
-          if (attempts === 1) {
-            logger.info("⏳ Waiting for payment history iframe to load...");
-          }
-          if (attempts % 5 === 0) {
-            logger.debug(`⏳ Still waiting for payment iframe... (attempt ${attempts}/${maxAttempts})`);
-          }
-          setTimeout(checkForIframe, interval);
-        } else {
-          reject(new Error("Payment history iframe not found or not accessible"));
-        }
-      }
-
-      checkForIframe();
-    });
-  }
-
-  // ########## NAVIGATION CONTROL ##########
-  // Use global hideNavigationLinks from the unified section above to avoid duplication
-
-  // ########## ACCESS CONTROL ##########
-
   /**
    * Hide contentmenu div and show unauthorized message
    */
@@ -2204,88 +2194,6 @@ async function initializeSearchInquiryDetailsFilter() {
     }
 
     logger.info("✅ Unauthorized message displayed");
-  }
-
-  // ########## MAIN LOGIC ##########
-
-  /**
-   * Handle Payment History context - check loan access from within payhist_viewAll.html
-   */
-  async function handlePaymentHistoryContext() {
-    try {
-      logger.info("🔄 Handling Payment History context");
-      LoaderManager.show();
-      LoaderManager.updateText("Checking loan access permissions...");
-
-      // Wait a bit for the page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Extract loan number using the new structure
-      LoaderManager.updateText("Extracting loan number...");
-      const loanNumber = extractLoanNumberDirectly();
-
-      if (!loanNumber) {
-        LoaderManager.updateText("Error: Loan number not found");
-        setTimeout(() => LoaderManager.hide(), 2000);
-        return;
-      }
-
-      // Check loan access
-      LoaderManager.updateText(`Verifying access for loan ${loanNumber}...`);
-      const allowedLoans = await checkNumbersBatch([loanNumber]);
-
-      if (!allowedLoans || allowedLoans.length === 0) {
-        LoaderManager.updateText("Access denied - Hiding restricted content...");
-        logger.debug(`🚫 Loan ${loanNumber} is restricted`);
-
-        // Hide content and show unauthorized message  
-        setTimeout(() => {
-          LoaderManager.hide();
-
-          // Hide only the contentmenu div which contains the loan information
-          const contentMenuDiv = document.querySelector('.contentmenu');
-          if (contentMenuDiv) {
-            // Create unauthorized message
-            const unauthorizedElement = createUnauthorizedElement();
-
-            // Insert the unauthorized message in place of the contentmenu div
-            if (contentMenuDiv.parentNode && unauthorizedElement) {
-              contentMenuDiv.parentNode.insertBefore(unauthorizedElement, contentMenuDiv);
-              contentMenuDiv.style.display = "none";
-              logger.info("✅ contentmenu div hidden and unauthorized message placed in its position in payment history context");
-            } else {
-              // Fallback: just hide the contentmenu div
-              contentMenuDiv.style.display = "none";
-              logger.info("✅ contentmenu div hidden successfully in payment history context");
-            }
-          } else {
-            logger.warn("⚠️ contentmenu div not found, falling back to full content hiding");
-            // Fallback: Hide all content if contentmenu div is not found
-            const allElements = document.querySelectorAll("body > *:not(script):not(style)");
-            allElements.forEach((element) => {
-              if (element && element.id !== "paymentHistoryLoader") {
-                element.style.display = "none";
-              }
-            });
-
-            // Show unauthorized message at body level as fallback
-            const unauthorizedElement = createUnauthorizedElement();
-            if (document.body) {
-              document.body.appendChild(unauthorizedElement);
-            }
-          }
-        }, 1000);
-      } else {
-        LoaderManager.updateText("Access granted");
-        logger.debug(`✅ Loan ${loanNumber} is authorized`);
-        setTimeout(() => LoaderManager.hide(), 1000);
-      }
-
-    } catch (error) {
-      logger.error("❌ Error in Payment History context handling:", error);
-      LoaderManager.updateText("Error occurred during access verification");
-      setTimeout(() => LoaderManager.hide(), 2000);
-    }
   }
 
   /**
@@ -2537,25 +2445,6 @@ async function initializeHomePageFilter() {
     });
   }
 
-  /**
-   * Wait for multiple elements to be present
-   */
-  function waitForElements(selectors, timeout = 10000) {
-    Logger.info(`🔍 Waiting for multiple elements: ${selectors.join(', ')}`);
-
-    const promises = selectors.map(selector =>
-      waitForElement(selector, timeout).catch(error => {
-        Logger.warn(`⚠️ Element not found: ${selector}`, error.message);
-        return null;
-      })
-    );
-
-    return Promise.all(promises);
-  }
-  /**
-   * Define the links that should be hidden
-   */
-
   // ########## END NAVIGATION CONTROL ##########
 
   /**
@@ -2652,53 +2541,6 @@ async function initializeHomePageFilter() {
       margin: 20px 0;
     `;
     return message;
-  }
-
-  /**
-   * Create loader to show when trying to establish connection with extension
-   */
-  function createLoader() {
-    Logger.info("🎨 Creating loader styles...");
-    const style = document.createElement("style");
-    style.textContent = `
-      #loaderOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(255, 255, 255, 0.95);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.3s ease;
-      }
-      .spinner {
-        width: 60px;
-        height: 60px;
-        border: 6px solid #ccc;
-        border-top-color: #2b6cb0;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      .loader-text {
-        color: #2b6cb0;
-        font-size: 16px;
-        font-weight: 500;
-        text-align: center;
-      }
-      @keyframes spin {
-        to {transform: rotate(360deg);}
-      }
-      #loaderOverlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-    `;
-    return style;
   }
 
   /**
@@ -3221,10 +3063,6 @@ async function initializeSearchInquiryFilter() {
     }
   }
 
-  function togglePageDisplay(val) {
-    document.body.style.display = val;
-  }
-
   /**
    * Create unallowed element to show when loan is not allowed
    */
@@ -3294,82 +3132,6 @@ async function initializeSearchInquiryFilter() {
 
     return [...new Set(matches)];
   }
-
-  /**
-   * Class to manage the visibility of table rows containing loan information
-   */
-  class TableRowFilter {
-    constructor(row) {
-      this.row = row;
-      this.parent = row.parentElement;
-      this.loanNumber = this.getLoanNumber();
-    }
-
-    getLoanNumber() {
-      if (!this.row.cells || this.row.cells.length === 0) {
-        return null;
-      }
-
-      const table = this.row.closest("table");
-      if (!table) {
-        return null;
-      }
-
-      const headerRow = table.querySelector("thead tr");
-      if (!headerRow) {
-        if (this.row.cells.length >= 3) {
-          return this.row.cells[2].textContent.trim();
-        }
-        return null;
-      }
-
-      // Find the index of the "Loan Number" column
-      let loanNumberIndex = -1;
-      const headerCells = headerRow.cells;
-      for (let i = 0; i < headerCells.length; i++) {
-        if (headerCells[i].textContent.trim() === "Loan Number") {
-          loanNumberIndex = i;
-          break;
-        }
-      }
-
-      if (loanNumberIndex !== -1 && this.row.cells.length > loanNumberIndex) {
-        return this.row.cells[loanNumberIndex].textContent.trim();
-      }
-
-      if (this.row.cells.length >= 3) {
-        return this.row.cells[2].textContent.trim();
-      }
-
-      return null;
-    }
-
-    async filter() {
-      if (!this.loanNumber) {
-        return false;
-      }
-
-      const isAllowed = await isLoanNumberAllowed(this.loanNumber);
-
-      if (!isAllowed) {
-        this.hide();
-        return true;
-      }
-
-      return false;
-    }
-
-    hide() {
-      if (this.parent && this.row) {
-        try {
-          this.row.style.display = "none";
-        } catch (error) {
-          console.error("[radian_filter] Error hiding row:", error);
-        }
-      }
-    }
-  }
-
   /**
    * Clear any existing restriction or no-results messages from the table
    */
@@ -3631,26 +3393,6 @@ async function initializeSearchInquiryFilter() {
     }
 
     return true;
-  }
-
-  /**
-   * Process generic elements that might contain loan information
-   */
-  async function processGenericElements() {
-    const potentialContainers = document.querySelectorAll(
-      '.sc-kXOizl, .sc-dJkDXt, [class*="loan"], [class*="borrower"]'
-    );
-
-    for (const container of potentialContainers) {
-      if (processedElements.has(container)) continue;
-      processedElements.add(container);
-
-      if (await shouldHideElement(container)) {
-        if (container.parentElement) {
-          container.parentElement.removeChild(container);
-        }
-      }
-    }
   }
 
   /**
@@ -4216,43 +3958,7 @@ async function initializeCancelMiFilter() {
     return unallowed;
   }
 
-  /**
-   * Create loader style
-   */
-  function createLoader() {
-    const style = document.createElement("style");
-    style.textContent = `
-      #loaderOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(255, 255, 255, 0.9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.3s ease;
-      }
-      .spinner {
-        width: 60px;
-        height: 60px;
-        border: 6px solid #ccc;
-        border-top-color: #2b6cb0;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-      @keyframes spin {
-        to {transform: rotate(360deg);}
-      }
-      #loaderOverlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-    `;
-    return style;
-  }
+  // Note: duplicate createLoader removed to use the shared implementation defined earlier
 
   /**
    * Create loader element
