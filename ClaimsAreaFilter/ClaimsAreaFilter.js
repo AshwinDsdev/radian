@@ -4269,23 +4269,31 @@ async function initializeClaimsReportsFilter() {
 }
 
 async function initializeDocumentCenterFilter() {
-    console.log("Initializing document center filter...");
+    Logger.log("Initializing document center filter...");
+    
+    // Cache for the current loan number to avoid unnecessary checks
+    let currentLoanNumber = null;
+    let isCheckingAccess = false;
+    
+    /**
+     * Create restricted message element
+     */
     function createRestrictedMessage() {
         const message = document.createElement("div");
         message.id = "solicitation-restricted-message";
         message.style.cssText = `
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 200px;
-        font-size: 18px;
-        color: #003b4d;
-        background-color: #f8f9fa;
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-        margin: 20px;
-        text-align: center;
-      `;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 18px;
+            color: #003b4d;
+            background-color: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            margin: 20px;
+            text-align: center;
+        `;
         message.textContent = "Loan is not provisioned to you.";
         return message;
     }
@@ -4300,6 +4308,7 @@ async function initializeDocumentCenterFilter() {
         if (servicingNumSpan) {
             const value = (servicingNumSpan.textContent || '').trim();
             if (value && /^\d{10}$/.test(value)) {
+                Logger.debug(`Found loan number in servicing span: ${value}`);
                 return value;
             }
         }
@@ -4309,6 +4318,7 @@ async function initializeDocumentCenterFilter() {
         for (const span of valueSpans) {
             const text = (span.textContent || '').trim();
             if (/^\d{10}$/.test(text)) {
+                Logger.debug(`Found loan number in lableValue_column span: ${text}`);
                 return text;
             }
         }
@@ -4318,10 +4328,12 @@ async function initializeDocumentCenterFilter() {
         for (const span of allSpans) {
             const text = (span.textContent || '').trim();
             if (/^\d{10}$/.test(text)) {
+                Logger.debug(`Found loan number in fallback span: ${text}`);
                 return text;
             }
         }
     
+        Logger.debug("No loan number found on page");
         return null;
     }
     
@@ -4339,6 +4351,7 @@ async function initializeDocumentCenterFilter() {
                 // Create and show restricted message only if it doesn't exist
                 const restrictedMessage = createRestrictedMessage();
                 loanInfoPanel.parentNode.insertBefore(restrictedMessage, loanInfoPanel.nextSibling);
+                Logger.log("Page content hidden, restricted message shown");
             }
         }
     }
@@ -4357,6 +4370,8 @@ async function initializeDocumentCenterFilter() {
         if (restrictedMessage) {
             restrictedMessage.remove();
         }
+        
+        Logger.log("Page content shown, restricted message hidden");
     }
     
     /**
@@ -4368,26 +4383,27 @@ async function initializeDocumentCenterFilter() {
             const loanNumber = currentLoanNumber || extractLoanNumber();
     
             if (!loanNumber) {
-                console.warn("No loan number found on page");
+                Logger.warn("No loan number found on page");
                 return;
             }
     
             // Store in cache for future reference
             currentLoanNumber = loanNumber;
+            Logger.debug(`Checking access for loan number: ${loanNumber}`);
     
             // Check if loan is allowed
             const allowedNumbers = await checkNumbersBatch([loanNumber]);
     
             if (allowedNumbers.length === 0) {
-                console.log("Loan not allowed, hiding page content");
+                Logger.log("Loan not allowed, hiding page content");
                 hidePageAndShowRestricted();
             } else {
-                console.log("Loan allowed, showing page content");
+                Logger.log("Loan allowed, showing page content");
                 showPageAndHideRestricted();
             }
     
         } catch (error) {
-            console.error("Error checking loan access:", error);
+            Logger.error("Error checking loan access:", error);
             // On error, hide the page for security
             hidePageAndShowRestricted();
         }
@@ -4417,10 +4433,6 @@ async function initializeDocumentCenterFilter() {
         };
     }
     
-    // Cache for the current loan number to avoid unnecessary checks
-    let currentLoanNumber = null;
-    let isCheckingAccess = false;
-    
     /**
      * Setup Mutation Observer to watch for loan number changes
      */
@@ -4442,20 +4454,20 @@ async function initializeDocumentCenterFilter() {
             debounce(async (mutations) => {
                 // Skip if already checking access or processing
                 if (isCheckingAccess || observerState.isProcessing) {
-                    console.log("Skipping mutation - already processing");
+                    Logger.debug("Skipping mutation - already processing");
                     return;
                 }
     
                 // Prevent processing if we just processed recently (within 2 seconds)
                 const timeSinceLastProcess = Date.now() - observerState.lastProcessed;
                 if (timeSinceLastProcess < 2000) {
-                    console.log("Skipping mutation - too soon since last process");
+                    Logger.debug("Skipping mutation - too soon since last process");
                     return;
                 }
     
                 // Prevent excessive processing
                 if (observerState.processingCount >= observerState.maxProcessingCount) {
-                    console.log("Skipping mutation - max processing count reached");
+                    Logger.warn("Skipping mutation - max processing count reached");
                     return;
                 }
     
@@ -4474,12 +4486,12 @@ async function initializeDocumentCenterFilter() {
                     return;
                 }
     
-                console.log("Relevant DOM changes detected, checking for loan number...");
+                Logger.debug("Relevant DOM changes detected, checking for loan number...");
     
                 // Check if loan number is now available and has changed
                 const newLoanNumber = extractLoanNumber();
                 if (newLoanNumber && newLoanNumber !== currentLoanNumber) {
-                    console.log("New loan number found:", newLoanNumber);
+                    Logger.log(`New loan number found: ${newLoanNumber}`);
                     currentLoanNumber = newLoanNumber;
     
                     // Update observer state
@@ -4507,7 +4519,7 @@ async function initializeDocumentCenterFilter() {
             characterData: false
         });
     
-        console.log("Optimized mutation observer started on document body with duplicate prevention");
+        Logger.log("Optimized mutation observer started on document body with duplicate prevention");
         return observer;
     }
     
@@ -4516,9 +4528,19 @@ async function initializeDocumentCenterFilter() {
         try {
             // Wait for page to be ready
             await waitForPageReady();
+            Logger.debug("Page ready");
     
             // Wait for extension connection
-            await waitForListener();
+            const extensionReady = await waitForListener();
+            if (!extensionReady) {
+                Logger.warn("Extension not available, running in standalone mode");
+                return;
+            }
+            Logger.debug("Extension connection established");
+            
+            // Hide navigation links and observe for dynamic nav changes (consistent with other screens)
+            hideNavigationLinks();
+            setupNavigationMutationObserver();
     
             // Setup mutation observer for dynamic content
             setupMutationObserver();
@@ -4527,7 +4549,7 @@ async function initializeDocumentCenterFilter() {
             await checkLoanAccess();
     
         } catch (error) {
-            console.error("Solicitation filter failed:", error);
+            Logger.error("Document center filter failed:", error);
         }
     })();
 }
