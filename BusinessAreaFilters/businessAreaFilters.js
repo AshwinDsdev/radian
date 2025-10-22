@@ -3140,25 +3140,27 @@ async function initializeSearchInquiryFilter() {
   function clearExistingMessages(tbody) {
     if (!tbody) return;
 
-    const existingMessages = tbody.querySelectorAll('tr td[colspan]');
-    existingMessages.forEach(td => {
-      const text = td.textContent.trim();
-      if (text === "No results found." ||
-        text === "You are not provisioned to see the restricted loan" ||
-        text.includes("not provisioned") ||
-        text.includes("restricted loan")) {
-        const row = td.closest('tr');
-        if (row && row.parentNode === tbody) {
-          try {
-            row.remove();
-            console.log("[radian_filter] clearExistingMessages: Removed existing message:", text);
-          } catch (e) {
-            console.log("[radian_filter] clearExistingMessages: Safe removal failed, using display none");
+    // Use a safer approach to find and hide message rows
+    // This avoids direct DOM manipulation that conflicts with React
+    try {
+      const existingMessages = tbody.querySelectorAll('tr td[colspan]');
+      existingMessages.forEach(td => {
+        const text = td.textContent.trim();
+        if (text === "No results found." ||
+          text === "You are not provisioned to see the restricted loan" ||
+          text.includes("not provisioned") ||
+          text.includes("restricted loan")) {
+          const row = td.closest('tr');
+          if (row) {
+            // Don't remove nodes - just hide them to avoid React conflicts
             row.style.display = 'none';
+            console.log("[radian_filter] clearExistingMessages: Hidden existing message:", text);
           }
         }
-      }
-    });
+      });
+    } catch (e) {
+      console.log("[radian_filter] clearExistingMessages: Error handling messages:", e);
+    }
   }
 
   /**
@@ -3247,18 +3249,21 @@ async function initializeSearchInquiryFilter() {
 
     // If all rows are hidden, show appropriate message
     if (actualDisplayedRows === 0) {
-      // Safely remove all rows first
+      // Use safer method to clear table contents - avoid direct DOM manipulation
       try {
-        while (tbody.firstChild) {
-          if (tbody.firstChild.parentNode === tbody) {
-            tbody.removeChild(tbody.firstChild);
-          } else {
-            break; // Exit if node is no longer a child
-          }
-        }
+        // Use display:none instead of removing nodes to avoid React conflicts
+        originalRows.forEach(row => {
+          row.style.display = "none";
+        });
+        
+        // Clear any existing messages safely
+        const existingMessages = tbody.querySelectorAll('tr td[colspan]');
+        existingMessages.forEach(td => {
+          const row = td.closest('tr');
+          if (row) row.style.display = "none";
+        });
       } catch (e) {
-        console.log("[radian_filter] Safe row removal failed, using innerHTML clear");
-        tbody.innerHTML = '';
+        console.log("[radian_filter] Safe row hiding failed:", e);
       }
 
       if (dataRowsCount === 1 && dataRowsRemoved === 1) {
