@@ -1,3 +1,5 @@
+//Radian - MI BUSINESS AREA CODE
+
 /*!
  * @Portal : Radian
  * @Bussiness Area: MI
@@ -5,8 +7,8 @@
  * @Author : Rohith Kandikattu
  * @Group : Accelirate
  * @Owner : Cenlar
- * @LastModified : October-10th-2025
- * @Version : 1.0.10
+ * @LastModified : October-17th-2025
+ * @Version : 1.0.11
  */
 
 // ########## EXTENSION CONFIGURATION ##########
@@ -3146,9 +3148,14 @@ async function initializeSearchInquiryFilter() {
         text.includes("not provisioned") ||
         text.includes("restricted loan")) {
         const row = td.closest('tr');
-        if (row) {
-          row.remove();
-          console.log("[radian_filter] clearExistingMessages: Removed existing message:", text);
+        if (row && row.parentNode === tbody) {
+          try {
+            row.remove();
+            console.log("[radian_filter] clearExistingMessages: Removed existing message:", text);
+          } catch (e) {
+            console.log("[radian_filter] clearExistingMessages: Safe removal failed, using display none");
+            row.style.display = 'none';
+          }
         }
       }
     });
@@ -3240,9 +3247,18 @@ async function initializeSearchInquiryFilter() {
 
     // If all rows are hidden, show appropriate message
     if (actualDisplayedRows === 0) {
-      // Remove all rows first
-      while (tbody.firstChild) {
-        tbody.removeChild(tbody.firstChild);
+      // Safely remove all rows first
+      try {
+        while (tbody.firstChild) {
+          if (tbody.firstChild.parentNode === tbody) {
+            tbody.removeChild(tbody.firstChild);
+          } else {
+            break; // Exit if node is no longer a child
+          }
+        }
+      } catch (e) {
+        console.log("[radian_filter] Safe row removal failed, using innerHTML clear");
+        tbody.innerHTML = '';
       }
 
       if (dataRowsCount === 1 && dataRowsRemoved === 1) {
