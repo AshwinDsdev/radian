@@ -3446,9 +3446,8 @@ async function initializeSearchInquiryFilter() {
         return;
       }
 
-      // Prevent processing if we just processed recently (within 3 seconds)
       const timeSinceLastProcess = Date.now() - observerState.lastProcessed;
-      if (timeSinceLastProcess < 3000) {
+      if (timeSinceLastProcess < 5000) {
         console.log("[radian_filter] MutationObserver: Skipping - too soon since last process");
         return;
       }
@@ -3561,7 +3560,7 @@ async function initializeSearchInquiryFilter() {
       }
 
       if (shouldProcess) {
-        const delay = newTableDetected ? 1500 : 500; // Longer delay to prevent flickering
+        const delay = newTableDetected ? 2000 : 1000;
 
         observerState.processingDebounce = setTimeout(async () => {
           // Check if table content has actually changed
